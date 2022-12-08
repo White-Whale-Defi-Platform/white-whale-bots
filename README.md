@@ -1,1 +1,1 @@
-# bot-example
+# migaloo-bots-public
