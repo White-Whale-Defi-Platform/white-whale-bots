@@ -1,0 +1,107 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "jsx": true,
+    "useJSXTextNode": true,
+    "ecmaVersion": 2018,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "plugins": [
+    "@typescript-eslint",
+    "@typescript-eslint/eslint-plugin",
+    "prettier",
+    "simple-import-sort",
+    "jsdoc",
+    "promise",
+    "unused-imports"
+  ],
+  "extends": [
+    "plugin:@typescript-eslint/recommended",
+    "plugin:prettier/recommended",
+    "prettier",
+    "eslint:recommended"
+  ],
+  "rules": {
+    "prettier/prettier": [
+      "warn",
+      {
+        "semi": true,
+        "trailingComma": "all",
+        "singleQuote": false,
+        "printWidth": 120,
+        "tabWidth": 4,
+        "useTabs": true
+      }
+    ],
+    "@typescript-eslint/array-type": [
+      "warn",
+      {
+        "default": "generic",
+        "readonly": "generic"
+      }
+    ],
+    "@typescript-eslint/no-unused-vars": "off",
+    "@typescript-eslint/explicit-function-return-type": "off",
+    "@typescript-eslint/no-namespace": "off",
+    "@typescript-eslint/no-non-null-assertion": "off",
+    "@typescript-eslint/no-empty-function": "warn",
+    "@typescript-eslint/no-floating-promises": "error",
+    "@typescript-eslint/ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": "allow-with-description",
+        "minimumDescriptionLength": 10
+      }
+    ],
+    "simple-import-sort/imports": "error",
+    "simple-import-sort/exports": "error",
+    "prefer-const": [
+      "warn",
+      {
+        "destructuring": "all"
+      }
+    ],
+    "no-undef-init": "error",
+    "jsdoc/require-jsdoc": [
+      "error",
+      {
+        "publicOnly": false,
+        "require": {
+          "ArrowFunctionExpression": true,
+          "ClassDeclaration": true,
+          "ClassExpression": true,
+          "FunctionDeclaration": true,
+          "FunctionExpression": true,
+          "MethodDefinition": true
+        }
+      }
+    ],
+    "jsdoc/require-returns-description": [
+      "error",
+      {}
+    ],
+    "jsdoc/require-description-complete-sentence": [
+      "error"
+    ],
+    "jsdoc/require-param-type": "off",
+    "jsdoc/require-returns-type": "off",
+    "promise/catch-or-return": "error",
+    "promise/no-return-wrap": "error",
+    "promise/param-names": "error",
+    "promise/always-return": "error",
+    "promise/no-nesting": "error",
+    "promise/no-new-statics": "error",
+    "promise/valid-params": "error",
+    "promise/prefer-await-to-then": "error",
+    "promise/prefer-await-to-callbacks": "error",
+    "no-undef": "off",
+    "no-redeclare": "off",
+    "no-unused-vars": "off",
+    "require-atomic-updates": "off",
+    "no-constant-condition": "off",
+    "no-mixed-spaces-and-tabs": "off",
+    "eol-last": "error",
+    "unused-imports/no-unused-imports": "error"
+  }
+}
