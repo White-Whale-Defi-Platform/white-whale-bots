@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: I want help using White Whale's bots
+    url: https://discordapp.com/channels/908044702794801233/987301947440767006
+    about: Ask your questions about how to use a particular piece of our infrastructure in your dapp or bots.
