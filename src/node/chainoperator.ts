@@ -4,6 +4,8 @@ import { GasPrice, QueryClient, setupAuthExtension } from "@cosmjs/stargate";
 import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
 import { HttpBatchClient, HttpClient } from "@cosmjs/tendermint-rpc/build/rpcclients";
 
+import { BotConfig } from "../types/core/botConfig";
+
 export type BotClients = {
 	SigningCWClient: SigningCosmWasmClient; //used to sign transactions
 	TMClient: Tendermint34Client; //used to broadcast transactions
@@ -19,15 +21,15 @@ export type BotClients = {
  * @param gasPrice The gas price to sign txs with.
  * @returns A connected RPC sender + querier, along with the account to sign with.
  */
-export async function getChainOperator(rpcUrl: string, mnemonic: string, walletPrefix: string, gasPrice: GasPrice) {
+export async function getChainOperator(botConfig: BotConfig) {
 	// derive signing wallet
-	const signer = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, { prefix: walletPrefix });
+	const signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, { prefix: botConfig.chainPrefix });
 	// connect to client and querier
-	const cwClient = await SigningCosmWasmClient.connectWithSigner(rpcUrl, signer, {
-		prefix: walletPrefix,
-		gasPrice,
+	const cwClient = await SigningCosmWasmClient.connectWithSigner(botConfig.rpcUrl, signer, {
+		prefix: botConfig.chainPrefix,
+		gasPrice: GasPrice.fromString(botConfig.gasPrice + botConfig.baseDenom),
 	});
-	const httpClient = new HttpBatchClient(rpcUrl);
+	const httpClient = new HttpBatchClient(botConfig.rpcUrl);
 	const tmClient = await Tendermint34Client.create(httpClient);
 	const queryClient = QueryClient.withExtensions(tmClient, setupWasmExtension, setupAuthExtension);
 

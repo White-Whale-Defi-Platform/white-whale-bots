@@ -71,7 +71,7 @@ export async function getPoolStates(botClients: BotClients, pools: Array<Pool>) 
  */
 export async function initPools(
 	client: QueryClient & WasmExtension,
-	poolAddresses: Array<{ pool: string; fee: number }>,
+	poolAddresses: Array<{ pool: string; inputfee: number; outputfee: number }>,
 	factoryMapping: Array<{ factory: string; router: string }>,
 ): Promise<Array<Pool>> {
 	const pools: Array<Pool> = [];
@@ -92,7 +92,8 @@ export async function initPools(
 				totalShare: poolState.total_share,
 				address: poolAddress.pool,
 				type: "default",
-				fee: poolAddress.fee,
+				inputfee: poolAddress.inputfee,
+				outputfee: poolAddress.outputfee,
 				factoryAddress: factory ?? "",
 				routerAddress: router ?? "",
 			});
@@ -116,7 +117,8 @@ export async function initPools(
 
 				address: poolAddress.pool,
 				type: "junoswap",
-				fee: poolAddress.fee,
+				inputfee: poolAddress.inputfee,
+				outputfee: poolAddress.outputfee,
 				factoryAddress: factory ?? "",
 				routerAddress: router ?? "",
 			});
