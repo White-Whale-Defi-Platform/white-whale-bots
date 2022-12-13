@@ -41,6 +41,7 @@ export class MempoolLoop {
 		| {
 				path: Path;
 				offerAsset: Asset;
+				profit: number;
 		  }
 		| undefined;
 	updateStateFunction: (botClients: BotClients, pools: Array<Pool>) => void;
@@ -55,7 +56,7 @@ export class MempoolLoop {
 			paths: Array<Path>,
 			offerAssetInfo: AssetInfo,
 			[minProfit2Hop, minProfit3Hop]: [number, number],
-		) => { path: Path; offerAsset: Asset } | undefined,
+		) => { path: Path; offerAsset: Asset; profit: number } | undefined,
 		updateState: (botclients: BotClients, pools: Array<Pool>) => void,
 		messageFunction: (path: Path, walletAddress: string, offerAsset0: Asset) => [Array<EncodeObject>, number],
 		botClients: BotClients,
@@ -172,7 +173,8 @@ export class MempoolLoop {
 		const sendResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
 		console.log(sendResult);
 		this.sequence += 1;
-		await delay(3000);
+		await delay(5000);
+		await this.fetchRequiredChainData();
 	}
 }
 

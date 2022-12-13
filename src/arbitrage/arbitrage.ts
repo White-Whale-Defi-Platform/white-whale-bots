@@ -9,7 +9,7 @@ export function trySomeArb(
 	paths: Array<Path>,
 	offerAssetInfo: AssetInfo,
 	[minProfit2Hop, minProfit3Hop]: [number, number],
-): { path: Path; offerAsset: Asset } | undefined {
+): { path: Path; offerAsset: Asset; profit: number } | undefined {
 	const [path, tradesize, profit] = getOptimalTrade(paths, offerAssetInfo);
 
 	if (path === undefined) {
@@ -35,7 +35,7 @@ export function trySomeArb(
 					);
 				});
 			const offerAsset: Asset = { amount: String(tradesize), info: offerAssetInfo };
-			return { path: path, offerAsset: offerAsset };
+			return { path, offerAsset, profit };
 		}
 	}
 }
