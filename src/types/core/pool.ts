@@ -27,7 +27,8 @@ export interface Pool {
 	address: string;
 
 	type: string;
-	fee: number;
+	inputfee: number;
+	outputfee: number;
 	factoryAddress: string;
 	routerAddress: string;
 }
@@ -36,22 +37,27 @@ export interface Pool {
  *
  */
 export function outGivenIn(pool: Pool, inputAsset: Asset): [number, AssetInfo] {
-	const SWAP_FEE = pool.fee / 100;
+	const outputfee = 1 - pool.outputfee / 100;
+	const inputfee = 1 - pool.inputfee / 100;
 	if (isMatchingAssetInfos(pool.assets[0].info, inputAsset.info)) {
 		// asset[0] from pool is inputasset
 
 		return [
 			Math.floor(
-				(1 - SWAP_FEE) *
-					((+pool.assets[1].amount * +inputAsset.amount) / (+pool.assets[0].amount + +inputAsset.amount)),
+				inputfee *
+					outputfee *
+					((+pool.assets[1].amount * +inputAsset.amount) /
+						(+pool.assets[0].amount + inputfee * +inputAsset.amount)),
 			),
 			pool.assets[1].info,
 		];
 	} else {
 		return [
 			Math.floor(
-				(1 - SWAP_FEE) *
-					((+pool.assets[0].amount * +inputAsset.amount) / (+pool.assets[1].amount + +inputAsset.amount)),
+				inputfee *
+					outputfee *
+					((+pool.assets[0].amount * +inputAsset.amount) /
+						(+pool.assets[1].amount + inputfee * +inputAsset.amount)),
 			),
 			pool.assets[0].info,
 		];

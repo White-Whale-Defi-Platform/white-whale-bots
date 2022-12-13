@@ -28,8 +28,8 @@ function getTradesizeAndProfitForPath(path: Path, offerAssetInfo: AssetInfo): [n
 		const in1 = +inAsset1.amount;
 		const out1 = +outAsset1.amount;
 
-		const pool0fee = path.pools[0].fee / 100;
-		const pool1fee = path.pools[1].fee / 100;
+		const pool0fee = Math.max(path.pools[0].outputfee, path.pools[0].inputfee) / 100;
+		const pool1fee = Math.max(path.pools[1].outputfee, path.pools[1].inputfee) / 100;
 		const x1 =
 			(in0 * in1 - Math.sqrt(((pool0fee - 1) * pool1fee - pool0fee + 1) * in0 * in1 * out1 * out0)) /
 			((pool0fee - 1) * out0 - in1);
@@ -55,9 +55,9 @@ function getTradesizeAndProfitForPath(path: Path, offerAssetInfo: AssetInfo): [n
 		const in2 = +inAsset2.amount;
 		const out2 = +outAsset2.amount;
 
-		const pool0fee = path.pools[0].fee / 100;
-		const pool1fee = path.pools[1].fee / 100;
-		const pool2fee = path.pools[2].fee / 100;
+		const pool0fee = Math.max(path.pools[0].outputfee, path.pools[0].inputfee) / 100;
+		const pool1fee = Math.max(path.pools[1].outputfee, path.pools[1].inputfee) / 100;
+		const pool2fee = Math.max(path.pools[2].outputfee, path.pools[2].inputfee) / 100;
 		const x1 =
 			-(
 				in0 * in1 * in2 +
