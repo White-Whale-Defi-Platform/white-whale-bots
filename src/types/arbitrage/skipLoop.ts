@@ -11,7 +11,7 @@ import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { sendSlackMessage } from "../../logging/slacklogger";
 import { BotClients } from "../../node/chainoperator";
 import { SkipResult } from "../../node/skipclients";
-import { Asset, AssetInfo } from "../core/asset";
+import { Asset, AssetInfo, isNativeAsset } from "../core/asset";
 import { MempoolTrade, processMempool } from "../core/mempool";
 import { Path } from "../core/path";
 import { applyMempoolTradesOnPools, Pool } from "../core/pool";
@@ -98,10 +98,12 @@ export class SkipLoop extends MempoolLoop {
 	private async skipTrade(arbTrade: { path: Path; offerAsset: Asset; profit: number }, toArbTrade: MempoolTrade) {
 		const bidMsg: MsgSend = MsgSend.fromJSON({
 			fromAddress: this.account.address,
-			toAddress: "juno10g0l3hd9sau3vnjrayjhergcpxemucxcspgnn4",
+			toAddress: this.skipBidWallet,
 			amount: [
 				{
-					denom: "ujuno",
+					denom: isNativeAsset(this.offerAssetInfo)
+						? this.offerAssetInfo.native_token.denom
+						: this.offerAssetInfo.token.contract_addr,
 					amount: String(Math.max(Math.round(arbTrade.profit * 0.1), 651)),
 				},
 			],
@@ -114,7 +116,7 @@ export class SkipLoop extends MempoolLoop {
 		const signerData: SignerData = {
 			accountNumber: this.accountNumber,
 			sequence: this.sequence,
-			chainId: "juno-1",
+			chainId: this.chainid,
 		};
 		const [msgs, nrOfWasms] = this.messageFunction(arbTrade.path, this.account.address, arbTrade.offerAsset);
 		msgs.push(bidMsgEncodedObject);
