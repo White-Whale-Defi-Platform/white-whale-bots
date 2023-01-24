@@ -142,10 +142,6 @@ export function getOptimalTradeForPath(path: Path, offerAssetInfo: AssetInfo): [
 	let offerAssetNext = offerAssetInfo;
 	for (let i = 0; i < path.pools.length; i++) {
 		const [inAsset, outAsset] = getAssetsOrder(path.pools[i], offerAssetNext) ?? [];
-		if (outAsset === undefined) {
-			console.log(inAsset, outAsset);
-			console.log(path.pools[i], path.pools[i].assets[0].info, path.pools[i].assets[1].info, offerAssetNext);
-		}
 		offerAssetNext = outAsset.info;
 		assetBalances.push([+inAsset.amount, +outAsset.amount]);
 	}
