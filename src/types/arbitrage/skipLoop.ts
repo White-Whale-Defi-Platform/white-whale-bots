@@ -104,7 +104,7 @@ export class SkipLoop extends MempoolLoop {
 					denom: isNativeAsset(this.offerAssetInfo)
 						? this.offerAssetInfo.native_token.denom
 						: this.offerAssetInfo.token.contract_addr,
-					amount: String(Math.max(Math.round(arbTrade.profit * 0.1), 651)),
+					amount: String(Math.max(Math.round(arbTrade.profit * this.skipBidRate), 651)),
 				},
 			],
 		});
