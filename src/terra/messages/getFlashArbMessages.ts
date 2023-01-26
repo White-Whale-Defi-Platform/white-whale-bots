@@ -13,7 +13,11 @@ import { InnerSwapMessage, JunoSwapMessage, SwapMessage } from "../../types/mess
 /**
  *
  */
-export function getFlashArbMessages(arbTrade: OptimalTrade, walletAddress: string): [Array<EncodeObject>, number] {
+export function getFlashArbMessages(
+	arbTrade: OptimalTrade,
+	walletAddress: string,
+	flashloancontract: string,
+): [Array<EncodeObject>, number] {
 	let flashLoanMessage: FlashLoanMessage;
 	if (arbTrade.path.pools.length == 3) {
 		flashLoanMessage = getFlashArbMessages3Hop(arbTrade.path, arbTrade.offerAsset);
@@ -24,7 +28,7 @@ export function getFlashArbMessages(arbTrade: OptimalTrade, walletAddress: strin
 		typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
 		value: MsgExecuteContract.fromPartial({
 			sender: walletAddress,
-			contract: "terra1c8tpvta3umr4mpufvxmq39gyuw2knpyxyfgq8thpaeyw2r6a80qsg5wa00",
+			contract: flashloancontract,
 			msg: toUtf8(JSON.stringify(flashLoanMessage)),
 			funds: [],
 		}),

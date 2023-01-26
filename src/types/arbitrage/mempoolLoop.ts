@@ -1,12 +1,11 @@
 import { AccountData } from "@cosmjs/amino";
 import { EncodeObject } from "@cosmjs/proto-signing";
-import { StdFee } from "@cosmjs/stargate";
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { BotClients } from "../../node/chainoperator";
-import { AssetInfo } from "../core/asset";
+import { BotConfig } from "../core/botConfig";
 import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../core/mempool";
 import { Path } from "../core/path";
 import { applyMempoolTradesOnPools, Pool } from "../core/pool";
@@ -22,10 +21,7 @@ export class MempoolLoop {
 	accountNumber = 0;
 	sequence = 0;
 	chainid = "";
-	offerAssetInfo: AssetInfo;
-	minProfits: [number, number];
-	tx_fees!: [StdFee, StdFee];
-
+	botConfig: BotConfig;
 	// CACHE VALUES
 	totalBytes = 0;
 	mempool!: Mempool;
@@ -34,30 +30,29 @@ export class MempoolLoop {
 	/**
 	 *
 	 */
-	arbitrageFunction: (
-		paths: Array<Path>,
-		offerAssetInfo: AssetInfo,
-		[minProfit2Hop, minProfit3Hop]: [number, number],
-	) => OptimalTrade | undefined;
+	arbitrageFunction: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined;
 	updateStateFunction: (botClients: BotClients, pools: Array<Pool>) => void;
-	messageFunction: (arbTrade: OptimalTrade, walletAddress: string) => [Array<EncodeObject>, number];
+	messageFunction: (
+		arbTrade: OptimalTrade,
+		walletAddress: string,
+		flashloancontract: string,
+	) => [Array<EncodeObject>, number];
 	/**
 	 *
 	 */
 	public constructor(
 		pools: Array<Pool>,
 		paths: Array<Path>,
-		arbitrage: (
-			paths: Array<Path>,
-			offerAssetInfo: AssetInfo,
-			[minProfit2Hop, minProfit3Hop]: [number, number],
-		) => OptimalTrade | undefined,
+		arbitrage: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined,
 		updateState: (botclients: BotClients, pools: Array<Pool>) => void,
-		messageFunction: (arbTrade: OptimalTrade, walletAddress: string) => [Array<EncodeObject>, number],
+		messageFunction: (
+			arbTrade: OptimalTrade,
+			walletAddress: string,
+			flashloancontract: string,
+		) => [Array<EncodeObject>, number],
 		botClients: BotClients,
 		account: AccountData,
-		offerAssetInfo: AssetInfo,
-		[minProfit2Hop, minProfit3Hop]: [number, number],
+		botConfig: BotConfig,
 	) {
 		this.pools = pools;
 		this.paths = paths;
@@ -66,7 +61,7 @@ export class MempoolLoop {
 		this.messageFunction = messageFunction;
 		this.botClients = botClients;
 		this.account = account;
-		(this.offerAssetInfo = offerAssetInfo), (this.minProfits = [minProfit2Hop, minProfit3Hop]);
+		this.botConfig = botConfig;
 	}
 	/**
 	 *
@@ -79,12 +74,7 @@ export class MempoolLoop {
 		const chainId = await this.botClients.SigningCWClient.getChainId();
 		this.chainid = chainId;
 	}
-	/**
-	 *
-	 */
-	public setGasFees(tx_fees: [StdFee, StdFee]) {
-		this.tx_fees = tx_fees;
-	}
+
 	/**
 	 *
 	 */
@@ -92,11 +82,7 @@ export class MempoolLoop {
 		this.iterations++;
 		this.updateStateFunction(this.botClients, this.pools);
 
-		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(
-			this.paths,
-			this.offerAssetInfo,
-			this.minProfits,
-		);
+		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
 		if (arbTrade) {
 			await this.trade(arbTrade);
@@ -122,7 +108,7 @@ export class MempoolLoop {
 				applyMempoolTradesOnPools(this.pools, mempoolTrades);
 			}
 
-			const arbTrade = this.arbitrageFunction(this.paths, this.offerAssetInfo, this.minProfits);
+			const arbTrade = this.arbitrageFunction(this.paths, this.botConfig);
 
 			if (arbTrade) {
 				await this.trade(arbTrade);
@@ -142,7 +128,11 @@ export class MempoolLoop {
 	 *
 	 */
 	private async trade(arbTrade: OptimalTrade) {
-		const [msgs, nrOfMessages] = this.messageFunction(arbTrade, this.account.address);
+		const [msgs, nrOfMessages] = this.messageFunction(
+			arbTrade,
+			this.account.address,
+			this.botConfig.flashloanRouterAddress,
+		);
 		console.log(msgs);
 		const signerData = {
 			accountNumber: this.accountNumber,
@@ -150,7 +140,7 @@ export class MempoolLoop {
 			chainId: this.chainid,
 		};
 
-		const GAS_FEE = nrOfMessages === 2 ? this.tx_fees[0] : this.tx_fees[1];
+		const GAS_FEE = nrOfMessages === 2 ? this.botConfig.txFee2Hop : this.botConfig.txFee3Hop;
 
 		// sign, encode and broadcast the transaction
 		const txRaw = await this.botClients.SigningCWClient.sign(
