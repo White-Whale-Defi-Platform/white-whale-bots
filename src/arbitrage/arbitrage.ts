@@ -2,6 +2,11 @@ import { Asset, AssetInfo, isNativeAsset } from "./../types/core/asset";
 import { Path } from "./../types/core/path";
 import { getOptimalTrade } from "./optimizers/analyticalOptimizer";
 
+export interface OptimalTrade {
+	offerAsset: Asset;
+	profit: number;
+	path: Path;
+}
 /**
  *
  */
@@ -9,7 +14,7 @@ export function trySomeArb(
 	paths: Array<Path>,
 	offerAssetInfo: AssetInfo,
 	[minProfit2Hop, minProfit3Hop]: [number, number],
-): { path: Path; offerAsset: Asset; profit: number } | undefined {
+): OptimalTrade | undefined {
 	const [path, tradesize, profit] = getOptimalTrade(paths, offerAssetInfo);
 
 	if (path === undefined) {
