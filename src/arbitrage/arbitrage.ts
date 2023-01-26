@@ -1,4 +1,5 @@
-import { Asset, AssetInfo, isNativeAsset } from "./../types/core/asset";
+import { BotConfig } from "../types/core/botConfig";
+import { Asset, isNativeAsset } from "./../types/core/asset";
 import { Path } from "./../types/core/path";
 import { getOptimalTrade } from "./optimizers/analyticalOptimizer";
 
@@ -10,17 +11,13 @@ export interface OptimalTrade {
 /**
  *
  */
-export function trySomeArb(
-	paths: Array<Path>,
-	offerAssetInfo: AssetInfo,
-	[minProfit2Hop, minProfit3Hop]: [number, number],
-): OptimalTrade | undefined {
-	const [path, tradesize, profit] = getOptimalTrade(paths, offerAssetInfo);
+export function trySomeArb(paths: Array<Path>, botConfig: BotConfig): OptimalTrade | undefined {
+	const [path, tradesize, profit] = getOptimalTrade(paths, botConfig.offerAssetInfo);
 
 	if (path === undefined) {
 		return undefined;
 	} else {
-		const minProfit = path.pools.length == 2 ? minProfit2Hop : minProfit3Hop;
+		const minProfit = path.pools.length == 2 ? botConfig.profitThreshold2Hop : botConfig.profitThreshold3Hop;
 		if (profit * 0.997 < minProfit) {
 			return undefined;
 		} else {
@@ -39,7 +36,7 @@ export function trySomeArb(
 						pool.assets[1].amount,
 					);
 				});
-			const offerAsset: Asset = { amount: String(tradesize), info: offerAssetInfo };
+			const offerAsset: Asset = { amount: String(tradesize), info: botConfig.offerAssetInfo };
 			return { path, offerAsset, profit };
 		}
 	}
