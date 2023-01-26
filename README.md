@@ -18,7 +18,7 @@
 [Twitter badge]: https://twitter.com/intent/follow?screen_name=WhiteWhaleDefi
 
 # Migaloo Bots Repository
-This repository contains the code for the open-sourced arbitrage bots as part of the White Whale Migaloo Project. To get started on using the bots, please see the [docs](https://ww0-1.gitbook.io/migaloo-docs/).
+This repository contains the code for the open-sourced arbitrage bots as part of the White Whale Migaloo Project. To get started on using the bots, please see the [docs](https://docs.whitewhale.money/migaloo-docs/).
 The other repositories that are part of the Migaloo Project:
 - [Migaloo Docs](https://github.com/White-Whale-Defi-Platform/migaloo-docs/)
 - [Migaloo Smart Contracts](https://github.com/White-Whale-Defi-Platform/migaloo-core/)
