@@ -4,8 +4,9 @@ import { StdFee } from "@cosmjs/stargate";
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
+import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { BotClients } from "../../node/chainoperator";
-import { Asset, AssetInfo } from "../core/asset";
+import { AssetInfo } from "../core/asset";
 import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../core/mempool";
 import { Path } from "../core/path";
 import { applyMempoolTradesOnPools, Pool } from "../core/pool";
@@ -37,15 +38,9 @@ export class MempoolLoop {
 		paths: Array<Path>,
 		offerAssetInfo: AssetInfo,
 		[minProfit2Hop, minProfit3Hop]: [number, number],
-	) =>
-		| {
-				path: Path;
-				offerAsset: Asset;
-				profit: number;
-		  }
-		| undefined;
+	) => OptimalTrade | undefined;
 	updateStateFunction: (botClients: BotClients, pools: Array<Pool>) => void;
-	messageFunction: (path: Path, walletAddress: string, offerAsset0: Asset) => [Array<EncodeObject>, number];
+	messageFunction: (arbTrade: OptimalTrade, walletAddress: string) => [Array<EncodeObject>, number];
 	/**
 	 *
 	 */
@@ -56,9 +51,9 @@ export class MempoolLoop {
 			paths: Array<Path>,
 			offerAssetInfo: AssetInfo,
 			[minProfit2Hop, minProfit3Hop]: [number, number],
-		) => { path: Path; offerAsset: Asset; profit: number } | undefined,
+		) => OptimalTrade | undefined,
 		updateState: (botclients: BotClients, pools: Array<Pool>) => void,
-		messageFunction: (path: Path, walletAddress: string, offerAsset0: Asset) => [Array<EncodeObject>, number],
+		messageFunction: (arbTrade: OptimalTrade, walletAddress: string) => [Array<EncodeObject>, number],
 		botClients: BotClients,
 		account: AccountData,
 		offerAssetInfo: AssetInfo,
@@ -97,7 +92,7 @@ export class MempoolLoop {
 		this.iterations++;
 		this.updateStateFunction(this.botClients, this.pools);
 
-		const arbTrade: { path: Path; offerAsset: Asset } | undefined = this.arbitrageFunction(
+		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(
 			this.paths,
 			this.offerAssetInfo,
 			this.minProfits,
@@ -127,11 +122,7 @@ export class MempoolLoop {
 				applyMempoolTradesOnPools(this.pools, mempoolTrades);
 			}
 
-			const arbTrade: { path: Path; offerAsset: Asset } | undefined = this.arbitrageFunction(
-				this.paths,
-				this.offerAssetInfo,
-				this.minProfits,
-			);
+			const arbTrade = this.arbitrageFunction(this.paths, this.offerAssetInfo, this.minProfits);
 
 			if (arbTrade) {
 				await this.trade(arbTrade);
@@ -150,8 +141,8 @@ export class MempoolLoop {
 	/**
 	 *
 	 */
-	private async trade(arbTrade: { path: Path; offerAsset: Asset }) {
-		const [msgs, nrOfMessages] = this.messageFunction(arbTrade.path, this.account.address, arbTrade.offerAsset);
+	private async trade(arbTrade: OptimalTrade) {
+		const [msgs, nrOfMessages] = this.messageFunction(arbTrade, this.account.address);
 		console.log(msgs);
 		const signerData = {
 			accountNumber: this.accountNumber,

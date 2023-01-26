@@ -8,10 +8,11 @@ import { WebClient } from "@slack/web-api";
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
+import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { sendSlackMessage } from "../../logging/slacklogger";
 import { BotClients } from "../../node/chainoperator";
 import { SkipResult } from "../../node/skipclients";
-import { Asset, AssetInfo, isNativeAsset } from "../core/asset";
+import { AssetInfo, isNativeAsset } from "../core/asset";
 import { MempoolTrade, processMempool } from "../core/mempool";
 import { Path } from "../core/path";
 import { applyMempoolTradesOnPools, Pool } from "../core/pool";
@@ -36,9 +37,9 @@ export class SkipLoop extends MempoolLoop {
 			paths: Array<Path>,
 			offerAssetInfo: AssetInfo,
 			[minProfit2Hop, minProfit3Hop]: [number, number],
-		) => { path: Path; offerAsset: Asset; profit: number } | undefined,
+		) => OptimalTrade | undefined,
 		updateState: (botclients: BotClients, pools: Array<Pool>) => void,
-		messageFunction: (path: Path, walletAddress: string, offerAsset0: Asset) => [Array<EncodeObject>, number],
+		messageFunction: (arbTrade: OptimalTrade, walletAddress: string) => [Array<EncodeObject>, number],
 		botClients: BotClients,
 		account: AccountData,
 		offerAssetInfo: AssetInfo,
@@ -82,8 +83,11 @@ export class SkipLoop extends MempoolLoop {
 			} else {
 				for (const trade of mempoolTrades) {
 					applyMempoolTradesOnPools(this.pools, [trade]);
-					const arbTrade: { path: Path; offerAsset: Asset; profit: number } | undefined =
-						this.arbitrageFunction(this.paths, this.offerAssetInfo, this.minProfits);
+					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(
+						this.paths,
+						this.offerAssetInfo,
+						this.minProfits,
+					);
 					if (arbTrade) {
 						await this.skipTrade(arbTrade, trade);
 						break;
@@ -95,7 +99,7 @@ export class SkipLoop extends MempoolLoop {
 	/**
 	 *
 	 */
-	private async skipTrade(arbTrade: { path: Path; offerAsset: Asset; profit: number }, toArbTrade: MempoolTrade) {
+	private async skipTrade(arbTrade: OptimalTrade, toArbTrade: MempoolTrade) {
 		const bidMsg: MsgSend = MsgSend.fromJSON({
 			fromAddress: this.account.address,
 			toAddress: this.skipBidWallet,
@@ -118,7 +122,7 @@ export class SkipLoop extends MempoolLoop {
 			sequence: this.sequence,
 			chainId: this.chainid,
 		};
-		const [msgs, nrOfWasms] = this.messageFunction(arbTrade.path, this.account.address, arbTrade.offerAsset);
+		const [msgs, nrOfWasms] = this.messageFunction(arbTrade, this.account.address);
 		msgs.push(bidMsgEncodedObject);
 
 		const txRaw: TxRaw = await this.botClients.SigningCWClient.sign(

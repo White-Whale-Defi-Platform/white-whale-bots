@@ -26,6 +26,10 @@ declare namespace NodeJS {
 		 */
 		FACTORIES_TO_ROUTERS_MAPPING: string;
 		/**
+		 * Flashloan router contract that handles the flashloan and execute the operations/messages.
+		 */
+		FLASHLOAN_ROUTER_ADDRESS: string;
+		/**
 		 * A list of all the pools to map, separated by ", \n".
 		 *
 		 * Stored as a JSON object containing a "pool" and "fee" key/value pair.
