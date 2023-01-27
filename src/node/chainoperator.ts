@@ -32,7 +32,6 @@ export async function getChainOperator(botConfig: BotConfig) {
 	const httpClient = new HttpBatchClient(botConfig.rpcUrl);
 	const tmClient = await Tendermint34Client.create(httpClient);
 	const queryClient = QueryClient.withExtensions(tmClient, setupWasmExtension, setupAuthExtension);
-
 	const account = await signer.getAccounts();
 	const botClients: BotClients = {
 		SigningCWClient: cwClient,
