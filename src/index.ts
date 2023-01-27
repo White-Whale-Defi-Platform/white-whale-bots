@@ -88,13 +88,10 @@ async function main() {
 			getFlashArbMessages,
 			botClients,
 			account,
-			botConfig.offerAssetInfo,
-			[botConfig.profitThreshold2Hop, botConfig.profitThreshold3Hop],
+			botConfig,
 			skipClient,
 			skipSigner,
 			slackClient,
-			botConfig.skipBidRate,
-			botConfig.skipBidWallet,
 		);
 	} else if (botConfig.useMempool === true) {
 		console.log("Initializing mempool loop");
@@ -106,8 +103,7 @@ async function main() {
 			getFlashArbMessages,
 			botClients,
 			account,
-			botConfig.offerAssetInfo,
-			[botConfig.profitThreshold2Hop, botConfig.profitThreshold3Hop],
+			botConfig,
 		);
 	} else {
 		await sendSlackMessage("loop without mempool or skip not implemented yet", slackClient, botConfig.slackChannel);
@@ -115,7 +111,6 @@ async function main() {
 	}
 	// main loop of the bot
 	await loop.fetchRequiredChainData();
-	loop.setGasFees([botConfig.txFee2Hop, botConfig.txFee3Hop]);
 
 	console.log("starting loop");
 	while (true) {
