@@ -1,4 +1,4 @@
-import { isSendMessage } from "../messages/sendmessages";
+import { isSendMessage } from "./messages/sendmessages";
 import {
 	isAstroSwapOperationsMessages,
 	isJunoSwapMessage,
@@ -7,25 +7,16 @@ import {
 	isSwapOperationsMessage,
 	isTFMSwapOperationsMessage,
 	isWWSwapOperationsMessages,
-	isWyndDaoSwapOperationsMessages,
-} from "../messages/swapmessages";
-import { Asset, AssetInfo, isMatchingAssetInfos, isWyndDaoNativeAsset } from "./asset";
+} from "./messages/swapmessages";
+import { Asset, AssetInfo, isMatchingAssetInfos } from "./asset";
 import { MempoolTrade } from "./mempool";
 import { Uint128 } from "./uint128";
 
-export enum AmmDexName {
-	junoswap = "junoswap",
-	default = "default",
-	wyndex = "wyndex",
-}
-export enum ClobDexName {
-	injective = "injective",
-}
 export interface Pool {
 	/**
 	 * The two assets that can be swapped between in the pool.
 	 */
-	assets: Array<Asset>;
+	assets: [Asset, Asset];
 	/**
 	 * The total amount of LP tokens that exist.
 	 */
@@ -35,9 +26,8 @@ export interface Pool {
 	 */
 	address: string;
 
-	dexname: AmmDexName;
-	inputfee: number;
-	outputfee: number;
+	type: string;
+	fee: number;
 	factoryAddress: string;
 	routerAddress: string;
 }
@@ -46,27 +36,22 @@ export interface Pool {
  *
  */
 export function outGivenIn(pool: Pool, inputAsset: Asset): [number, AssetInfo] {
-	const outputfee = 1 - pool.outputfee / 100;
-	const inputfee = 1 - pool.inputfee / 100;
+	const SWAP_FEE = pool.fee / 100;
 	if (isMatchingAssetInfos(pool.assets[0].info, inputAsset.info)) {
 		// asset[0] from pool is inputasset
 
 		return [
 			Math.floor(
-				inputfee *
-					outputfee *
-					((+pool.assets[1].amount * +inputAsset.amount) /
-						(+pool.assets[0].amount + inputfee * +inputAsset.amount)),
+				(1 - SWAP_FEE) *
+					((+pool.assets[1].amount * +inputAsset.amount) / (+pool.assets[0].amount + +inputAsset.amount)),
 			),
 			pool.assets[1].info,
 		];
 	} else {
 		return [
 			Math.floor(
-				inputfee *
-					outputfee *
-					((+pool.assets[0].amount * +inputAsset.amount) /
-						(+pool.assets[1].amount + inputfee * +inputAsset.amount)),
+				(1 - SWAP_FEE) *
+					((+pool.assets[0].amount * +inputAsset.amount) / (+pool.assets[1].amount + +inputAsset.amount)),
 			),
 			pool.assets[0].info,
 		];
@@ -177,24 +162,6 @@ export function applyMempoolTradesOnPools(pools: Array<Pool>, mempoolTrades: Arr
 							operation.astro_swap.offer_asset_info,
 							operation.astro_swap.ask_asset_info,
 						);
-						if (currentPool !== undefined) {
-							applyTradeOnPool(currentPool, offerAsset);
-							const [outGivenInNext, offerAssetInfoNext] = outGivenIn(currentPool, offerAsset);
-							offerAsset = { amount: String(outGivenInNext), info: offerAssetInfoNext };
-						}
-					}
-				}
-				if (isWyndDaoSwapOperationsMessages(operations)) {
-					// astropoart router
-
-					for (const operation of operations) {
-						const offerAssetInfo = isWyndDaoNativeAsset(operation.wyndex_swap.offer_asset_info)
-							? { native_token: { denom: operation.wyndex_swap.offer_asset_info.native } }
-							: { token: { contract_addr: operation.wyndex_swap.offer_asset_info.token } };
-						const askAssetInfo = isWyndDaoNativeAsset(operation.wyndex_swap.ask_asset_info)
-							? { native_token: { denom: operation.wyndex_swap.ask_asset_info.native } }
-							: { token: { contract_addr: operation.wyndex_swap.ask_asset_info.token } };
-						const currentPool = findPoolByInfos(poolsFromThisRouter, offerAssetInfo, askAssetInfo);
 						if (currentPool !== undefined) {
 							applyTradeOnPool(currentPool, offerAsset);
 							const [outGivenInNext, offerAssetInfoNext] = outGivenIn(currentPool, offerAsset);

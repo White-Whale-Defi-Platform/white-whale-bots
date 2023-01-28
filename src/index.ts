@@ -30,7 +30,7 @@ console.log("---".repeat(30));
 console.log("Environmental variables for setup:");
 console.log("RPC ENPDOINT: ", botConfig.rpcUrl);
 console.log("OFFER DENOM: ", botConfig.offerAssetInfo);
-console.log("POOLS: ", botConfig.poolEnvs);
+// console.log("POOLS: ", botConfig.poolEnvs);
 console.log("FACTORIES_TO_ROUTERS_MAPPING", botConfig.mappingFactoryRouter);
 console.log("USE MEMPOOL: ", botConfig.useMempool);
 console.log("USE SKIP: ", botConfig.useSkip);
@@ -58,7 +58,7 @@ async function main() {
 	console.log("Done, Clients established");
 	console.log("---".repeat(30));
 	console.log("Deriving paths for arbitrage");
-	const pools = await initPools(botClients.WasmQueryClient, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+	const pools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
 	const paths = getPathsFromPool(pools, botConfig.offerAssetInfo);
 	const paths2 = getPathsFromPools3Hop(pools, botConfig.offerAssetInfo);
 	console.log("2 HOP paths: ", paths.length);

@@ -55,7 +55,6 @@ export class SkipLoop extends MempoolLoop {
 	public async step(): Promise<void> {
 		this.iterations++;
 		this.updateStateFunction(this.botClients, this.pools);
-
 		while (true) {
 			const mempoolResult = await this.botClients.HttpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
 			this.mempool = mempoolResult.result;
@@ -131,13 +130,19 @@ export class SkipLoop extends MempoolLoop {
 			"",
 			signerData,
 		);
+		// const txBytes = TxRaw.encode(txRaw).finish();
+		// const normalResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
+		// console.log(normalResult);
 		const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
 		const signed = await this.skipClient.signBundle([txToArbRaw, txRaw], this.skipSigner, this.account.address);
 
 		const res = <SkipResult>await this.skipClient.sendBundle(signed, 0, true);
 
 		let slackMessage =
-			">*block:* " +
+			"<*wallet:* " +
+			this.account.address +
+			"\n" +
+			" *block:* " +
 			res.result.desired_height +
 			"\t" +
 			"*profit:* " +

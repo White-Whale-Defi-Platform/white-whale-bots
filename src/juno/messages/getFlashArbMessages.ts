@@ -5,7 +5,7 @@ import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { Asset, isMatchingAssetInfos, isNativeAsset } from "../../types/core/asset";
 import { Path } from "../../types/core/path";
-import { outGivenIn, Pool } from "../../types/core/pool";
+import { AmmDexName, outGivenIn, Pool } from "../../types/core/pool";
 import { IncreaseAllowanceMessage } from "../../types/messages/allowance";
 import { FlashLoanMessage, WasmMessage } from "../../types/messages/flashloanmessage";
 import { SendMessage } from "../../types/messages/sendmessages";
@@ -87,12 +87,15 @@ function getWasmMessages(pool: Pool, offerAsset: Asset) {
 	const beliefPrice = Math.round((+offerAsset.amount / outGivenInTrade) * 1e6) / 1e6; //gives price per token bought
 	const nextOfferAsset: Asset = { amount: String(outGivenInTrade), info: returnAssetInfo };
 	let msg: SwapMessage | JunoSwapMessage | SendMessage;
-	if (pool.type == "default") {
+	if (pool.dexname === AmmDexName.default || pool.dexname === AmmDexName.wyndex) {
 		if (isNativeAsset(offerAsset.info)) {
 			msg = <SwapMessage>{
 				swap: {
 					max_spread: "0.05",
-					offer_asset: offerAsset,
+					offer_asset:
+						pool.dexname === AmmDexName.default
+							? offerAsset
+							: { amount: offerAsset.amount, info: { native: offerAsset.info.native_token.denom } },
 					belief_price: String(beliefPrice),
 				},
 			};
@@ -123,7 +126,8 @@ function getWasmMessages(pool: Pool, offerAsset: Asset) {
 		wasm: {
 			execute: {
 				contract_addr:
-					!isNativeAsset(offerAsset.info) && pool.type == "default"
+					!isNativeAsset(offerAsset.info) &&
+					(pool.dexname === AmmDexName.default || pool.dexname === AmmDexName.wyndex)
 						? offerAsset.info.token.contract_addr
 						: pool.address,
 				funds: isNativeAsset(offerAsset.info)
@@ -139,7 +143,7 @@ function getWasmMessages(pool: Pool, offerAsset: Asset) {
 		},
 	};
 	const wasmMessages: Array<WasmMessage> = [];
-	if (!isNativeAsset(offerAsset.info) && pool.type == "junoswap") {
+	if (!isNativeAsset(offerAsset.info) && pool.dexname === AmmDexName.junoswap) {
 		const allowanceMessage: IncreaseAllowanceMessage = {
 			increase_allowance: {
 				amount: offerAsset.amount,
