@@ -96,6 +96,7 @@ function validateEnvs(envs: NodeJS.ProcessEnv) {
 	assert(envs.RPC_URL && envs.RPC_URL.includes("http"), `Please set "RPC_URL" in env or ".env" file`);
 	assert(envs.FACTORIES_TO_ROUTERS_MAPPING, `Please set "FACTORIES_TO_ROUTERS_MAPPING" in env or ".env" file`);
 	assert(envs.POOLS, `Please set "POOLS" in env or ".env" file`);
+	assert(envs.FLASHLOAN_ROUTER_ADDRESS, `Please set "FLASHLOAN_ROUTER_ADDRESS" in env, or ".env" file`);
 }
 
 /**
