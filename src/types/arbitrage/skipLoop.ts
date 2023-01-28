@@ -101,7 +101,7 @@ export class SkipLoop extends MempoolLoop {
 			toAddress: this.botConfig.skipBidWallet,
 			amount: [
 				{
-					denom: this.botConfig.offerAssetInfo,
+					denom: this.botConfig.offerAssetInfo.native_token.denom,
 					amount: String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipBidRate), 651)),
 				},
 			],
