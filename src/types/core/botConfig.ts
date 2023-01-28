@@ -8,6 +8,7 @@ export interface BotConfig {
 	rpcUrl: string;
 	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number }>;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
+	flashloanRouterAddress: string;
 	offerAssetInfo: NativeAssetInfo;
 	mnemonic: string;
 	useMempool: boolean;
@@ -64,6 +65,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		rpcUrl: envs.RPC_URL,
 		poolEnvs: POOLS_ENVS,
 		mappingFactoryRouter: FACTORIES_TO_ROUTERS_MAPPING,
+		flashloanRouterAddress: envs.FLASHLOAN_ROUTER_ADDRESS,
 		offerAssetInfo: OFFER_ASSET_INFO,
 		mnemonic: envs.WALLET_MNEMONIC,
 		useMempool: envs.USE_MEMPOOL == "1" ? true : false,
@@ -94,6 +96,7 @@ function validateEnvs(envs: NodeJS.ProcessEnv) {
 	assert(envs.RPC_URL && envs.RPC_URL.includes("http"), `Please set "RPC_URL" in env or ".env" file`);
 	assert(envs.FACTORIES_TO_ROUTERS_MAPPING, `Please set "FACTORIES_TO_ROUTERS_MAPPING" in env or ".env" file`);
 	assert(envs.POOLS, `Please set "POOLS" in env or ".env" file`);
+	assert(envs.FLASHLOAN_ROUTER_ADDRESS, `Please set "FLASHLOAN_ROUTER_ADDRESS" in env, or ".env" file`);
 }
 
 /**

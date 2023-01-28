@@ -2,6 +2,7 @@ import { toBase64, toUtf8 } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
+import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { Asset, isMatchingAssetInfos, isNativeAsset } from "../../types/core/asset";
 import { Path } from "../../types/core/path";
 import { AmmDexName, outGivenIn, Pool } from "../../types/core/pool";
@@ -13,22 +14,23 @@ import { InnerSwapMessage, JunoSwapMessage, SwapMessage } from "../../types/mess
  *
  */
 export function getFlashArbMessages(
-	path: Path,
+	arbTrade: OptimalTrade,
 	walletAddress: string,
-	offerAsset0: Asset,
+	flashloancontract: string,
 ): [Array<EncodeObject>, number] {
 	let flashLoanMessage: FlashLoanMessage;
-	if (path.pools.length === 3) {
-		flashLoanMessage = getFlashArbMessages3Hop(path, offerAsset0);
+
+	if (arbTrade.path.pools.length == 3) {
+		flashLoanMessage = getFlashArbMessages3Hop(arbTrade.path, arbTrade.offerAsset);
+
 	} else {
-		flashLoanMessage = getFlashArbMessages2Hop(path, offerAsset0);
+		flashLoanMessage = getFlashArbMessages2Hop(arbTrade.path, arbTrade.offerAsset);
 	}
 	const encodedMsgObject: EncodeObject = {
 		typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
 		value: MsgExecuteContract.fromPartial({
 			sender: walletAddress,
-			//TODO #38
-			contract: "terra1c8tpvta3umr4mpufvxmq39gyuw2knpyxyfgq8thpaeyw2r6a80qsg5wa00",
+			contract: flashloancontract,
 			msg: toUtf8(JSON.stringify(flashLoanMessage)),
 			funds: [],
 		}),

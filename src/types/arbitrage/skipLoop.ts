@@ -8,10 +8,11 @@ import { WebClient } from "@slack/web-api";
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
+import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { sendSlackMessage } from "../../logging/slacklogger";
 import { BotClients } from "../../node/chainoperator";
 import { SkipResult } from "../../node/skipclients";
-import { Asset, AssetInfo, isNativeAsset } from "../core/asset";
+import { BotConfig } from "../core/botConfig";
 import { MempoolTrade, processMempool } from "../core/mempool";
 import { Path } from "../core/path";
 import { applyMempoolTradesOnPools, Pool } from "../core/pool";
@@ -24,37 +25,28 @@ export class SkipLoop extends MempoolLoop {
 	skipClient: SkipBundleClient;
 	skipSigner: DirectSecp256k1HdWallet;
 	slackLogger: WebClient | undefined;
-	skipBidRate: number;
-	skipBidWallet: string;
 	/**
 	 *
 	 */
 	public constructor(
 		pools: Array<Pool>,
 		paths: Array<Path>,
-		arbitrage: (
-			paths: Array<Path>,
-			offerAssetInfo: AssetInfo,
-			[minProfit2Hop, minProfit3Hop]: [number, number],
-		) => { path: Path; offerAsset: Asset; profit: number } | undefined,
+		arbitrage: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined,
 		updateState: (botclients: BotClients, pools: Array<Pool>) => void,
-		messageFunction: (path: Path, walletAddress: string, offerAsset0: Asset) => [Array<EncodeObject>, number],
+		messageFunction: (
+			arbTrade: OptimalTrade,
+			walletAddress: string,
+			flashloanRouterAddress: string,
+		) => [Array<EncodeObject>, number],
 		botClients: BotClients,
 		account: AccountData,
-		offerAssetInfo: AssetInfo,
-		[minProfit2Hop, minProfit3Hop]: [number, number],
+		botConfig: BotConfig,
 		skipClient: SkipBundleClient,
 		skipSigner: DirectSecp256k1HdWallet,
 		slackLogger: WebClient | undefined,
-		skipBidRate: number,
-		skipBidWallet: string,
 	) {
-		super(pools, paths, arbitrage, updateState, messageFunction, botClients, account, offerAssetInfo, [
-			minProfit2Hop,
-			minProfit3Hop,
-		]);
+		super(pools, paths, arbitrage, updateState, messageFunction, botClients, account, botConfig);
 		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.slackLogger = slackLogger);
-		(this.skipBidRate = skipBidRate), (this.skipBidWallet = skipBidWallet);
 	}
 
 	/**
@@ -81,8 +73,7 @@ export class SkipLoop extends MempoolLoop {
 			} else {
 				for (const trade of mempoolTrades) {
 					applyMempoolTradesOnPools(this.pools, [trade]);
-					const arbTrade: { path: Path; offerAsset: Asset; profit: number } | undefined =
-						this.arbitrageFunction(this.paths, this.offerAssetInfo, this.minProfits);
+					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 					if (arbTrade) {
 						await this.skipTrade(arbTrade, trade);
 						break;
@@ -94,16 +85,23 @@ export class SkipLoop extends MempoolLoop {
 	/**
 	 *
 	 */
-	private async skipTrade(arbTrade: { path: Path; offerAsset: Asset; profit: number }, toArbTrade: MempoolTrade) {
+	private async skipTrade(arbTrade: OptimalTrade, toArbTrade: MempoolTrade) {
+		if (
+			!this.botConfig.useSkip ||
+			this.botConfig.skipRpcUrl === undefined ||
+			this.botConfig.skipBidRate === undefined ||
+			this.botConfig.skipBidWallet === undefined
+		) {
+			console.error("please setup skip variables in the config environment file", 1);
+			return;
+		}
 		const bidMsg: MsgSend = MsgSend.fromJSON({
 			fromAddress: this.account.address,
-			toAddress: this.skipBidWallet,
+			toAddress: this.botConfig.skipBidWallet,
 			amount: [
 				{
-					denom: isNativeAsset(this.offerAssetInfo)
-						? this.offerAssetInfo.native_token.denom
-						: this.offerAssetInfo.token.contract_addr,
-					amount: String(Math.max(Math.round(arbTrade.profit * 0.1), 651)),
+					denom: this.botConfig.offerAssetInfo.native_token.denom,
+					amount: String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipBidRate), 651)),
 				},
 			],
 		});
@@ -117,13 +115,18 @@ export class SkipLoop extends MempoolLoop {
 			sequence: this.sequence,
 			chainId: this.chainid,
 		};
-		const [msgs, nrOfWasms] = this.messageFunction(arbTrade.path, this.account.address, arbTrade.offerAsset);
+		const [msgs, nrOfWasms] = this.messageFunction(
+			arbTrade,
+			this.account.address,
+			this.botConfig.flashloanRouterAddress,
+		);
 		msgs.push(bidMsgEncodedObject);
 
+		const GAS_FEE = nrOfWasms === 2 ? this.botConfig.txFee2Hop : this.botConfig.txFee3Hop;
 		const txRaw: TxRaw = await this.botClients.SigningCWClient.sign(
 			this.account.address,
 			msgs,
-			nrOfWasms == 2 ? this.tx_fees[0] : this.tx_fees[1],
+			GAS_FEE,
 			"",
 			signerData,
 		);
