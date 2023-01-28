@@ -175,3 +175,12 @@ export function isWyndDaoSwapOperationsMessages(
 ): msg is Array<WyndSwapOperations> {
 	return msg[0]["wyndex_swap" as keyof (typeof msg)[0]] !== undefined;
 }
+
+/**
+ *
+ */
+export function isWyndDaoSwapOperationsMessages(
+	msg: SwapOperationsInnerMessageOperations,
+): msg is Array<WyndSwapOperations> {
+	return msg[0]["wyndex_swap" as keyof typeof msg[0]] !== undefined;
+}
