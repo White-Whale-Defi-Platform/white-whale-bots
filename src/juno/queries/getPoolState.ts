@@ -1,19 +1,14 @@
-import { WasmExtension } from "@cosmjs/cosmwasm-stargate";
-import { QueryClient } from "@cosmjs/stargate";
-
 import { BotClients } from "../../node/chainoperator";
-import { Asset, AssetInfo } from "../../types/core/asset";
-import { Pool } from "../../types/core/pool";
+import {
+	Asset,
+	isJunoSwapNativeAssetInfo,
+	isWyndDaoNativeAsset,
+	isWyndDaoTokenAsset,
+	JunoSwapAssetInfo,
+} from "../../types/core/asset";
+import { AmmDexName, Pool } from "../../types/core/pool";
 import { Uint128 } from "../../types/core/uint128";
-import { identity } from "../../types/identity";
-
-interface JunoSwapCW20 {
-	cw20: string;
-}
-interface JunoSwapNative {
-	native: string;
-}
-type JunoSwapAssetInfo = JunoSwapNative | JunoSwapCW20;
+import { getPoolsFromFactory } from "./getPoolsFromFactory";
 
 interface JunoSwapPoolState {
 	token1_reserve: string;
@@ -29,24 +24,15 @@ interface PoolState {
 	total_share: Uint128;
 }
 
-interface FactoryStatePair {
-	asset_infos: Array<AssetInfo>;
-	contract_addr: string;
-	liquidity_token: string;
-}
-interface FactoryState {
-	pairs: Array<FactoryStatePair>;
-}
-
 /**
  * Retrieves the pool state of a given Terra address.
- * @param client The cosmwasm client to send requests from.
- * @param address The Terra address to retrieve the pool state from.
+ * @param client The cosmwasm client to send requests from, including wasmextension.
+ * @param pools An array of Pool objects to obtain the chain states for.
  */
 export async function getPoolStates(botClients: BotClients, pools: Array<Pool>) {
 	await Promise.all(
 		pools.map(async (pool) => {
-			if (pool.type == "junoswap") {
+			if (pool.dexname === AmmDexName.junoswap) {
 				const poolState: JunoSwapPoolState = await botClients.WasmQueryClient.wasm.queryContractSmart(
 					pool.address,
 					{ info: {} },
@@ -58,128 +44,104 @@ export async function getPoolStates(botClients: BotClients, pools: Array<Pool>) 
 				const poolState: PoolState = await botClients.WasmQueryClient.wasm.queryContractSmart(pool.address, {
 					pool: {},
 				});
-
-				pool.assets = poolState.assets;
-				return;
+				const [assets] = processPoolStateAssets(poolState);
+				pool.assets = assets;
 			}
 		}),
 	);
 }
 
 /**
- *
+ * Initializes the pools based on a queryclient with wasmextension.
+ * @param client The cosmwasm client to send requests from, including wasmextension.
+ * @param poolAddresses An array of objects (set by environment variables) holding the pooladdress, its inputfee and its outputfee.
+ * @param factoryMapping An array of objects (set by environment variables) holding the mapping between factories and their routers.
+ * @returns An array of instantiated Pool objects.
  */
 export async function initPools(
-	client: QueryClient & WasmExtension,
+	botClients: BotClients,
 	poolAddresses: Array<{ pool: string; inputfee: number; outputfee: number }>,
 	factoryMapping: Array<{ factory: string; router: string }>,
 ): Promise<Array<Pool>> {
 	const pools: Array<Pool> = [];
-	const factoryPools = await getPoolsFromFactory(client, factoryMapping);
+	const factoryPools = await getPoolsFromFactory(botClients, factoryMapping);
 	for (const poolAddress of poolAddresses) {
-		let poolState: PoolState | JunoSwapPoolState;
-		const factory = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.factory;
-		const router = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.router;
-
+		let assets: Array<Asset> = [];
+		let dexname: AmmDexName;
+		let totalShare: string;
 		try {
-			poolState = await client.wasm.queryContractSmart(poolAddress.pool, { pool: {} });
+			const poolState = <PoolState>(
+				await botClients.WasmQueryClient.wasm.queryContractSmart(poolAddress.pool, { pool: {} })
+			);
+			[assets, dexname, totalShare] = processPoolStateAssets(poolState);
 		} catch (error) {
-			poolState = await client.wasm.queryContractSmart(poolAddress.pool, { info: {} });
+			const poolState = <JunoSwapPoolState>(
+				await botClients.WasmQueryClient.wasm.queryContractSmart(poolAddress.pool, { info: {} })
+			);
+			[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
 		}
-		if (isPoolState(poolState)) {
-			const pool: Pool = identity<Pool>({
-				assets: poolState.assets,
-				totalShare: poolState.total_share,
-				address: poolAddress.pool,
-				type: "default",
-				inputfee: poolAddress.inputfee,
-				outputfee: poolAddress.outputfee,
-				factoryAddress: factory ?? "",
-				routerAddress: router ?? "",
-			});
-			pools.push(pool);
-		} else {
-			const asset1: Asset = {
-				amount: String(poolState.token1_reserve),
-				info: isJunoSwapAssetInfo(poolState.token1_denom)
-					? { native_token: { denom: poolState.token1_denom.native } }
-					: { token: { contract_addr: poolState.token1_denom.cw20 } },
-			};
-			const asset2: Asset = {
-				amount: String(poolState.token2_reserve),
-				info: isJunoSwapAssetInfo(poolState.token2_denom)
-					? { native_token: { denom: poolState.token2_denom.native } }
-					: { token: { contract_addr: poolState.token2_denom.cw20 } },
-			};
-			const pool: Pool = identity<Pool>({
-				assets: [asset1, asset2],
-				totalShare: String(poolState.lp_token_supply),
+		const factory = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.factory ?? "";
+		const router = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.router ?? "";
 
-				address: poolAddress.pool,
-				type: "junoswap",
-				inputfee: poolAddress.inputfee,
-				outputfee: poolAddress.outputfee,
-				factoryAddress: factory ?? "",
-				routerAddress: router ?? "",
-			});
-			pools.push(pool);
-		}
+		pools.push({
+			assets: assets,
+			totalShare: totalShare,
+			address: poolAddress.pool,
+			dexname: dexname,
+			inputfee: poolAddress.inputfee,
+			outputfee: poolAddress.outputfee,
+			factoryAddress: factory,
+			routerAddress: router,
+		});
 	}
 	return pools;
 }
 
 /**
- * Checks to see if a given `info` is a native token.
- * @param info The `AssetInfo` to check.
- * @returns If the given `info` was a native token.
- */
-function isPoolState(state: PoolState | JunoSwapPoolState): state is PoolState {
-	return state["total_share" as keyof typeof state] !== undefined;
-}
-
-/**
  *
  */
-function isJunoSwapAssetInfo(info: JunoSwapAssetInfo | JunoSwapCW20): info is JunoSwapNative {
-	return info["native" as keyof typeof info] !== undefined;
-}
+function processPoolStateAssets(poolState: PoolState): [Array<Asset>, AmmDexName, string] {
+	const assets: Array<Asset> = [];
+	let type = AmmDexName.default;
 
-/**
- *
- */
-export async function getPoolsFromFactory(
-	client: QueryClient & WasmExtension,
-	factoryMapping: Array<{ factory: string; router: string }>,
-): Promise<Array<{ pool: string; factory: string; router: string }>> {
-	const factorypairs: Array<{ pool: string; factory: string; router: string }> = [];
-	await Promise.all(
-		factoryMapping.map(async (factorymap) => {
-			let res: FactoryState = await client.wasm.queryContractSmart(factorymap.factory, { pairs: { limit: 30 } });
-
-			res.pairs.map((factorypair) => {
-				factorypairs.push({
-					pool: factorypair.contract_addr,
-					factory: factorymap.factory,
-					router: factorymap.router,
-				});
+	for (const assetState of poolState.assets) {
+		if (isWyndDaoNativeAsset(assetState.info)) {
+			assets.push({
+				amount: assetState.amount,
+				info: { native_token: { denom: assetState.info.native } },
 			});
+			type = AmmDexName.wyndex;
+		} else if (isWyndDaoTokenAsset(assetState.info)) {
+			assets.push({
+				amount: assetState.amount,
+				info: { token: { contract_addr: assetState.info.token } },
+			});
+			type = AmmDexName.wyndex;
+		} else {
+			assets.push(assetState);
+		}
+	}
+	return [assets, type, poolState.total_share];
+}
 
-			while (res.pairs.length == 30) {
-				const start_after = res.pairs[res.pairs.length - 1].asset_infos;
-				res = await client.wasm.queryContractSmart(factorymap.factory, {
-					pairs: { limit: 30, start_after: start_after },
-				});
+/**
+ *
+ */
+function processJunoswapPoolStateAssets(poolState: JunoSwapPoolState): [Array<Asset>, AmmDexName, string] {
+	const assets: Array<Asset> = [];
+	assets.push({
+		amount: String(poolState.token1_reserve),
+		info: isJunoSwapNativeAssetInfo(poolState.token1_denom)
+			? { native_token: { denom: poolState.token1_denom.native } }
+			: { token: { contract_addr: poolState.token1_denom.cw20 } },
+	});
 
-				res.pairs.map((factorypair) => {
-					factorypairs.push({
-						pool: factorypair.contract_addr,
-						factory: factorymap.factory,
-						router: factorymap.router,
-					});
-				});
-			}
-		}),
-	);
+	assets.push({
+		amount: String(poolState.token2_reserve),
+		info: isJunoSwapNativeAssetInfo(poolState.token2_denom)
+			? { native_token: { denom: poolState.token2_denom.native } }
+			: { token: { contract_addr: poolState.token2_denom.cw20 } },
+	});
 
-	return factorypairs;
+	return [assets, AmmDexName.junoswap, poolState.lp_token_supply];
 }

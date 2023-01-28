@@ -4,7 +4,7 @@ import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
 import { Asset, isMatchingAssetInfos, isNativeAsset } from "../../types/core/asset";
 import { Path } from "../../types/core/path";
-import { outGivenIn } from "../../types/core/pool";
+import { AmmDexName, outGivenIn } from "../../types/core/pool";
 import { SendMessage } from "../../types/messages/sendmessages";
 import { InnerSwapMessage, JunoSwapMessage, SwapMessage } from "../../types/messages/swapmessages";
 /**
@@ -21,7 +21,7 @@ export function getArbMessages(path: Path, walletAddress: string, offerAsset0: A
 		// double swap message as we trade only native assets
 		let swapMsg0: SwapMessage | JunoSwapMessage;
 		let encodedSwapMsg0: EncodeObject;
-		if (path.pools[0].type == "default") {
+		if (path.pools[0].dexname == AmmDexName.default) {
 			swapMsg0 = {
 				swap: {
 					max_spread: "0.0005",
@@ -75,7 +75,7 @@ export function getArbMessages(path: Path, walletAddress: string, offerAsset0: A
 
 		let swapMsg1: SwapMessage | JunoSwapMessage;
 		let encodedSwapMsg1: EncodeObject;
-		if (path.pools[1].type == "default") {
+		if (path.pools[1].dexname == AmmDexName.default) {
 			swapMsg1 = {
 				swap: {
 					max_spread: "0.0005",
@@ -130,7 +130,7 @@ export function getArbMessages(path: Path, walletAddress: string, offerAsset0: A
 	} else {
 		let swapMsg0: SwapMessage | JunoSwapMessage;
 		let encodedSwapMsg0: EncodeObject;
-		if (path.pools[0].type == "default") {
+		if (path.pools[0].dexname == AmmDexName.default) {
 			swapMsg0 = {
 				swap: {
 					max_spread: "0.0005",
@@ -184,7 +184,7 @@ export function getArbMessages(path: Path, walletAddress: string, offerAsset0: A
 
 		let swapMsg1: SendMessage | JunoSwapMessage;
 		let encodedSwapMsg1: EncodeObject;
-		if (path.pools[1].type == "default") {
+		if (path.pools[1].dexname == AmmDexName.default) {
 			const innerSwapMsg: InnerSwapMessage = {
 				swap: { belief_price: String(beliefPrice1), max_spread: "0.0005" },
 			};

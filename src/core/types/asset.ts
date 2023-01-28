@@ -13,19 +13,6 @@ export interface TokenAssetInfo {
 	token: { contract_addr: string };
 }
 
-export interface WyndDaoNativeAssetInfo {
-	native: string;
-}
-export interface WyndDaoTokenAssetInfo {
-	token: string;
-}
-export interface JunoSwapCW20 {
-	cw20: string;
-}
-export interface JunoSwapNative {
-	native: string;
-}
-export type JunoSwapAssetInfo = JunoSwapNative | JunoSwapCW20;
 /**
  * Checks to see if a given `info` is a native token.
  * @param info The `AssetInfo` to check.
@@ -33,30 +20,6 @@ export type JunoSwapAssetInfo = JunoSwapNative | JunoSwapCW20;
  */
 export function isNativeAsset(info: AssetInfo): info is NativeAssetInfo {
 	return info["native_token" as keyof typeof info] !== undefined;
-}
-
-/**
- *
- */
-export function isWyndDaoNativeAsset(info: any): info is WyndDaoNativeAssetInfo {
-	return info["native" as keyof typeof info] !== undefined && info.native["denom" as keyof typeof info] === undefined;
-}
-
-/**
- *
- */
-export function isWyndDaoTokenAsset(info: any): info is WyndDaoTokenAssetInfo {
-	return (
-		info["token" as keyof typeof info] !== undefined &&
-		info.token["contract_addr" as keyof typeof info] === undefined
-	);
-}
-
-/**
- *
- */
-export function isJunoSwapNativeAssetInfo(info: JunoSwapAssetInfo | JunoSwapCW20): info is JunoSwapNative {
-	return info["native" as keyof typeof info] !== undefined;
 }
 
 /**
