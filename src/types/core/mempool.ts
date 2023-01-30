@@ -2,7 +2,7 @@ import { fromBase64, fromUtf8 } from "@cosmjs/encoding";
 import { decodeTxRaw } from "@cosmjs/proto-signing";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
-import { Asset, isWyndDaoNativeAsset } from "../../types/core/asset";
+import { Asset, isWyndDaoNativeAsset, isWyndDaoTokenAsset } from "../../types/core/asset";
 import { isSendMessage, SendMessage } from "../../types/messages/sendmessages";
 import {
 	isAstroSwapOperationsMessages,
@@ -77,12 +77,20 @@ export function processMempool(mempool: Mempool): Array<MempoolTrade> {
 				const msgExecuteContract: MsgExecuteContract = MsgExecuteContract.decode(message.value);
 				const containedMsg = JSON.parse(fromUtf8(msgExecuteContract.msg));
 				const funds = msgExecuteContract.funds;
+
 				// check if the message is a swap message we want to add to the relevant trades
 				if (isSwapMessage(containedMsg)) {
+					const offerAsset = containedMsg.swap.offer_asset;
+					if (isWyndDaoNativeAsset(offerAsset.info)) {
+						offerAsset.info = { native_token: { denom: offerAsset.info.native } };
+					}
+					if (isWyndDaoTokenAsset(offerAsset.info)) {
+						offerAsset.info = { token: { contract_addr: offerAsset.info.token } };
+					}
 					mempoolTrades.push({
 						contract: msgExecuteContract.contract,
 						message: containedMsg,
-						offer_asset: containedMsg.swap.offer_asset,
+						offer_asset: offerAsset,
 						txBytes: txBytes,
 					});
 					continue;
