@@ -103,7 +103,6 @@ export function applyMempoolTradesOnPools(pools: Array<Pool>, mempoolTrades: Arr
 		if (poolToUpdate) {
 			// a direct swap or send to pool
 			if (isSwapMessage(msg) && trade.offer_asset !== undefined) {
-				// Normal swapmessage
 				applyTradeOnPool(poolToUpdate, trade.offer_asset);
 			} else if (isSendMessage(msg) && trade.offer_asset !== undefined) {
 				applyTradeOnPool(poolToUpdate, trade.offer_asset);
@@ -185,8 +184,6 @@ export function applyMempoolTradesOnPools(pools: Array<Pool>, mempoolTrades: Arr
 					}
 				}
 				if (isWyndDaoSwapOperationsMessages(operations)) {
-					// astropoart router
-
 					for (const operation of operations) {
 						const offerAssetInfo = isWyndDaoNativeAsset(operation.wyndex_swap.offer_asset_info)
 							? { native_token: { denom: operation.wyndex_swap.offer_asset_info.native } }
