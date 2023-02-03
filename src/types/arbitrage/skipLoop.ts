@@ -178,7 +178,7 @@ export class SkipLoop extends MempoolLoop {
 			});
 		}
 		console.log(slackMessage);
-		await sendSlackMessage(slackMessage, this.slackLogger, "logging");
+		await sendSlackMessage(slackMessage, this.slackLogger, this.botConfig.slackChannel);
 		if (res.result.code === 0) {
 			this.sequence += 1;
 		} else {
