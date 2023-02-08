@@ -250,13 +250,13 @@ export function getAssetsOrder(pool: Pool, assetInfo: AssetInfo) {
  * @returns Filtered array of Pools.
  */
 export function removedUnusedPools(pools: Array<Pool>, paths: Array<Path>): Array<Pool> {
-	const filteredPools: Array<Pool> = [];
+	const filteredPools: Set<Pool> = new Set();
 	pools.forEach((pool) =>
 		paths.forEach((path) => {
 			if (path.pools.find((pathPool) => pathPool.address === pool.address) !== undefined) {
-				filteredPools.push(pool);
+				filteredPools.add(pool);
 			}
 		}),
 	);
-	return [...new Set(filteredPools)];
+	return [...filteredPools];
 }
