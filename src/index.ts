@@ -11,6 +11,7 @@ import { MempoolLoop } from "./types/arbitrage/mempoolLoop";
 import { SkipLoop } from "./types/arbitrage/skipLoop";
 import { setBotConfig } from "./types/core/botConfig";
 import { getPathsFromPool, getPathsFromPools3Hop } from "./types/core/path";
+import { removedUnusedPools } from "./types/core/pool";
 // load env files
 dotenv.config();
 const botConfig = setBotConfig(process.env);
@@ -58,14 +59,17 @@ async function main() {
 	console.log("Done, Clients established");
 	console.log("---".repeat(30));
 	console.log("Deriving paths for arbitrage");
-	const pools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-	const paths = getPathsFromPool(pools, botConfig.offerAssetInfo);
-	const paths2 = getPathsFromPools3Hop(pools, botConfig.offerAssetInfo);
+	const allPools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+
+	const paths = getPathsFromPool(allPools, botConfig.offerAssetInfo);
+	const paths2 = getPathsFromPools3Hop(allPools, botConfig.offerAssetInfo);
 	console.log("2 HOP paths: ", paths.length);
 	console.log("3 HOP paths: ", paths2.length);
 	paths.push(...paths2);
 	console.log("total paths: ", paths.length);
 	console.log("---".repeat(30));
+	const filteredPools = removedUnusedPools(allPools, paths);
+	console.log("Removed ", allPools.length - filteredPools.length, " unused pools");
 
 	let loop;
 	if (
@@ -81,7 +85,7 @@ async function main() {
 			botConfig.chainPrefix,
 		);
 		loop = new SkipLoop(
-			pools,
+			filteredPools,
 			paths,
 			trySomeArb,
 			getPoolStates,
@@ -96,7 +100,7 @@ async function main() {
 	} else if (botConfig.useMempool === true) {
 		console.log("Initializing mempool loop");
 		loop = new MempoolLoop(
-			pools,
+			filteredPools,
 			paths,
 			trySomeArb,
 			getPoolStates,
