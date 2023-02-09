@@ -11,6 +11,7 @@ import {
 } from "../messages/swapmessages";
 import { Asset, AssetInfo, isMatchingAssetInfos, isWyndDaoNativeAsset } from "./asset";
 import { MempoolTrade } from "./mempool";
+import { Path } from "./path";
 import { Uint128 } from "./uint128";
 
 export enum AmmDexName {
@@ -240,4 +241,17 @@ export function getAssetsOrder(pool: Pool, assetInfo: AssetInfo) {
 	} else if (isMatchingAssetInfos(pool.assets[1].info, assetInfo)) {
 		return [pool.assets[1], pool.assets[0]] as Array<Asset>;
 	}
+}
+
+/**
+ * Function to remove pools that are not used in paths.
+ * @param pools Array of Pool types to check for filtering.
+ * @param paths Array of Path types to check the pools against.
+ * @returns Filtered array of Pools.
+ */
+export function removedUnusedPools(pools: Array<Pool>, paths: Array<Path>): Array<Pool> {
+	const filteredPools: Set<Pool> = new Set(
+		pools.filter((pool) => paths.some((path) => path.pools.some((pathPool) => pathPool.address === pool.address))),
+	);
+	return [...filteredPools];
 }
