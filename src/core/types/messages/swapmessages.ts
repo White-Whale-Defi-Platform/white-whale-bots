@@ -1,4 +1,4 @@
-import { Asset, AssetInfo } from "../asset";
+import { Asset, AssetInfo } from "../base/asset";
 
 export type SwapMessage = {
 	swap: {
@@ -45,7 +45,10 @@ export type AstroSwapOperation = {
 		ask_asset_info: AssetInfo;
 	};
 };
-type SwapOperationsInnerMessageOperations = Array<WWSwapOperation> | Array<AstroSwapOperation>;
+type SwapOperationsInnerMessageOperations =
+	| Array<WWSwapOperation>
+	| Array<AstroSwapOperation>
+	| Array<WyndSwapOperations>;
 
 export type SwapOperationsMessage = {
 	execute_swap_operations: SwapOperationsInnerMessage;
@@ -55,6 +58,13 @@ export type SwapOperationsInnerMessage = {
 	minimum_receive: string;
 	offer_amount: string;
 	operations: SwapOperationsInnerMessageOperations;
+};
+
+export type WyndSwapOperations = {
+	wyndex_swap: {
+		offer_asset_info: { native: string } | { token: string };
+		ask_asset_info: { native: string } | { token: string };
+	};
 };
 
 export type TFMSwapOperationsMessage = {
@@ -148,4 +158,13 @@ export function isAstroSwapOperationsMessages(
 	msg: SwapOperationsInnerMessageOperations,
 ): msg is Array<AstroSwapOperation> {
 	return msg[0]["astro_swap" as keyof typeof msg[0]] !== undefined;
+}
+
+/**
+ *
+ */
+export function isWyndDaoSwapOperationsMessages(
+	msg: SwapOperationsInnerMessageOperations,
+): msg is Array<WyndSwapOperations> {
+	return msg[0]["wyndex_swap" as keyof typeof msg[0]] !== undefined;
 }

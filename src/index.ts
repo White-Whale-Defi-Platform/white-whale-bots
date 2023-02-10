@@ -1,31 +1,19 @@
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import dotenv from "dotenv";
 
-import { trySomeArb } from "./arbitrage/arbitrage";
-import * as Juno from "./juno/juno";
-import { getSlackClient, sendSlackMessage } from "./logging/slacklogger";
-import { getChainOperator } from "./node/chainoperator";
-import { getSkipClient } from "./node/skipclients";
-import * as Terra from "./terra/terra";
-import { MempoolLoop } from "./types/arbitrage/mempoolLoop";
-import { SkipLoop } from "./types/arbitrage/skipLoop";
-import { setBotConfig } from "./types/core/botConfig";
-import { getPathsFromPool, getPathsFromPools3Hop } from "./types/core/path";
-import { removedUnusedPools } from "./types/core/pool";
+import * as chains from "./chains";
+import { trySomeArb } from "./core/arbitrage/arbitrage";
+import { getSlackClient, sendSlackMessage } from "./core/logging/slacklogger";
+import { getChainOperator } from "./core/node/chainoperator";
+import { getSkipClient } from "./core/node/skipclients";
+import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
+import { SkipLoop } from "./core/types/arbitrageloops/skipLoop";
+import { setBotConfig } from "./core/types/base/botConfig";
+import { getPathsFromPool, getPathsFromPools3Hop } from "./core/types/base/path";
+import { removedUnusedPools } from "./core/types/base/pool";
 // load env files
 dotenv.config();
 const botConfig = setBotConfig(process.env);
-
-let getFlashArbMessages = Juno.getFlashArbMessages;
-let getPoolStates = Juno.getPoolStates;
-let initPools = Juno.initPools;
-switch (process.env.CHAIN_PREFIX) {
-	case "terra": {
-		getFlashArbMessages = Terra.getFlashArbMessages;
-		getPoolStates = Terra.getPoolStates;
-		initPools = Terra.initPools;
-	}
-}
 
 console.log("---".repeat(30));
 console.log("Environmental variables for setup:");
@@ -44,6 +32,18 @@ console.log("---".repeat(30));
  * Runs the main program.
  */
 async function main() {
+	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
+	let getPoolStates = chains.defaults.getPoolStates;
+	let initPools = chains.defaults.initPools;
+	await import("./chains/" + botConfig.chainPrefix).then((chainSetups) => {
+		if (chainSetups === undefined) {
+			console.log("Unable to resolve specific chain imports, using defaults");
+		}
+		getFlashArbMessages = chainSetups.getFlashArbMessages;
+		getPoolStates = chainSetups.getPoolStates;
+		initPools = chainSetups.initPools;
+		return;
+	});
 	console.log("Setting up connections and paths");
 	const [account, botClients] = await getChainOperator(botConfig);
 	let slackClient;
