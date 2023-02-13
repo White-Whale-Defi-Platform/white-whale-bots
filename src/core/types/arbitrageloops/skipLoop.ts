@@ -8,10 +8,10 @@ import { WebClient } from "@slack/web-api";
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
+import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { sendSlackMessage } from "../../logging/slacklogger";
 import { BotClients } from "../../node/chainoperator";
 import { SkipResult } from "../../node/skipclients";
-import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { BotConfig } from "../base/botConfig";
 import { MempoolTrade, processMempool } from "../base/mempool";
 import { Path } from "../base/path";
@@ -87,21 +87,21 @@ export class SkipLoop extends MempoolLoop {
 	 */
 	private async skipTrade(arbTrade: OptimalTrade, toArbTrade: MempoolTrade) {
 		if (
-			!this.botConfig.useSkip ||
-			this.botConfig.skipRpcUrl === undefined ||
-			this.botConfig.skipBidRate === undefined ||
-			this.botConfig.skipBidWallet === undefined
+			!this.botConfig.skipConfig?.useSkip ||
+			this.botConfig.skipConfig?.skipRpcUrl === undefined ||
+			this.botConfig.skipConfig?.skipBidRate === undefined ||
+			this.botConfig.skipConfig?.skipBidWallet === undefined
 		) {
 			console.error("please setup skip variables in the config environment file", 1);
 			return;
 		}
 		const bidMsg: MsgSend = MsgSend.fromJSON({
 			fromAddress: this.account.address,
-			toAddress: this.botConfig.skipBidWallet,
+			toAddress: this.botConfig.skipConfig.skipBidWallet,
 			amount: [
 				{
 					denom: this.botConfig.offerAssetInfo.native_token.denom,
-					amount: String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipBidRate), 651)),
+					amount: String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651)),
 				},
 			],
 		});
@@ -122,11 +122,14 @@ export class SkipLoop extends MempoolLoop {
 		);
 		msgs.push(bidMsgEncodedObject);
 
-		const GAS_FEE = nrOfWasms === 2 ? this.botConfig.txFee2Hop : this.botConfig.txFee3Hop;
+		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
+		const TX_FEE =
+			this.botConfig.txFees.get(arbTrade.path.pools.length) ??
+			Array.from(this.botConfig.txFees.values())[this.botConfig.gasFees.size];
 		const txRaw: TxRaw = await this.botClients.SigningCWClient.sign(
 			this.account.address,
 			msgs,
-			GAS_FEE,
+			TX_FEE,
 			"",
 			signerData,
 		);
