@@ -24,12 +24,12 @@ startupMessage += `\nEnvironment Variables:\n
 **OFFER DENOM:** \t${JSON.stringify(botConfig.offerAssetInfo)}
 **FACTORIES_TO_ROUTERS_MAPPING:** \t${JSON.stringify(botConfig.mappingFactoryRouter)}
 **USE MEMPOOL:** \t${botConfig.useMempool}
-**USE SKIP:** \t${botConfig.useSkip}
+**USE SKIP:** \t${botConfig.skipConfig?.useSkip}
 `;
 if (botConfig.skipConfig) {
 	startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
 	startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
-}  
+}
 startupMessage += "---".repeat(30);
 
 /**
@@ -85,8 +85,7 @@ Derived Paths for Arbitrage:\n
 	await logger.sendMessage(startupMessage, LogType.Console);
 
 	let loop;
-	if (botConfig.skipconfig)
-	{
+	if (botConfig.skipConfig) {
 		await logger.sendMessage("Initializing skip loop...", LogType.Console);
 		const [skipClient, skipSigner] = await getSkipClient(
 			botConfig.skipConfig.skipRpcUrl,
