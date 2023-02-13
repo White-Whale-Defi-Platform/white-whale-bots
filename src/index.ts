@@ -22,9 +22,10 @@ console.log("OFFER DENOM: ", botConfig.offerAssetInfo);
 // console.log("POOLS: ", botConfig.poolEnvs);
 console.log("FACTORIES_TO_ROUTERS_MAPPING", botConfig.mappingFactoryRouter);
 console.log("USE MEMPOOL: ", botConfig.useMempool);
-console.log("USE SKIP: ", botConfig.useSkip);
-if (botConfig.useSkip) {
-	console.log("SKIP URL: ", botConfig.skipRpcUrl);
+
+if (botConfig.skipConfig) {
+	console.log("USE SKIP: ", botConfig.skipConfig.useSkip);
+	console.log("SKIP URL: ", botConfig.skipConfig.skipRpcUrl);
 }
 console.log("---".repeat(30));
 
@@ -50,7 +51,7 @@ async function main() {
 	if (botConfig.slackToken) {
 		slackClient = getSlackClient(botConfig.slackToken);
 	}
-
+	console.log(botConfig);
 	const { accountNumber, sequence } = await botClients.SigningCWClient.getSequence(account.address);
 	const chainId = await (
 		await botClients.HttpClient.execute(createJsonRpcRequest("block"))
@@ -72,15 +73,10 @@ async function main() {
 	console.log("Removed ", allPools.length - filteredPools.length, " unused pools");
 
 	let loop;
-	if (
-		botConfig.useSkip &&
-		botConfig.skipRpcUrl !== undefined &&
-		botConfig.skipBidRate !== undefined &&
-		botConfig.skipBidWallet !== undefined
-	) {
+	if (botConfig.skipConfig) {
 		console.log("Initializing skip loop");
 		const [skipClient, skipSigner] = await getSkipClient(
-			botConfig.skipRpcUrl,
+			botConfig.skipConfig.skipRpcUrl,
 			botConfig.mnemonic,
 			botConfig.chainPrefix,
 		);
