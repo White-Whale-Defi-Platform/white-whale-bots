@@ -51,7 +51,6 @@ async function main() {
 	if (botConfig.slackToken) {
 		slackClient = getSlackClient(botConfig.slackToken);
 	}
-	console.log(botConfig);
 	const { accountNumber, sequence } = await botClients.SigningCWClient.getSequence(account.address);
 	const chainId = await (
 		await botClients.HttpClient.execute(createJsonRpcRequest("block"))
