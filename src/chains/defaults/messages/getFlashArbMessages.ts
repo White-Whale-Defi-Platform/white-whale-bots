@@ -18,72 +18,44 @@ export function getFlashArbMessages(
 	walletAddress: string,
 	flashloancontract: string,
 ): [Array<EncodeObject>, number] {
-	let flashLoanMessage: FlashLoanMessage;
-	if (arbTrade.path.pools.length == 3) {
-		flashLoanMessage = getFlashArbMessages3Hop(arbTrade.path, arbTrade.offerAsset);
-	} else {
-		flashLoanMessage = getFlashArbMessages2Hop(arbTrade.path, arbTrade.offerAsset);
-	}
+	const flashloanMessage = getFlashArbMessage(arbTrade.path, arbTrade.offerAsset);
+
 	const encodedMsgObject: EncodeObject = {
 		typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
 		value: MsgExecuteContract.fromPartial({
 			sender: walletAddress,
 			contract: flashloancontract,
-			msg: toUtf8(JSON.stringify(flashLoanMessage)),
+			msg: toUtf8(JSON.stringify(flashloanMessage)),
 			funds: [],
 		}),
 	};
-	return [[encodedMsgObject], flashLoanMessage.flash_loan.msgs.length];
+	return [[encodedMsgObject], flashloanMessage.flash_loan.msgs.length];
 }
 
 /**
  *
  */
-function getFlashArbMessages2Hop(path: Path, offerAsset0: Asset): FlashLoanMessage {
-	// double swap message as we trade only native assets
-	const [wasmMsgs0, offerAsset1] = getWasmMessages(path.pools[0], offerAsset0);
-	const [wasmMsgs1, offerAsset2] = getWasmMessages(path.pools[1], offerAsset1);
-
+function getFlashArbMessage(path: Path, offerAsset0: Asset): FlashLoanMessage {
+	const wasmMsgs = [];
+	let offerAsset = offerAsset0;
+	for (const pool of path.pools) {
+		const [wasmMsgsPool, offerAssetNext] = getWasmMessages(pool, offerAsset);
+		wasmMsgs.push(...wasmMsgsPool);
+		offerAsset = offerAssetNext;
+	}
 	const flashLoanMessage: FlashLoanMessage = {
 		flash_loan: {
 			assets: [offerAsset0],
-			msgs: [...wasmMsgs0, ...wasmMsgs1],
+			msgs: wasmMsgs,
 		},
 	};
 	return flashLoanMessage;
 }
-/**
- *
- */
-function getFlashArbMessages3Hop(path: Path, offerAsset0: Asset): FlashLoanMessage {
-	// double swap message as we trade only native assets
-	const [wasmMsgs0, offerAsset1] = getWasmMessages(path.pools[0], offerAsset0);
-	const [wasmMsgs1, offerAsset2] = getWasmMessages(path.pools[1], offerAsset1);
-	const [wasmMsgs2, offerAsset3] = getWasmMessages(path.pools[2], offerAsset2);
-	const flashLoanMessage: FlashLoanMessage = {
-		flash_loan: {
-			assets: [offerAsset0],
-			msgs: [...wasmMsgs0, ...wasmMsgs1, ...wasmMsgs2],
-		},
-	};
-	return flashLoanMessage;
-}
-
 /**
  *
  */
 function getWasmMessages(pool: Pool, offerAsset: Asset) {
 	const [outGivenInTrade, returnAssetInfo] = outGivenIn(pool, offerAsset);
-	console.log(
-		pool.address,
-		": ",
-		"in: ",
-		offerAsset.amount,
-		isNativeAsset(offerAsset.info) ? offerAsset.info.native_token.denom : offerAsset.info.token.contract_addr,
-		"out: ",
-		outGivenInTrade,
-		isNativeAsset(returnAssetInfo) ? returnAssetInfo.native_token.denom : returnAssetInfo.token.contract_addr,
-	);
 	const beliefPrice = Math.round((+offerAsset.amount / outGivenInTrade) * 1e6) / 1e6; //gives price per token bought
 	const nextOfferAsset: Asset = { amount: String(outGivenInTrade), info: returnAssetInfo };
 	let msg: SwapMessage | JunoSwapMessage | SendMessage;
@@ -91,7 +63,7 @@ function getWasmMessages(pool: Pool, offerAsset: Asset) {
 		if (isNativeAsset(offerAsset.info)) {
 			msg = <SwapMessage>{
 				swap: {
-					max_spread: "0.05",
+					max_spread: "0.01",
 					offer_asset:
 						pool.dexname === AmmDexName.default
 							? offerAsset
@@ -101,7 +73,7 @@ function getWasmMessages(pool: Pool, offerAsset: Asset) {
 			};
 		} else {
 			const innerSwapMsg: InnerSwapMessage = {
-				swap: { belief_price: String(beliefPrice), max_spread: "0.0005" },
+				swap: { belief_price: String(beliefPrice), max_spread: "0.01" },
 			};
 			const objJsonStr = JSON.stringify(innerSwapMsg);
 			const objJsonB64 = Buffer.from(objJsonStr).toString("base64");

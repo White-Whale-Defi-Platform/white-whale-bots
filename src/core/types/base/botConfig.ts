@@ -3,6 +3,12 @@ import { assert } from "console";
 
 import { NativeAssetInfo } from "./asset";
 
+interface SkipConfig {
+	useSkip: boolean;
+	skipRpcUrl: string;
+	skipBidWallet: string;
+	skipBidRate: number;
+}
 export interface BotConfig {
 	chainPrefix: string;
 	rpcUrl: string;
@@ -15,10 +21,9 @@ export interface BotConfig {
 	baseDenom: string;
 
 	gasPrice: string;
-	profitThreshold3Hop: number;
-	profitThreshold2Hop: number;
-	txFee3Hop: StdFee;
-	txFee2Hop: StdFee;
+	gasFees: Map<number, Coin>;
+	txFees: Map<number, StdFee>;
+	profitThresholds: Map<number, number>;
 
 	// logging specific (optionally)
 	// Slack OAuth2 token for the specific SlackApp
@@ -29,10 +34,7 @@ export interface BotConfig {
 	discordWebhookUrl?: string | undefined;
 
 	// Skip specific (optionally)
-	useSkip?: boolean;
-	skipRpcUrl?: string | undefined;
-	skipBidWallet?: string | undefined;
-	skipBidRate?: number | undefined;
+	skipConfig: SkipConfig | undefined;
 }
 
 /**
@@ -46,22 +48,40 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		JSON.parse(mapping),
 	);
 	const OFFER_ASSET_INFO: NativeAssetInfo = { native_token: { denom: envs.BASE_DENOM } };
-
-	const GAS_UNIT_USAGES = envs.GAS_UNIT_USAGES.split(",");
 	const GAS_UNIT_PRICE = envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
-	const GAS_FEE_2HOP: Coin = { denom: envs.BASE_DENOM, amount: String(+GAS_UNIT_USAGES[0] * +GAS_UNIT_PRICE) };
-	const GAS_FEE_3HOP: Coin = { denom: envs.BASE_DENOM, amount: String(+GAS_UNIT_USAGES[1] * +GAS_UNIT_PRICE) };
-	const TX_FEE_2HOP: StdFee = { amount: [GAS_FEE_2HOP], gas: GAS_UNIT_USAGES[0] };
-	const TX_FEE_3HOP: StdFee = { amount: [GAS_FEE_3HOP], gas: GAS_UNIT_USAGES[1] };
 
-	//make sure amount is GAS_FEE.gas * GAS_PRICE at minimum
-	//make sure gas units used is adjusted based on amount of msgs in the arb
-	//make sure amount is GAS_FEE.gas * GAS_PRICE at minimum
-	//make sure gas units used is adjusted based on amount of msgs in the arb
-	const MIN_PROFIT_THRESHOLD3Hop = +envs.PROFIT_THRESHOLD * +GAS_FEE_3HOP.amount; //minimal profit threshold as multiplier of paid GAS_COIN.amount
-	const MIN_PROFIT_THRESHOLD2Hop = +envs.PROFIT_THRESHOLD * +GAS_FEE_2HOP.amount; //minimal profit threshold as multiplier of paid GAS_COIN.amount
+	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
+	const MAX_PATH_HOPS = +envs.MAX_PATH_HOPS; //required gas units per trade (hop)
 
-	const SKIP_BID_RATE = envs.SKIP_BID_RATE !== undefined ? +envs.SKIP_BID_RATE : undefined;
+	// setup skipconfig if present
+	let skipConfig;
+	if (envs.USE_SKIP == "1") {
+		validateSkipEnvs(envs);
+		skipConfig = {
+			useSkip: true,
+			skipRpcUrl: envs.SKIP_URL ?? "",
+			skipBidWallet: envs.SKIP_BID_WALLET ?? "",
+			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
+		};
+	}
+	const FLASHLOAN_FEE = +envs.FLASHLOAN_FEE;
+	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
+
+	//set all required fees for the depth of the hops set by user;
+	const GAS_FEES = new Map<number, Coin>();
+	const TX_FEES = new Map<number, StdFee>();
+	const PROFIT_THRESHOLDS = new Map<number, number>();
+	for (let hops = 2; hops <= MAX_PATH_HOPS; hops++) {
+		const gasFee = { denom: envs.BASE_DENOM, amount: String(GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE) };
+		GAS_FEES.set(hops, gasFee);
+		TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) });
+		const profitThreshold: number =
+			skipConfig === undefined
+				? PROFIT_THRESHOLD / (1 - FLASHLOAN_FEE) + +gasFee.amount //dont use skip bid on top of the threshold, include flashloan fee and gas fee
+				: PROFIT_THRESHOLD / (1 - FLASHLOAN_FEE) + +gasFee.amount + skipConfig.skipBidRate * PROFIT_THRESHOLD; //need extra profit to provide the skip bid
+		PROFIT_THRESHOLDS.set(hops, profitThreshold);
+	}
+
 	const botConfig: BotConfig = {
 		chainPrefix: envs.CHAIN_PREFIX,
 		rpcUrl: envs.RPC_URL,
@@ -73,17 +93,13 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		useMempool: envs.USE_MEMPOOL == "1" ? true : false,
 		baseDenom: envs.BASE_DENOM,
 		gasPrice: envs.GAS_UNIT_PRICE,
-		profitThreshold3Hop: MIN_PROFIT_THRESHOLD3Hop,
-		profitThreshold2Hop: MIN_PROFIT_THRESHOLD2Hop,
-		txFee3Hop: TX_FEE_3HOP,
-		txFee2Hop: TX_FEE_2HOP,
+		profitThresholds: PROFIT_THRESHOLDS,
+		gasFees: GAS_FEES,
+		txFees: TX_FEES,
 		slackToken: envs.SLACK_TOKEN,
 		slackChannel: envs.SLACK_CHANNEL,
 		discordWebhookUrl: envs.DISCORD_WEBHOOK_URL,
-		useSkip: envs.USE_SKIP == "1" ? true : false,
-		skipRpcUrl: envs.SKIP_URL,
-		skipBidWallet: envs.SKIP_BID_WALLET,
-		skipBidRate: SKIP_BID_RATE,
+		skipConfig: skipConfig,
 	};
 	return botConfig;
 }
@@ -103,5 +119,10 @@ function validateEnvs(envs: NodeJS.ProcessEnv) {
 }
 
 /**
- * Runs the main program.
+ *
  */
+function validateSkipEnvs(envs: NodeJS.ProcessEnv) {
+	assert(envs.SKIP_URL, `Please set SKIP_URL in env or ".env" file`);
+	assert(envs.SKIP_BID_WALLET, `Please set SKIP_BID_WALLET in env or ".env" file`);
+	assert(envs.SKIP_BID_RATE, `Please set SKIP_BID_RATE in env or ".env" file`);
+}
