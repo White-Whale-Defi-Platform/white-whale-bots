@@ -96,7 +96,10 @@ export class SkipLoop extends MempoolLoop {
 			this.botConfig.skipBidRate === undefined ||
 			this.botConfig.skipBidWallet === undefined
 		) {
-			await this.logger?.sendMessage("Please setup skip variables in the config environment file", LogType.Log);
+			await this.logger?.sendMessage(
+				"Please setup skip variables in the config environment file",
+				LogType.Console,
+			);
 			return;
 		}
 		const bidMsg: MsgSend = MsgSend.fromJSON({
@@ -173,7 +176,7 @@ export class SkipLoop extends MempoolLoop {
 		await this.logger?.sendMessage(logMessage, LogType.All, res.result.code);
 
 		if (logItem.length > 0) {
-			await this.logger?.sendMessage(logItem, LogType.Log);
+			await this.logger?.sendMessage(logItem, LogType.Console);
 		}
 
 		if (res.result.code === 0) {

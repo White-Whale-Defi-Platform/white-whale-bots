@@ -142,7 +142,7 @@ export class MempoolLoop {
 			this.botConfig.flashloanRouterAddress,
 		);
 
-		await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Log);
+		await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
 
 		const signerData = {
 			accountNumber: this.accountNumber,
@@ -163,7 +163,7 @@ export class MempoolLoop {
 		const txBytes = TxRaw.encode(txRaw).finish();
 		const sendResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
 
-		await this.logger?.sendMessage(JSON.stringify(sendResult), LogType.Log);
+		await this.logger?.sendMessage(JSON.stringify(sendResult), LogType.Console);
 
 		this.sequence += 1;
 		await delay(5000);

@@ -1,7 +1,7 @@
 export enum LogType {
 	All = "ALL",
-	Log = "LOG",
-	External = "EXTERNAL",
+	Console = "CONSOLE",
+	Externals = "EXTERNALS",
 	Discord = "DISCORD",
 	Slack = "SLACK",
 }

@@ -12,7 +12,7 @@ export class Logger {
 	public slackLogger?: SlackLogger;
 
 	// Codes that are not sent to external sources (discord, slack)
-	private externalExemptCodes: Array<number> = [4, 5, 6, 7, 8];
+	private externalExemptCodes: Array<number> = [4, 5, 6, 8];
 
 	/**
 	 *
@@ -38,21 +38,21 @@ export class Logger {
 	public async sendMessage(message: string, type: LogType = LogType.All, code = -1) {
 		if (message) {
 			// Don't send common errors to discord/slack
-			if (type != LogType.Log && !this.externalExemptCodes.includes(code)) {
+			if (type != LogType.Console && !this.externalExemptCodes.includes(code)) {
 				// Add indicator on success
 				if (code === 0) message = ":tada: **Success!** :tada:\n" + message;
 
-				if (this.discordLogger && [LogType.All, LogType.External, LogType.Discord].includes(type)) {
+				if (this.discordLogger && [LogType.All, LogType.Externals, LogType.Discord].includes(type)) {
 					await this.discordLogger.sendMessage(message);
 				}
 
-				if (this.slackLogger && [LogType.All, LogType.External, LogType.Slack].includes(type)) {
+				if (this.slackLogger && [LogType.All, LogType.Externals, LogType.Slack].includes(type)) {
 					message = message.replaceAll("**", "*");
 					await this.slackLogger.sendMessage(message);
 				}
 			}
 
-			if ([LogType.All, LogType.Log].includes(type)) {
+			if ([LogType.All, LogType.Console].includes(type)) {
 				message = message.replaceAll("**", "");
 				console.log(message);
 			}

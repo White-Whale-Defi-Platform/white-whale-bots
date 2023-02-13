@@ -48,7 +48,7 @@ async function main() {
 
 	await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
 		if (chainSetups === undefined) {
-			await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Log);
+			await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
 		}
 		getFlashArbMessages = chainSetups.getFlashArbMessages;
 		getPoolStates = chainSetups.getPoolStates;
@@ -87,7 +87,7 @@ Derived Paths for Arbitrage:\n
 
 	startupMessage += setupMessage;
 
-	await logger.sendMessage(startupMessage, LogType.Log);
+	await logger.sendMessage(startupMessage, LogType.Console);
 
 	let loop;
 	if (
@@ -96,7 +96,7 @@ Derived Paths for Arbitrage:\n
 		botConfig.skipBidRate !== undefined &&
 		botConfig.skipBidWallet !== undefined
 	) {
-		await logger.sendMessage("Initializing skip loop...", LogType.Log);
+		await logger.sendMessage("Initializing skip loop...", LogType.Console);
 
 		const [skipClient, skipSigner] = await getSkipClient(
 			botConfig.skipRpcUrl,
@@ -117,7 +117,7 @@ Derived Paths for Arbitrage:\n
 			logger,
 		);
 	} else if (botConfig.useMempool === true) {
-		await logger.sendMessage("Initializing mempool loop...", LogType.Log);
+		await logger.sendMessage("Initializing mempool loop...", LogType.Console);
 
 		loop = new MempoolLoop(
 			filteredPools,
