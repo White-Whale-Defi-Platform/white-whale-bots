@@ -9,63 +9,85 @@ import { getSkipClient } from "./core/node/skipclients";
 import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
 import { SkipLoop } from "./core/types/arbitrageloops/skipLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
+import { LogType } from "./core/types/base/logging";
 import { getPathsFromPool, getPathsFromPools3Hop } from "./core/types/base/path";
 import { removedUnusedPools } from "./core/types/base/pool";
 // load env files
 dotenv.config();
 const botConfig = setBotConfig(process.env);
 
-console.log("---".repeat(30));
-console.log("Environmental variables for setup:");
-console.log("RPC ENPDOINT: ", botConfig.rpcUrl);
-console.log("OFFER DENOM: ", botConfig.offerAssetInfo);
-// console.log("POOLS: ", botConfig.poolEnvs);
-console.log("FACTORIES_TO_ROUTERS_MAPPING", botConfig.mappingFactoryRouter);
-console.log("USE MEMPOOL: ", botConfig.useMempool);
-console.log("USE SKIP: ", botConfig.useSkip);
+let startupMessage = "===".repeat(30);
+startupMessage += "\n**White Whale Bot**\n";
+startupMessage += "===".repeat(30);
+startupMessage += `\nEnvironment Variables:\n
+**RPC ENPDOINT:** \t${botConfig.rpcUrl}
+**OFFER DENOM:** \t${JSON.stringify(botConfig.offerAssetInfo)}
+**FACTORIES_TO_ROUTERS_MAPPING:** \t${JSON.stringify(botConfig.mappingFactoryRouter)}
+**USE MEMPOOL:** \t${botConfig.useMempool}
+**USE SKIP:** \t${botConfig.useSkip}
+`;
+
 if (botConfig.useSkip) {
-	console.log("SKIP URL: ", botConfig.skipRpcUrl);
+	startupMessage += `**SKIP URL:** \t${botConfig.skipRpcUrl}\n`;
 }
-console.log("---".repeat(30));
+
+if (botConfig.skipBidRate) {
+	startupMessage += `**SKIP BID RATE:** \t${botConfig.skipBidRate}\n`;
+}
+
+startupMessage += "---".repeat(30);
 
 /**
  * Runs the main program.
  */
 async function main() {
+	const logger = new Logger(botConfig);
 	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
 	let getPoolStates = chains.defaults.getPoolStates;
 	let initPools = chains.defaults.initPools;
-	await import("./chains/" + botConfig.chainPrefix).then((chainSetups) => {
+
+	await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
 		if (chainSetups === undefined) {
-			console.log("Unable to resolve specific chain imports, using defaults");
+			await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Log);
 		}
 		getFlashArbMessages = chainSetups.getFlashArbMessages;
 		getPoolStates = chainSetups.getPoolStates;
 		initPools = chainSetups.initPools;
 		return;
 	});
-	console.log("Setting up connections and paths");
+
 	const [account, botClients] = await getChainOperator(botConfig);
-	const logger = new Logger(botConfig);
 	const { accountNumber, sequence } = await botClients.SigningCWClient.getSequence(account.address);
 	const chainId = await (
 		await botClients.HttpClient.execute(createJsonRpcRequest("block"))
 	).result.block.header.chain_id;
-	console.log("accountnumber: ", accountNumber, " sequence: ", sequence, "chainid: ", chainId);
-	console.log("Done, Clients established");
-	console.log("---".repeat(30));
-	console.log("Deriving paths for arbitrage");
-	const allPools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
 
+	let setupMessage = `
+Connections Details:\n
+**Account Number:** ${accountNumber}
+**Sequence:** \t${sequence}
+**Chain Id:** \t${chainId}\n`;
+	setupMessage += "---".repeat(30);
+
+	const allPools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
 	const paths = getPathsFromPool(allPools, botConfig.offerAssetInfo);
 	const paths2 = getPathsFromPools3Hop(allPools, botConfig.offerAssetInfo);
-	console.log("2 HOP paths: ", paths.length);
-	console.log("3 HOP paths: ", paths2.length);
-	paths.push(...paths2);
-	console.log("total paths: ", paths.length);
-	console.log("---".repeat(30));
 	const filteredPools = removedUnusedPools(allPools, paths);
-	console.log("Removed ", allPools.length - filteredPools.length, " unused pools");
+
+	setupMessage += `
+Derived Paths for Arbitrage:\n
+**2 HOP Paths:** \t${paths.length}
+**3 HOP Paths:** \t${paths2.length}\n`;
+
+	paths.push(...paths2);
+
+	setupMessage += `**Total Paths:** \t${paths.length}\n`;
+	setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
+	setupMessage += "---".repeat(30);
+
+	startupMessage += setupMessage;
+
+	await logger.sendMessage(startupMessage, LogType.Log);
 
 	let loop;
 	if (
@@ -74,7 +96,8 @@ async function main() {
 		botConfig.skipBidRate !== undefined &&
 		botConfig.skipBidWallet !== undefined
 	) {
-		console.log("Initializing skip loop");
+		await logger.sendMessage("Initializing skip loop...", LogType.Log);
+
 		const [skipClient, skipSigner] = await getSkipClient(
 			botConfig.skipRpcUrl,
 			botConfig.mnemonic,
@@ -94,7 +117,8 @@ async function main() {
 			logger,
 		);
 	} else if (botConfig.useMempool === true) {
-		console.log("Initializing mempool loop");
+		await logger.sendMessage("Initializing mempool loop...", LogType.Log);
+
 		loop = new MempoolLoop(
 			filteredPools,
 			paths,
@@ -113,7 +137,8 @@ async function main() {
 	// main loop of the bot
 	await loop.fetchRequiredChainData();
 
-	console.log("starting loop");
+	await logger.sendMessage("Starting loop...", LogType.All);
+
 	while (true) {
 		await loop.step();
 		loop.reset();

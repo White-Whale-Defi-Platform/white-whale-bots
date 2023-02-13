@@ -96,7 +96,7 @@ export class SkipLoop extends MempoolLoop {
 			this.botConfig.skipBidRate === undefined ||
 			this.botConfig.skipBidWallet === undefined
 		) {
-			console.error("please setup skip variables in the config environment file", 1);
+			await this.logger?.sendMessage("Please setup skip variables in the config environment file", LogType.Log);
 			return;
 		}
 		const bidMsg: MsgSend = MsgSend.fromJSON({
