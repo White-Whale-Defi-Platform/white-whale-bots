@@ -32,6 +32,8 @@ console.log("---".repeat(30));
  * Runs the main program.
  */
 async function main() {
+	const timeouturls = new Map<string,number>;
+	const errorpaths = new Map<string,number>;
 	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
 	let getPoolStates = chains.defaults.getPoolStates;
 	let initPools = chains.defaults.initPools;
@@ -45,7 +47,7 @@ async function main() {
 		return;
 	});
 	console.log("Setting up connections and paths");
-	const [account, botClients] = await getChainOperator(botConfig);
+	const [account, botClients] = await getChainOperator(botConfig, botConfig.rpcUrl[0]);
 	let slackClient;
 	if (botConfig.slackToken) {
 		slackClient = getSlackClient(botConfig.slackToken);
@@ -96,6 +98,8 @@ async function main() {
 			skipClient,
 			skipSigner,
 			slackClient,
+			timeouturls,
+			errorpaths,
 		);
 	} else if (botConfig.useMempool === true) {
 		console.log("Initializing mempool loop");
@@ -108,6 +112,8 @@ async function main() {
 			botClients,
 			account,
 			botConfig,
+			timeouturls,
+			errorpaths,
 		);
 	} else {
 		await sendSlackMessage("loop without mempool or skip not implemented yet", slackClient, botConfig.slackChannel);
@@ -136,7 +142,7 @@ async function main() {
 	}
 }
 
-main().catch((e) => {
-	console.error(e);
-	process.exit(1);
-});
+main()//.catch((e) => {
+	//console.error(e);
+	//process.exit(1);
+//});

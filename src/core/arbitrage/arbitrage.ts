@@ -2,6 +2,7 @@ import { Asset, isNativeAsset } from "../types/base/asset";
 import { BotConfig } from "../types/base/botConfig";
 import { Path } from "../types/base/path";
 import { getOptimalTrade } from "./optimizers/analyticalOptimizer";
+import { PATHTIMEOUT } from "../types/arbitrageloops/mempoolLoop"
 
 export interface OptimalTrade {
 	offerAsset: Asset;
@@ -11,12 +12,23 @@ export interface OptimalTrade {
 /**
  *
  */
-export function trySomeArb(paths: Array<Path>, botConfig: BotConfig): OptimalTrade | undefined {
+export function trySomeArb(paths: Array<Path>, botConfig: BotConfig, errorpaths: Map<string,number> ): OptimalTrade | undefined {
 	const [path, tradesize, profit] = getOptimalTrade(paths, botConfig.offerAssetInfo);
 
 	if (path === undefined) {
 		return undefined;
 	} else {
+		//Path to address String
+		let addrs: any= new Array
+		//Get Addresses from arbTrade.path.Pools and add to array
+		for (let i = 0; i < path.pools.length; i++) {
+			addrs.push(path.pools[i].address);        
+		}
+		//Needed as Key for errorpaths
+		addrs=addrs.toString()
+		if (errorpaths.has(addrs)&&errorpaths.get(addrs)!+PATHTIMEOUT > Date.now()){
+			return undefined;
+		}
 		const minProfit = path.pools.length == 2 ? botConfig.profitThreshold2Hop : botConfig.profitThreshold3Hop;
 		if (profit * 0.997 < minProfit) {
 			return undefined;

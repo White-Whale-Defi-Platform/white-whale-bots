@@ -5,7 +5,7 @@ import { NativeAssetInfo } from "./asset";
 
 export interface BotConfig {
 	chainPrefix: string;
-	rpcUrl: string;
+	rpcUrl: Array<string>;
 	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number }>;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
 	flashloanRouterAddress: string;
@@ -51,7 +51,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 	const GAS_FEE_3HOP: Coin = { denom: envs.BASE_DENOM, amount: String(+GAS_UNIT_USAGES[1] * +GAS_UNIT_PRICE) };
 	const TX_FEE_2HOP: StdFee = { amount: [GAS_FEE_2HOP], gas: GAS_UNIT_USAGES[0] };
 	const TX_FEE_3HOP: StdFee = { amount: [GAS_FEE_3HOP], gas: GAS_UNIT_USAGES[1] };
-
+	const RPC_ENVS: Array<string> = process.env.RPC_URL!.replaceAll("\"","").split(",")
 	//make sure amount is GAS_FEE.gas * GAS_PRICE at minimum
 	//make sure gas units used is adjusted based on amount of msgs in the arb
 	//make sure amount is GAS_FEE.gas * GAS_PRICE at minimum
@@ -62,7 +62,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 	const SKIP_BID_RATE = envs.SKIP_BID_RATE !== undefined ? +envs.SKIP_BID_RATE : undefined;
 	const botConfig: BotConfig = {
 		chainPrefix: envs.CHAIN_PREFIX,
-		rpcUrl: envs.RPC_URL,
+		rpcUrl: RPC_ENVS,
 		poolEnvs: POOLS_ENVS,
 		mappingFactoryRouter: FACTORIES_TO_ROUTERS_MAPPING,
 		flashloanRouterAddress: envs.FLASHLOAN_ROUTER_ADDRESS,
