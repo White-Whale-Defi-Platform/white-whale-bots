@@ -140,13 +140,15 @@ export class MempoolLoop {
 			chainId: this.chainid,
 		};
 
-		const GAS_FEE = nrOfMessages === 2 ? this.botConfig.txFee2Hop : this.botConfig.txFee3Hop;
+		const TX_FEE =
+			this.botConfig.txFees.get(arbTrade.path.pools.length) ??
+			Array.from(this.botConfig.txFees.values())[this.botConfig.gasFees.size];
 
 		// sign, encode and broadcast the transaction
 		const txRaw = await this.botClients.SigningCWClient.sign(
 			this.account.address,
 			msgs,
-			GAS_FEE,
+			TX_FEE,
 			"memo",
 			signerData,
 		);

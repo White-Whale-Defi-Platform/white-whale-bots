@@ -30,6 +30,10 @@ declare namespace NodeJS {
 		 */
 		FLASHLOAN_ROUTER_ADDRESS: string;
 		/**
+		 * Fee used for taking a flashloan.
+		 */
+		FLASHLOAN_FEE: string;
+		/**
 		 * A list of all the pools to map, separated by ", \n".
 		 *
 		 * Stored as a JSON object containing a "pool" and "fee" key/value pair.
@@ -55,7 +59,8 @@ declare namespace NodeJS {
 		 */
 		PROFIT_THRESHOLD: string;
 
-		GAS_UNIT_USAGES: string;
+		GAS_USAGE_PER_HOP: string;
+		MAX_PATH_HOPS: string;
 
 		SLACK_TOKEN: string | undefined;
 		SLACK_CHANNEL: string | undefined;

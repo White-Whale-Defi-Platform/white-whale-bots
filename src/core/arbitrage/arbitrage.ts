@@ -17,8 +17,10 @@ export function trySomeArb(paths: Array<Path>, botConfig: BotConfig): OptimalTra
 	if (path === undefined) {
 		return undefined;
 	} else {
-		const minProfit = path.pools.length == 2 ? botConfig.profitThreshold2Hop : botConfig.profitThreshold3Hop;
-		if (profit * 0.997 < minProfit) {
+		const profitThreshold =
+			botConfig.profitThresholds.get(path.pools.length) ??
+			Array.from(botConfig.profitThresholds.values())[botConfig.profitThresholds.size];
+		if (profit < profitThreshold) {
 			return undefined;
 		} else {
 			console.log("optimal tradesize: ", tradesize, " with profit: ", profit);
