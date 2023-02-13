@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 
 import * as chains from "./chains";
 import { trySomeArb } from "./core/arbitrage/arbitrage";
-import { getSlackClient, sendSlackMessage } from "./core/logging/slacklogger";
+import { Logger } from "./core/logging";
 import { getChainOperator } from "./core/node/chainoperator";
 import { getSkipClient } from "./core/node/skipclients";
 import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
@@ -46,11 +46,7 @@ async function main() {
 	});
 	console.log("Setting up connections and paths");
 	const [account, botClients] = await getChainOperator(botConfig);
-	let slackClient;
-	if (botConfig.slackToken) {
-		slackClient = getSlackClient(botConfig.slackToken);
-	}
-
+	const logger = new Logger(botConfig);
 	const { accountNumber, sequence } = await botClients.SigningCWClient.getSequence(account.address);
 	const chainId = await (
 		await botClients.HttpClient.execute(createJsonRpcRequest("block"))
@@ -95,7 +91,7 @@ async function main() {
 			botConfig,
 			skipClient,
 			skipSigner,
-			slackClient,
+			logger,
 		);
 	} else if (botConfig.useMempool === true) {
 		console.log("Initializing mempool loop");
@@ -108,9 +104,10 @@ async function main() {
 			botClients,
 			account,
 			botConfig,
+			logger,
 		);
 	} else {
-		await sendSlackMessage("loop without mempool or skip not implemented yet", slackClient, botConfig.slackChannel);
+		await logger.sendMessage("**Info:** loop without mempool or skip not implemented yet");
 		return;
 	}
 	// main loop of the bot
@@ -121,17 +118,8 @@ async function main() {
 		await loop.step();
 		loop.reset();
 		if (loop.iterations % 150 === 0) {
-			await sendSlackMessage(
-				">*chain: * " +
-					loop.chainid +
-					" *wallet: * " +
-					account.address +
-					" sign of life, bot is running for " +
-					loop.iterations +
-					" blocks",
-				slackClient,
-				botConfig.slackChannel,
-			);
+			const message = `**chain:** ${loop.chainid} **wallet:** ${account.address} **status:** running for ${loop.iterations} blocks`;
+			await logger.sendMessage(message);
 		}
 	}
 }

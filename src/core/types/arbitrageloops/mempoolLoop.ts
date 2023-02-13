@@ -4,8 +4,10 @@ import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
+import { Logger } from "../../logging";
 import { BotClients } from "../../node/chainoperator";
 import { BotConfig } from "../base/botConfig";
+import { LogType } from "../base/logging";
 import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../base/mempool";
 import { Path } from "../base/path";
 import { applyMempoolTradesOnPools, Pool } from "../base/pool";
@@ -22,6 +24,7 @@ export class MempoolLoop {
 	sequence = 0;
 	chainid = "";
 	botConfig: BotConfig;
+	logger: Logger | undefined;
 	// CACHE VALUES
 	totalBytes = 0;
 	mempool!: Mempool;
@@ -37,6 +40,7 @@ export class MempoolLoop {
 		walletAddress: string,
 		flashloancontract: string,
 	) => [Array<EncodeObject>, number];
+
 	/**
 	 *
 	 */
@@ -53,6 +57,7 @@ export class MempoolLoop {
 		botClients: BotClients,
 		account: AccountData,
 		botConfig: BotConfig,
+		logger: Logger | undefined,
 	) {
 		this.pools = pools;
 		this.paths = paths;
@@ -62,7 +67,9 @@ export class MempoolLoop {
 		this.botClients = botClients;
 		this.account = account;
 		this.botConfig = botConfig;
+		this.logger = logger;
 	}
+
 	/**
 	 *
 	 */
@@ -124,6 +131,7 @@ export class MempoolLoop {
 		this.totalBytes = 0;
 		flushTxMemory();
 	}
+
 	/**
 	 *
 	 */
@@ -133,7 +141,9 @@ export class MempoolLoop {
 			this.account.address,
 			this.botConfig.flashloanRouterAddress,
 		);
-		console.log(msgs);
+
+		await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Log);
+
 		const signerData = {
 			accountNumber: this.accountNumber,
 			sequence: this.sequence,
@@ -152,7 +162,9 @@ export class MempoolLoop {
 		);
 		const txBytes = TxRaw.encode(txRaw).finish();
 		const sendResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
-		console.log(sendResult);
+
+		await this.logger?.sendMessage(JSON.stringify(sendResult), LogType.Log);
+
 		this.sequence += 1;
 		await delay(5000);
 		await this.fetchRequiredChainData();
