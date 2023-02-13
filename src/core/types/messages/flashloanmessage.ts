@@ -1,4 +1,4 @@
-import { Asset } from "../asset";
+import { Asset } from "../base/asset";
 
 export type ExecuteMessage = {
 	execute: {
