@@ -17,11 +17,10 @@ export function getSlackClient(token: string) {
 export async function sendSlackMessage(message: string, client: WebClient | undefined, channel: string | undefined) {
 	if (client && channel) {
 		// send log to slack channel
-		const result = await client.chat.postMessage({
+		await client.chat.postMessage({
 			text: message,
 			channel: channel,
 		});
-		console.log(result);
 	} else {
 		// log to stdout
 		console.log(message);
