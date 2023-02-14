@@ -3,13 +3,13 @@ import dotenv from "dotenv";
 
 import * as chains from "./chains";
 import { trySomeArb } from "./core/arbitrage/arbitrage";
+import { getPaths, newGraph } from "./core/arbitrage/graph";
 import { getSlackClient, sendSlackMessage } from "./core/logging/slacklogger";
 import { getChainOperator } from "./core/node/chainoperator";
 import { getSkipClient } from "./core/node/skipclients";
 import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
 import { SkipLoop } from "./core/types/arbitrageloops/skipLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
-import { getPathsFromPool, getPathsFromPools3Hop } from "./core/types/base/path";
 import { removedUnusedPools } from "./core/types/base/pool";
 // load env files
 dotenv.config();
@@ -51,7 +51,6 @@ async function main() {
 	if (botConfig.slackToken) {
 		slackClient = getSlackClient(botConfig.slackToken);
 	}
-	console.log(botConfig);
 	const { accountNumber, sequence } = await botClients.SigningCWClient.getSequence(account.address);
 	const chainId = await (
 		await botClients.HttpClient.execute(createJsonRpcRequest("block"))
@@ -61,17 +60,16 @@ async function main() {
 	console.log("---".repeat(30));
 	console.log("Deriving paths for arbitrage");
 	const allPools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-
-	const paths = getPathsFromPool(allPools, botConfig.offerAssetInfo);
-	const paths2 = getPathsFromPools3Hop(allPools, botConfig.offerAssetInfo);
-	console.log("2 HOP paths: ", paths.length);
-	console.log("3 HOP paths: ", paths2.length);
-	paths.push(...paths2);
+	const graph = newGraph(allPools);
+	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 	console.log("total paths: ", paths.length);
+	for (let i = 2; i <= botConfig.maxPathPools; i++) {
+		const nrOfPaths = paths.filter((path) => path.pools.length === i).length;
+		console.log(`${i}hop paths: `, nrOfPaths);
+	}
 	console.log("---".repeat(30));
 	const filteredPools = removedUnusedPools(allPools, paths);
 	console.log("Removed ", allPools.length - filteredPools.length, " unused pools");
-
 	let loop;
 	if (botConfig.skipConfig) {
 		console.log("Initializing skip loop");
