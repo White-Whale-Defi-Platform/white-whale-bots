@@ -8,10 +8,10 @@ import { WebClient } from "@slack/web-api";
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
-import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { sendSlackMessage } from "../../logging/slacklogger";
 import { BotClients } from "../../node/chainoperator";
 import { SkipResult } from "../../node/skipclients";
+import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { BotConfig } from "../base/botConfig";
 import { MempoolTrade, processMempool } from "../base/mempool";
 import { Path } from "../base/path";
@@ -31,7 +31,7 @@ export class SkipLoop extends MempoolLoop {
 	public constructor(
 		pools: Array<Pool>,
 		paths: Array<Path>,
-		arbitrage: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined,
+		arbitrage: (paths: Array<Path>, botConfig: BotConfig, errorpaths: Map<string,number>) => OptimalTrade | undefined,
 		updateState: (botclients: BotClients, pools: Array<Pool>) => void,
 		messageFunction: (
 			arbTrade: OptimalTrade,
@@ -44,8 +44,10 @@ export class SkipLoop extends MempoolLoop {
 		skipClient: SkipBundleClient,
 		skipSigner: DirectSecp256k1HdWallet,
 		slackLogger: WebClient | undefined,
+		timeouturls: Map<string, number>,
+		errorpaths: Map<string, number>,
 	) {
-		super(pools, paths, arbitrage, updateState, messageFunction, botClients, account, botConfig);
+		super(pools, paths, arbitrage, updateState, messageFunction, botClients, account, botConfig, timeouturls, errorpaths);
 		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.slackLogger = slackLogger);
 	}
 
@@ -73,7 +75,7 @@ export class SkipLoop extends MempoolLoop {
 			} else {
 				for (const trade of mempoolTrades) {
 					applyMempoolTradesOnPools(this.pools, [trade]);
-					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig, this.errorpaths);
 					if (arbTrade) {
 						await this.skipTrade(arbTrade, trade);
 						break;

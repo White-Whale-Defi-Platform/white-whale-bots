@@ -11,7 +11,7 @@ interface SkipConfig {
 }
 export interface BotConfig {
 	chainPrefix: string;
-	rpcUrl: string;
+	rpcUrl: Array<string>;
 	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number }>;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
 	flashloanRouterAddress: string;
@@ -62,6 +62,8 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
 		};
 	}
+
+	const RPC_ENVS: Array<string> = envs.RPC_URL!.replaceAll("\"","").split(",")
 	const FLASHLOAN_FEE = +envs.FLASHLOAN_FEE;
 	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
 
@@ -82,7 +84,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 
 	const botConfig: BotConfig = {
 		chainPrefix: envs.CHAIN_PREFIX,
-		rpcUrl: envs.RPC_URL,
+		rpcUrl: RPC_ENVS,
 		poolEnvs: POOLS_ENVS,
 		mappingFactoryRouter: FACTORIES_TO_ROUTERS_MAPPING,
 		flashloanRouterAddress: envs.FLASHLOAN_ROUTER_ADDRESS,
