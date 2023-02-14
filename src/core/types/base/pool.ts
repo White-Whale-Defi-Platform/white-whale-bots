@@ -220,21 +220,6 @@ function findPoolByInfos(pools: Array<Pool>, infoA: AssetInfo, infoB: AssetInfo)
 /**
  *
  */
-export function routeBetweenPools(poolA: Pool, poolB: Pool): boolean {
-	const match0 = isMatchingAssetInfos(poolA.assets[0].info, poolB.assets[0].info) ? 1 : 0;
-	const match1 = isMatchingAssetInfos(poolA.assets[1].info, poolB.assets[0].info) ? 1 : 0;
-	const match2 = isMatchingAssetInfos(poolA.assets[1].info, poolB.assets[1].info) ? 1 : 0;
-	const match3 = isMatchingAssetInfos(poolA.assets[0].info, poolB.assets[1].info) ? 1 : 0;
-
-	const matched = match0 + match1 + match2 + match3;
-	return matched == 1;
-	// there is exactly 1 match, meaning we can travel from A to B through 1 asset. We want to exclude pools with exactly the same 2 assets
-	// as they will be included in a 2 hop path.
-}
-
-/**
- *
- */
 export function getAssetsOrder(pool: Pool, assetInfo: AssetInfo) {
 	if (isMatchingAssetInfos(pool.assets[0].info, assetInfo)) {
 		return [pool.assets[0], pool.assets[1]] as Array<Asset>;
