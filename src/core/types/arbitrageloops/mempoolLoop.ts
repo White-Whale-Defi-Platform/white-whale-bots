@@ -10,15 +10,16 @@ import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../base/me
 import { Path } from "../base/path";
 import { applyMempoolTradesOnPools, Pool } from "../base/pool";
 
-/**
+/**.
  * Variables for the Timeout Duration of RPCs and Arbitrage Paths
  *
  */
-const TIMEOUTDUR: number = 600000; // 10 Minutes
-export const PATHTIMEOUT: number = 600000;
+const TIMEOUTDUR = 600000; // 10 Minutes
+export const PATHTIMEOUT = 600000;
 
-
-
+/**
+ *
+ */
 export class MempoolLoop {
 	pools: Array<Pool>;
 	paths: Array<Path>;
@@ -38,7 +39,11 @@ export class MempoolLoop {
 	/**
 	 *
 	 */
-	arbitrageFunction: (paths: Array<Path>, botConfig: BotConfig, errorpaths: Map<string, number>) => OptimalTrade | undefined;
+	arbitrageFunction: (
+		paths: Array<Path>,
+		botConfig: BotConfig,
+		errorpaths: Map<string, number>,
+	) => OptimalTrade | undefined;
 	updateStateFunction: (botClients: BotClients, pools: Array<Pool>) => void;
 	messageFunction: (
 		arbTrade: OptimalTrade,
@@ -51,7 +56,11 @@ export class MempoolLoop {
 	public constructor(
 		pools: Array<Pool>,
 		paths: Array<Path>,
-		arbitrage: (paths: Array<Path>, botConfig: BotConfig, errorpaths: Map<string, number>) => OptimalTrade | undefined,
+		arbitrage: (
+			paths: Array<Path>,
+			botConfig: BotConfig,
+			errorpaths: Map<string, number>,
+		) => OptimalTrade | undefined,
 		updateState: (botclients: BotClients, pools: Array<Pool>) => void,
 		messageFunction: (
 			arbTrade: OptimalTrade,
@@ -88,60 +97,61 @@ export class MempoolLoop {
 	}
 
 	/**
-	 * Sets new Clients for Mempoolloop
-	 * @param errurl: Old RPC-URL
+	 * Sets new Clients for Mempoolloop.
+	 * @param errurl: Old RPC-URL.
 	 */
 
+	/**
+	 *
+	 */
 	private async getNewClients(errurl: string) {
-		let n: number = 0;
-		let urlstring: string | undefined = undefined;
-		this.timeouturls.set(errurl, Date.now())
+		let n = 0;
+		let urlstring: string | undefined;
+		this.timeouturls.set(errurl, Date.now());
 		while (!urlstring && n < this.botConfig.rpcUrl.length) {
-			let currtime: number = Date.now()
+			const currtime: number = Date.now();
 
 			if (!this.timeouturls.has(this.botConfig.rpcUrl[n])) {
-				urlstring = this.botConfig.rpcUrl[n]
-			}
-			else {
-				let errtime = this.timeouturls.get(this.botConfig.rpcUrl[n])
+				urlstring = this.botConfig.rpcUrl[n];
+			} else {
+				const errtime = this.timeouturls.get(this.botConfig.rpcUrl[n]);
 				if (errtime && errtime + TIMEOUTDUR <= currtime) {
-					this.timeouturls.delete(this.botConfig.rpcUrl[n])
-					urlstring = this.botConfig.rpcUrl[n]
+					this.timeouturls.delete(this.botConfig.rpcUrl[n]);
+					urlstring = this.botConfig.rpcUrl[n];
 				}
 			}
-			n++
+			n++;
 		}
 		if (!urlstring) {
-			console.log("All RPC's Timeouted")
-			let n: number = Date.now()
-			let nexturl: string = errurl
+			console.log("All RPC's Timeouted");
+			let n: number = Date.now();
+			let nexturl: string = errurl;
 			for (const [url, timeouted] of this.timeouturls.entries()) {
 				if (timeouted < n) {
-					n = timeouted
-					nexturl = url
+					n = timeouted;
+					nexturl = url;
 				}
 			}
-			delay(TIMEOUTDUR + n - Date.now())
-			let [account, botClients] = await getChainOperator(this.botConfig, nexturl)
-			this.account = account
-			this.botClients = botClients
-		}
-		else {
-			console.log("Updating Clients to: " + urlstring)
-			let [account, botClients] = await getChainOperator(this.botConfig, urlstring)
-			this.account = account
-			this.botClients = botClients
+			await delay(TIMEOUTDUR + n - Date.now());
+			const [account, botClients] = await getChainOperator(this.botConfig, nexturl);
+			this.account = account;
+			this.botClients = botClients;
+		} else {
+			console.log("Updating Clients to: " + urlstring);
+			const [account, botClients] = await getChainOperator(this.botConfig, urlstring);
+			this.account = account;
+			this.botClients = botClients;
 		}
 	}
 	/**
-	 * 
+	 *
 	 */
 	public async step() {
 		this.iterations++;
 		try {
 			this.updateStateFunction(this.botClients, this.pools);
 		} catch (e) {
-			this.errhandle(e, "http")
+			await this.errhandle(e, "http");
 		}
 
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig, this.errorpaths);
@@ -150,7 +160,7 @@ export class MempoolLoop {
 			try {
 				await this.trade(arbTrade);
 			} catch (e) {
-				this.errhandle(e, "tx")
+				await this.errhandle(e, "tx");
 			}
 			return;
 		}
@@ -159,7 +169,10 @@ export class MempoolLoop {
 			try {
 				const mempoolResult = await this.botClients.HttpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
 				this.mempool = mempoolResult.result;
-			} catch (e) { this.errhandle(e, "http"); break; }
+			} catch (e) {
+				await this.errhandle(e, "http");
+				break;
+			}
 
 			if (+this.mempool.total_bytes < this.totalBytes) {
 				break;
@@ -182,12 +195,11 @@ export class MempoolLoop {
 				try {
 					await this.trade(arbTrade);
 				} catch (e) {
-					this.errhandle(e, "tx")
+					await this.errhandle(e, "tx");
 				}
 				break;
 			}
 		}
-
 	}
 
 	/*
@@ -195,35 +207,34 @@ export class MempoolLoop {
 	TODO: Define other Error Codes. Not sure if TIMEOUT works.
 	*/
 
+	/**
+	 *
+	 */
 	private async errhandle(err: any, src: string) {
-		console.error(err)
+		console.error(err);
 		// Catch errors, if status code is Timeout reconnect to next RPC and create/set new Clients. Else it does still quit the Bot.
 		if (src == "http") {
-			let errjsn = JSON.parse(err.message)
+			const errjsn = JSON.parse(err.message);
 			if (errjsn["code"] == "TIMEOUT") {
-				this.getNewClients(this.botClients.rpcurl)
-			}
-			else if (errjsn["message"].includes("Request failed with status code ")) {
-				let errcode = errjsn["message"].match(/...$/)
-				console.log(errcode)
-			}
-			else {
-				console.log(errjsn)
-				process.exit(1)
+				await this.getNewClients(this.botClients.rpcurl);
+			} else if (errjsn["message"].includes("Request failed with status code ")) {
+				const errcode = errjsn["message"].match(/...$/);
+				console.log(errcode);
+			} else {
+				console.log(errjsn);
+				process.exit(1);
 			}
 		} else if (src == "tx") {
-			let errjsn = JSON.parse(err.message)
+			const errjsn = JSON.parse(err.message);
 
 			if (errjsn["code"] == -32603) {
 				console.log("TX already in Cache");
 			} else {
-				console.log("Unknown Error: " + errjsn["code"])
-				process.exit(1)
+				console.log("Unknown Error: " + errjsn["code"]);
+				process.exit(1);
 			}
-
 		}
 	}
-
 
 	/**
 	 *
@@ -233,20 +244,20 @@ export class MempoolLoop {
 		flushTxMemory();
 	}
 	/**
-	 * why not use broadcast_tx_commit if there is already a delay after sending the transaction
+	 * Why not use broadcast_tx_commit if there is already a delay after sending the transaction.
 	 */
 	private async trade(arbTrade: OptimalTrade) {
-		let addrs: any = new Array
+		let addrs: any = [];
 		//Get Addresses from arbTrade.path.Pools and add to array
 		for (let i = 0; i < arbTrade.path.pools.length; i++) {
 			addrs.push(arbTrade.path.pools[i].address);
 		}
 		//Needed as Key for errorpaths
-		addrs = addrs.toString()
+		addrs = addrs.toString();
 
 		// Check if Tradepath is on Cooldown because of error
 		if (this.errorpaths.has(addrs) && this.errorpaths.get(addrs)! + PATHTIMEOUT > Date.now()) {
-			return
+			return;
 		}
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
@@ -262,7 +273,7 @@ export class MempoolLoop {
 
 		const TX_FEE =
 			this.botConfig.txFees.get(arbTrade.path.pools.length) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.gasFees.size-1];
+			Array.from(this.botConfig.txFees.values())[this.botConfig.gasFees.size - 1];
 
 		// sign, encode and broadcast the transaction
 		const txRaw = await this.botClients.SigningCWClient.sign(
@@ -282,12 +293,12 @@ export class MempoolLoop {
 		await delay(15000);
 		//check tx result, if error put on cooldown. Catch if e.g TX not found after delay
 		try {
-			let txstatus = await this.botClients.TMClient.tx({ hash: sendResult.hash })
+			const txstatus = await this.botClients.TMClient.tx({ hash: sendResult.hash });
 			if (txstatus.result.code != 0) {
-				this.errorpaths.set(addrs, Date.now())
+				this.errorpaths.set(addrs, Date.now());
 			}
 		} catch {
-			this.errorpaths.set(addrs, Date.now())
+			this.errorpaths.set(addrs, Date.now());
 		}
 		await this.fetchRequiredChainData();
 	}
@@ -299,4 +310,3 @@ export class MempoolLoop {
 function delay(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
