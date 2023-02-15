@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 
 import * as chains from "./chains";
 import { trySomeArb } from "./core/arbitrage/arbitrage";
+import { getPaths, newGraph } from "./core/arbitrage/graph";
 import { Logger } from "./core/logging";
 import { getChainOperator } from "./core/node/chainoperator";
 import { getSkipClient } from "./core/node/skipclients";
@@ -10,7 +11,6 @@ import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
 import { SkipLoop } from "./core/types/arbitrageloops/skipLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
 import { LogType } from "./core/types/base/logging";
-import { getPathsFromPool, getPathsFromPools3Hop } from "./core/types/base/path";
 import { removedUnusedPools } from "./core/types/base/pool";
 // load env files
 dotenv.config();
@@ -65,18 +65,19 @@ Connections Details:\n
 	setupMessage += "---".repeat(30);
 
 	const allPools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-	const paths = getPathsFromPool(allPools, botConfig.offerAssetInfo);
-	const paths2 = getPathsFromPools3Hop(allPools, botConfig.offerAssetInfo);
+	const graph = newGraph(allPools);
+	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+
 	const filteredPools = removedUnusedPools(allPools, paths);
 
-	setupMessage += `
-Derived Paths for Arbitrage:\n
-**2 HOP Paths:** \t${paths.length}
-**3 HOP Paths:** \t${paths2.length}\n`;
-
-	paths.push(...paths2);
-
 	setupMessage += `**Total Paths:** \t${paths.length}\n`;
+	for (let pathlength = 2; 2 <= botConfig.maxPathPools; pathlength++) {
+		const nrOfPaths = paths.filter((path) => path.pools.length === pathlength).length;
+		setupMessage += `
+		Derived Paths for Arbitrage:\n
+		**${pathlength} HOP Paths:** \t${nrOfPaths}`;
+	}
+
 	setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
 	setupMessage += "---".repeat(30);
 
