@@ -210,7 +210,7 @@ export class MempoolLoop {
 	/**
 	 *
 	 */
-	private async errHandle(err: unknown, src: string) {
+	private async errHandle(err: any, src: string) {
         console.error(err);
         console.error(typeof err);
         console.error(err.message);
