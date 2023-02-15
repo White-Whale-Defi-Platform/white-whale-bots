@@ -9,7 +9,6 @@ import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
-
 import { Logger } from "../../logging";
 import { BotClients } from "../../node/chainoperator";
 import { SkipResult } from "../../node/skipclients";
@@ -133,7 +132,7 @@ export class SkipLoop extends MempoolLoop {
 		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
 		const TX_FEE =
 			this.botConfig.txFees.get(arbTrade.path.pools.length) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.gasFees.size - 1];
+			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
 		const txRaw: TxRaw = await this.botClients.SigningCWClient.sign(
 			this.account.address,

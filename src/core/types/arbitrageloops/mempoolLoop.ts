@@ -152,9 +152,7 @@ export class MempoolLoop {
 
 		const TX_FEE =
 			this.botConfig.txFees.get(arbTrade.path.pools.length) ??
-
-			Array.from(this.botConfig.txFees.values())[this.botConfig.gasFees.size - 1];
-
+			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
 		// sign, encode and broadcast the transaction
 		const txRaw = await this.botClients.SigningCWClient.sign(
