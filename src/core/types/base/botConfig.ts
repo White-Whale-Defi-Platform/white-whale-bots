@@ -30,6 +30,8 @@ export interface BotConfig {
 	slackToken?: string | undefined;
 	// channel the bot logs in to
 	slackChannel?: string | undefined;
+	// Discord webhook url
+	discordWebhookUrl?: string | undefined;
 
 	// Skip specific (optionally)
 	skipConfig: SkipConfig | undefined;
@@ -97,6 +99,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		txFees: TX_FEES,
 		slackToken: envs.SLACK_TOKEN,
 		slackChannel: envs.SLACK_CHANNEL,
+		discordWebhookUrl: envs.DISCORD_WEBHOOK_URL,
 		skipConfig: skipConfig,
 	};
 	return botConfig;
