@@ -69,20 +69,18 @@ Connections Details:\n
 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 
 	const filteredPools = removedUnusedPools(allPools, paths);
-
-	setupMessage += `**Total Paths:** \t${paths.length}\n`;
-	for (let pathlength = 2; 2 <= botConfig.maxPathPools; pathlength++) {
+	setupMessage += `**\nDerived Paths for Arbitrage:
+Total Paths:** \t${paths.length}\n`;
+	for (let pathlength = 2; pathlength <= botConfig.maxPathPools; pathlength++) {
 		const nrOfPaths = paths.filter((path) => path.pools.length === pathlength).length;
-		setupMessage += `
-		Derived Paths for Arbitrage:\n
-		**${pathlength} HOP Paths:** \t${nrOfPaths}`;
+		setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
 	}
 
 	setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
 	setupMessage += "---".repeat(30);
 
 	startupMessage += setupMessage;
-
+	console.log(startupMessage);
 	await logger.sendMessage(startupMessage, LogType.Console);
 
 	let loop;
