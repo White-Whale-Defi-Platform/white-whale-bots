@@ -4,75 +4,90 @@ import dotenv from "dotenv";
 import * as chains from "./chains";
 import { trySomeArb } from "./core/arbitrage/arbitrage";
 import { getPaths, newGraph } from "./core/arbitrage/graph";
-import { getSlackClient, sendSlackMessage } from "./core/logging/slacklogger";
+import { Logger } from "./core/logging";
 import { getChainOperator } from "./core/node/chainoperator";
 import { getSkipClient } from "./core/node/skipclients";
 import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
 import { SkipLoop } from "./core/types/arbitrageloops/skipLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
+import { LogType } from "./core/types/base/logging";
 import { removedUnusedPools } from "./core/types/base/pool";
 // load env files
 dotenv.config();
 const botConfig = setBotConfig(process.env);
 
-console.log("---".repeat(30));
-console.log("Environmental variables for setup:");
-console.log("RPC ENPDOINT: ", botConfig.rpcUrl);
-console.log("OFFER DENOM: ", botConfig.offerAssetInfo);
-// console.log("POOLS: ", botConfig.poolEnvs);
-console.log("FACTORIES_TO_ROUTERS_MAPPING", botConfig.mappingFactoryRouter);
-console.log("USE MEMPOOL: ", botConfig.useMempool);
-
+let startupMessage = "===".repeat(30);
+startupMessage += "\n**White Whale Bot**\n";
+startupMessage += "===".repeat(30);
+startupMessage += `\nEnvironment Variables:\n
+**RPC ENPDOINT:** \t${botConfig.rpcUrl}
+**OFFER DENOM:** \t${JSON.stringify(botConfig.offerAssetInfo)}
+**FACTORIES_TO_ROUTERS_MAPPING:** \t${JSON.stringify(botConfig.mappingFactoryRouter)}
+**USE MEMPOOL:** \t${botConfig.useMempool}
+**USE SKIP:** \t${botConfig.skipConfig?.useSkip}
+`;
 if (botConfig.skipConfig) {
-	console.log("USE SKIP: ", botConfig.skipConfig.useSkip);
-	console.log("SKIP URL: ", botConfig.skipConfig.skipRpcUrl);
+	startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
+	startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
 }
-console.log("---".repeat(30));
+startupMessage += "---".repeat(30);
 
 /**
  * Runs the main program.
  */
 async function main() {
+	const logger = new Logger(botConfig);
 	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
 	let getPoolStates = chains.defaults.getPoolStates;
 	let initPools = chains.defaults.initPools;
-	await import("./chains/" + botConfig.chainPrefix).then((chainSetups) => {
+
+	await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
 		if (chainSetups === undefined) {
-			console.log("Unable to resolve specific chain imports, using defaults");
+			await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
 		}
 		getFlashArbMessages = chainSetups.getFlashArbMessages;
 		getPoolStates = chainSetups.getPoolStates;
 		initPools = chainSetups.initPools;
 		return;
 	});
-	console.log("Setting up connections and paths");
+
 	const [account, botClients] = await getChainOperator(botConfig);
-	let slackClient;
-	if (botConfig.slackToken) {
-		slackClient = getSlackClient(botConfig.slackToken);
-	}
 	const { accountNumber, sequence } = await botClients.SigningCWClient.getSequence(account.address);
 	const chainId = await (
 		await botClients.HttpClient.execute(createJsonRpcRequest("block"))
 	).result.block.header.chain_id;
-	console.log("accountnumber: ", accountNumber, " sequence: ", sequence, "chainid: ", chainId);
-	console.log("Done, Clients established");
-	console.log("---".repeat(30));
-	console.log("Deriving paths for arbitrage");
+
+	let setupMessage = `
+Connections Details:\n
+**Account Number:** ${accountNumber}
+**Sequence:** \t${sequence}
+**Chain Id:** \t${chainId}\n`;
+	setupMessage += "---".repeat(30);
+
 	const allPools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
 	const graph = newGraph(allPools);
 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
-	console.log("total paths: ", paths.length);
-	for (let i = 2; i <= botConfig.maxPathPools; i++) {
-		const nrOfPaths = paths.filter((path) => path.pools.length === i).length;
-		console.log(`${i}hop paths: `, nrOfPaths);
-	}
-	console.log("---".repeat(30));
+
 	const filteredPools = removedUnusedPools(allPools, paths);
-	console.log("Removed ", allPools.length - filteredPools.length, " unused pools");
+
+	setupMessage += `**Total Paths:** \t${paths.length}\n`;
+	for (let pathlength = 2; 2 <= botConfig.maxPathPools; pathlength++) {
+		const nrOfPaths = paths.filter((path) => path.pools.length === pathlength).length;
+		setupMessage += `
+		Derived Paths for Arbitrage:\n
+		**${pathlength} HOP Paths:** \t${nrOfPaths}`;
+	}
+
+	setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
+	setupMessage += "---".repeat(30);
+
+	startupMessage += setupMessage;
+
+	await logger.sendMessage(startupMessage, LogType.Console);
+
 	let loop;
 	if (botConfig.skipConfig) {
-		console.log("Initializing skip loop");
+		await logger.sendMessage("Initializing skip loop...", LogType.Console);
 		const [skipClient, skipSigner] = await getSkipClient(
 			botConfig.skipConfig.skipRpcUrl,
 			botConfig.mnemonic,
@@ -89,10 +104,11 @@ async function main() {
 			botConfig,
 			skipClient,
 			skipSigner,
-			slackClient,
+			logger,
 		);
 	} else if (botConfig.useMempool === true) {
-		console.log("Initializing mempool loop");
+		await logger.sendMessage("Initializing mempool loop...", LogType.Console);
+
 		loop = new MempoolLoop(
 			filteredPools,
 			paths,
@@ -102,30 +118,23 @@ async function main() {
 			botClients,
 			account,
 			botConfig,
+			logger,
 		);
 	} else {
-		await sendSlackMessage("loop without mempool or skip not implemented yet", slackClient, botConfig.slackChannel);
+		await logger.sendMessage("**Info:** loop without mempool or skip not implemented yet");
 		return;
 	}
 	// main loop of the bot
 	await loop.fetchRequiredChainData();
 
-	console.log("starting loop");
+	await logger.sendMessage("Starting loop...", LogType.All);
+
 	while (true) {
 		await loop.step();
 		loop.reset();
 		if (loop.iterations % 150 === 0) {
-			await sendSlackMessage(
-				">*chain: * " +
-					loop.chainid +
-					" *wallet: * " +
-					account.address +
-					" sign of life, bot is running for " +
-					loop.iterations +
-					" blocks",
-				slackClient,
-				botConfig.slackChannel,
-			);
+			const message = `**chain:** ${loop.chainid} **wallet:** ${account.address} **status:** running for ${loop.iterations} blocks`;
+			await logger.sendMessage(message);
 		}
 	}
 }

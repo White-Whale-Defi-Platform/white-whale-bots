@@ -9,10 +9,11 @@ import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
-import { sendSlackMessage } from "../../logging/slacklogger";
+import { Logger } from "../../logging";
 import { BotClients } from "../../node/chainoperator";
 import { SkipResult } from "../../node/skipclients";
 import { BotConfig } from "../base/botConfig";
+import { LogType } from "../base/logging";
 import { MempoolTrade, processMempool } from "../base/mempool";
 import { Path } from "../base/path";
 import { applyMempoolTradesOnPools, Pool } from "../base/pool";
@@ -25,6 +26,8 @@ export class SkipLoop extends MempoolLoop {
 	skipClient: SkipBundleClient;
 	skipSigner: DirectSecp256k1HdWallet;
 	slackLogger: WebClient | undefined;
+	logger: Logger | undefined;
+
 	/**
 	 *
 	 */
@@ -43,10 +46,10 @@ export class SkipLoop extends MempoolLoop {
 		botConfig: BotConfig,
 		skipClient: SkipBundleClient,
 		skipSigner: DirectSecp256k1HdWallet,
-		slackLogger: WebClient | undefined,
+		logger: Logger | undefined,
 	) {
-		super(pools, paths, arbitrage, updateState, messageFunction, botClients, account, botConfig);
-		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.slackLogger = slackLogger);
+		super(pools, paths, arbitrage, updateState, messageFunction, botClients, account, botConfig, logger);
+		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.logger = logger);
 	}
 
 	/**
@@ -82,6 +85,7 @@ export class SkipLoop extends MempoolLoop {
 			}
 		}
 	}
+
 	/**
 	 *
 	 */
@@ -92,7 +96,10 @@ export class SkipLoop extends MempoolLoop {
 			this.botConfig.skipConfig?.skipBidRate === undefined ||
 			this.botConfig.skipConfig?.skipBidWallet === undefined
 		) {
-			console.error("please setup skip variables in the config environment file", 1);
+			await this.logger?.sendMessage(
+				"Please setup skip variables in the config environment file",
+				LogType.Console,
+			);
 			return;
 		}
 		const bidMsg: MsgSend = MsgSend.fromJSON({
@@ -125,7 +132,7 @@ export class SkipLoop extends MempoolLoop {
 		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
 		const TX_FEE =
 			this.botConfig.txFees.get(arbTrade.path.pools.length) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.gasFees.size - 1];
+			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
 		const txRaw: TxRaw = await this.botClients.SigningCWClient.sign(
 			this.account.address,
@@ -142,47 +149,40 @@ export class SkipLoop extends MempoolLoop {
 
 		const res = <SkipResult>await this.skipClient.sendBundle(signed, 0, true);
 
-		let slackMessage =
-			"<*wallet:* " +
-			this.account.address +
-			"\n" +
-			" *block:* " +
-			res.result.desired_height +
-			"\t" +
-			"*profit:* " +
-			arbTrade.profit +
-			"\t" +
-			"*errorcode* " +
-			res.result.code +
-			":\t" +
-			res.result.error +
-			"\n";
+		let logItem = "";
+		let logMessage = `**wallet:** ${this.account.address}\t **block:** ${res.result.desired_height}\t **profit:** ${arbTrade.profit}`;
 
-		console.log(res);
+		if (res.result.code !== 0) {
+			logMessage += `\t **error code:** ${res.result.code}\n**error:** ${res.result.error}\n`;
+		}
+
 		if (res.result.result_check_txs != undefined) {
 			res.result.result_check_txs.map(async (item, idx) => {
 				if (item["code"] != "0") {
-					console.log("CheckTx Error on index: ", idx);
-					console.log(item);
+					logItem = JSON.stringify(item);
 
-					const slackMessageCheckTx = ">*CheckTx Error* on index: " + idx + ":\t" + String(item.log) + "\n";
-					slackMessage = slackMessage.concat(slackMessageCheckTx);
+					const logMessageCheckTx = `**CheckTx Error:** index: ${idx}\t ${String(item.log)}\n`;
+					logMessage = logMessage.concat(logMessageCheckTx);
 				}
 			});
 		}
 		if (res.result.result_deliver_txs != undefined) {
 			res.result.result_deliver_txs.map(async (item, idx) => {
 				if (item["code"] != "0") {
-					console.log("deliver tx result of index: ", idx);
-					console.log(item);
-					const slackMessageDeliverTx =
-						">*DeliverTx Error* on index: " + idx + "\t" + String(item.log) + "\n";
-					slackMessage = slackMessage.concat(slackMessageDeliverTx);
+					logItem = JSON.stringify(item);
+
+					const logMessageDeliverTx = `**DeliverTx Error:** index: ${idx}\t ${String(item.log)}\n`;
+					logMessage = logMessage.concat(logMessageDeliverTx);
 				}
 			});
 		}
-		console.log(slackMessage);
-		await sendSlackMessage(slackMessage, this.slackLogger, this.botConfig.slackChannel);
+
+		await this.logger?.sendMessage(logMessage, LogType.All, res.result.code);
+
+		if (logItem.length > 0) {
+			await this.logger?.sendMessage(logItem, LogType.Console);
+		}
+
 		if (res.result.code === 0) {
 			this.sequence += 1;
 		} else {
@@ -191,6 +191,7 @@ export class SkipLoop extends MempoolLoop {
 		await delay(5000);
 	}
 }
+
 /**
  *
  */
