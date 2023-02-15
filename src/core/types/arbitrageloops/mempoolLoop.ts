@@ -5,7 +5,9 @@ import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { BotClients, getChainOperator } from "../../node/chainoperator";
+import { Logger } from "../../logging";
 import { BotConfig } from "../base/botConfig";
+import { LogType } from "../base/logging";
 import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../base/mempool";
 import { Path } from "../base/path";
 import { applyMempoolTradesOnPools, Pool } from "../base/pool";
@@ -29,6 +31,7 @@ export class MempoolLoop {
 	sequence = 0;
 	chainid = "";
 	botConfig: BotConfig;
+	logger: Logger | undefined;
 	// CACHE VALUES
 	totalBytes = 0;
 	mempool!: Mempool;
@@ -50,6 +53,7 @@ export class MempoolLoop {
 		walletAddress: string,
 		flashloancontract: string,
 	) => [Array<EncodeObject>, number];
+
 	/**
 	 *
 	 */
@@ -72,6 +76,7 @@ export class MempoolLoop {
 		botConfig: BotConfig,
 		timeouturls: Map<string, number>,
 		errorpaths: Map<string, number>,
+		logger: Logger | undefined,
 	) {
 		this.pools = pools;
 		this.paths = paths;
@@ -83,7 +88,9 @@ export class MempoolLoop {
 		this.botConfig = botConfig;
 		this.timeoutUrls = timeouturls;
 		this.errorpaths = errorpaths;
+		this.logger = logger;
 	}
+
 	/**
 	 *
 	 */
@@ -248,6 +255,7 @@ export class MempoolLoop {
 		this.totalBytes = 0;
 		flushTxMemory();
 	}
+
 	/**
 	 * Why not use broadcast_tx_commit if there is already a delay after sending the transaction.
 	 */
@@ -269,7 +277,9 @@ export class MempoolLoop {
 			this.account.address,
 			this.botConfig.flashloanRouterAddress,
 		);
-		console.log(msgs);
+
+		await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
+
 		const signerData = {
 			accountNumber: this.accountNumber,
 			sequence: this.sequence,
@@ -278,7 +288,7 @@ export class MempoolLoop {
 
 		const TX_FEE =
 			this.botConfig.txFees.get(arbTrade.path.pools.length) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.gasFees.size - 1];
+			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
 		// sign, encode and broadcast the transaction
 		const txRaw = await this.botClients.SigningCWClient.sign(
@@ -293,7 +303,8 @@ export class MempoolLoop {
 		//can use broadcastTxCommit?
 		const sendResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
 
-		console.log(sendResult);
+		await this.logger?.sendMessage(JSON.stringify(sendResult), LogType.Console);
+
 		this.sequence += 1;
 		await delay(15000);
 		//check tx result, if error put on cooldown. Catch if e.g TX not found after delay

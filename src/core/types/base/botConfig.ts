@@ -13,6 +13,7 @@ export interface BotConfig {
 	chainPrefix: string;
 	rpcUrl: Array<string>;
 	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number }>;
+	maxPathPools: number;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
 	flashloanRouterAddress: string;
 	offerAssetInfo: NativeAssetInfo;
@@ -21,7 +22,6 @@ export interface BotConfig {
 	baseDenom: string;
 
 	gasPrice: string;
-	gasFees: Map<number, Coin>;
 	txFees: Map<number, StdFee>;
 	profitThresholds: Map<number, number>;
 
@@ -30,6 +30,8 @@ export interface BotConfig {
 	slackToken?: string | undefined;
 	// channel the bot logs in to
 	slackChannel?: string | undefined;
+	// Discord webhook url
+	discordWebhookUrl?: string | undefined;
 
 	// Skip specific (optionally)
 	skipConfig: SkipConfig | undefined;
@@ -77,15 +79,17 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) });
 		const profitThreshold: number =
 			skipConfig === undefined
-				? PROFIT_THRESHOLD / (1 - FLASHLOAN_FEE) + +gasFee.amount //dont use skip bid on top of the threshold, include flashloan fee and gas fee
-				: PROFIT_THRESHOLD / (1 - FLASHLOAN_FEE) + +gasFee.amount + skipConfig.skipBidRate * PROFIT_THRESHOLD; //need extra profit to provide the skip bid
+				? PROFIT_THRESHOLD / (1 - FLASHLOAN_FEE / 100) + +gasFee.amount //dont use skip bid on top of the threshold, include flashloan fee and gas fee
+				: PROFIT_THRESHOLD / (1 - FLASHLOAN_FEE / 100) +
+				  +gasFee.amount +
+				  skipConfig.skipBidRate * PROFIT_THRESHOLD; //need extra profit to provide the skip bid
 		PROFIT_THRESHOLDS.set(hops, profitThreshold);
 	}
-
 	const botConfig: BotConfig = {
 		chainPrefix: envs.CHAIN_PREFIX,
 		rpcUrl: RPC_ENVS,
 		poolEnvs: POOLS_ENVS,
+		maxPathPools: MAX_PATH_HOPS,
 		mappingFactoryRouter: FACTORIES_TO_ROUTERS_MAPPING,
 		flashloanRouterAddress: envs.FLASHLOAN_ROUTER_ADDRESS,
 		offerAssetInfo: OFFER_ASSET_INFO,
@@ -94,10 +98,10 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		baseDenom: envs.BASE_DENOM,
 		gasPrice: envs.GAS_UNIT_PRICE,
 		profitThresholds: PROFIT_THRESHOLDS,
-		gasFees: GAS_FEES,
 		txFees: TX_FEES,
 		slackToken: envs.SLACK_TOKEN,
 		slackChannel: envs.SLACK_CHANNEL,
+		discordWebhookUrl: envs.DISCORD_WEBHOOK_URL,
 		skipConfig: skipConfig,
 	};
 	return botConfig;
