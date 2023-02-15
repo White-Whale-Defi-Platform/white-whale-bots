@@ -71,7 +71,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 	const GAS_FEES = new Map<number, Coin>();
 	const TX_FEES = new Map<number, StdFee>();
 	const PROFIT_THRESHOLDS = new Map<number, number>();
-	for (let hops = 2; hops <= MAX_PATH_HOPS; hops++) {
+	for (let hops = 2; hops <= MAX_PATH_HOPS * 2; hops++) {
 		const gasFee = { denom: envs.BASE_DENOM, amount: String(GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE) };
 		GAS_FEES.set(hops, gasFee);
 		TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) });

@@ -90,6 +90,7 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 		}
 		paths.push({
 			pools: poolList,
+			cooldown: false,
 		});
 	}
 	return paths;
