@@ -35,7 +35,7 @@ export class Logger {
 	 * @param type The type of message, values of type LogType.
 	 * @param code The code number of the message, -1 if not given.
 	 */
-	public async sendMessage(message: string, type: LogType = LogType.All, code = -1) {
+	public async sendMessage(message: string | undefined, type: LogType = LogType.All, code = -1) {
 		if (message) {
 			// Don't send common errors to discord/slack
 			if (type != LogType.Console && !this.externalExemptCodes.includes(code)) {

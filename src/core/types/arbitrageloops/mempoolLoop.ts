@@ -4,8 +4,8 @@ import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
-import { BotClients, getChainOperator } from "../../node/chainoperator";
 import { Logger } from "../../logging";
+import { BotClients, getChainOperator } from "../../node/chainoperator";
 import { BotConfig } from "../base/botConfig";
 import { LogType } from "../base/logging";
 import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../base/mempool";
@@ -105,11 +105,7 @@ export class MempoolLoop {
 
 	/**
 	 * Sets new Clients for Mempoolloop.
-	 * @param errurl: Old RPC-URL.
-	 */
-
-	/**
-	 *
+	 * @param errUrl: Old RPC-URL.
 	 */
 	private async getNewClients(errUrl: string) {
 		let n = 0;
@@ -218,33 +214,31 @@ export class MempoolLoop {
 	 *
 	 */
 	private async errHandle(err: any, src: string) {
-        console.error(err);
-        console.error(typeof err);
-        console.error(err.message);
-        console.error(err.errno);
-        console.error(err.code);
-        console.error(err.response.status);
-		// Catch errors, if status code is Timeout reconnect to next RPC and create/set new Clients. Else it does still quit the Bot.
-		if (src == "http") {
-			const errjsn = JSON.parse(err.message);
-			if (errjsn["code"] == "TIMEOUT") {
-				await this.getNewClients(this.botClients.rpcurl);
-			} else if (errjsn["message"].includes("Request failed with status code ")) {
-				const errcode = errjsn["message"].match(/...$/);
-				console.log(errcode);
-			} else {
-				console.log(errjsn);
-				process.exit(1);
-			}
-		} else if (src == "tx") {
-			const errjsn = JSON.parse(err.message);
+		console.error(err);
+		console.error(typeof err);
+		console.error(err.message);
+		console.error(err.errno);
+		console.error(err.code);
+		try {
+			console.error(err.response.status);
+		} catch {
+			console.log("err");
+		}
 
-			if (errjsn["code"] == -32603) {
-				console.log("TX already in Cache");
-			} else {
-				console.log("Unknown Error: " + errjsn["code"]);
-				process.exit(1);
-			}
+		switch (err.code) {
+			case -32603:
+				console.error("error on broadcastTxCommit: tx already exists in cache. Path timeouted.");
+				break;
+			case -32000:
+				console.error("Server Error");
+				await this.getNewClients(this.botClients.rpcurl);
+				break;
+			case -41736:
+				console.error("SSL handshake failure");
+				await this.getNewClients(this.botClients.rpcurl);
+				break;
+			default:
+				console.error(err.code);
 		}
 	}
 
@@ -278,7 +272,7 @@ export class MempoolLoop {
 			this.botConfig.flashloanRouterAddress,
 		);
 
-		await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
+		//await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
 
 		const signerData = {
 			accountNumber: this.accountNumber,
@@ -301,21 +295,22 @@ export class MempoolLoop {
 		const txBytes = TxRaw.encode(txRaw).finish();
 
 		//can use broadcastTxCommit?
-		const sendResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
 
-		await this.logger?.sendMessage(JSON.stringify(sendResult), LogType.Console);
+		const sendResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
 
 		this.sequence += 1;
 		await delay(15000);
 		//check tx result, if error put on cooldown. Catch if e.g TX not found after delay
 		try {
 			const txStatus = await this.botClients.TMClient.tx({ hash: sendResult.hash });
-			if (txStatus.result.code != 0) {
+			await this.logger?.sendMessage(txStatus.result.log, LogType.Console);
+			if (sendResult && txStatus.result.code != 0) {
 				this.errorpaths.set(addrs, Date.now());
 			}
 		} catch {
 			this.errorpaths.set(addrs, Date.now());
 		}
+
 		await this.fetchRequiredChainData();
 	}
 }
