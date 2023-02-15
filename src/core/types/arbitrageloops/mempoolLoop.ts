@@ -33,7 +33,7 @@ export class MempoolLoop {
 	totalBytes = 0;
 	mempool!: Mempool;
 	iterations = 0;
-	timeouturls: Map<string, number>;
+	timeoutUrls: Map<string, number>;
 	errorpaths: Map<string, number>;
 
 	/**
@@ -81,7 +81,7 @@ export class MempoolLoop {
 		this.botClients = botClients;
 		this.account = account;
 		this.botConfig = botConfig;
-		this.timeouturls = timeouturls;
+		this.timeoutUrls = timeouturls;
 		this.errorpaths = errorpaths;
 	}
 	/**
@@ -104,41 +104,41 @@ export class MempoolLoop {
 	/**
 	 *
 	 */
-	private async getNewClients(errurl: string) {
+	private async getNewClients(errUrl: string) {
 		let n = 0;
-		let urlstring: string | undefined;
-		this.timeouturls.set(errurl, Date.now());
-		while (!urlstring && n < this.botConfig.rpcUrl.length) {
-			const currtime: number = Date.now();
+		let urlString: string | undefined;
+		this.timeoutUrls.set(errUrl, Date.now());
+		while (!urlString && n < this.botConfig.rpcUrl.length) {
+			const currTime: number = Date.now();
 
-			if (!this.timeouturls.has(this.botConfig.rpcUrl[n])) {
-				urlstring = this.botConfig.rpcUrl[n];
+			if (!this.timeoutUrls.has(this.botConfig.rpcUrl[n])) {
+				urlString = this.botConfig.rpcUrl[n];
 			} else {
-				const errtime = this.timeouturls.get(this.botConfig.rpcUrl[n]);
-				if (errtime && errtime + TIMEOUTDUR <= currtime) {
-					this.timeouturls.delete(this.botConfig.rpcUrl[n]);
-					urlstring = this.botConfig.rpcUrl[n];
+				const errTime = this.timeoutUrls.get(this.botConfig.rpcUrl[n]);
+				if (errTime && errTime + TIMEOUTDUR <= currTime) {
+					this.timeoutUrls.delete(this.botConfig.rpcUrl[n]);
+					urlString = this.botConfig.rpcUrl[n];
 				}
 			}
 			n++;
 		}
-		if (!urlstring) {
+		if (!urlString) {
 			console.log("All RPC's Timeouted");
 			let n: number = Date.now();
-			let nexturl: string = errurl;
-			for (const [url, timeouted] of this.timeouturls.entries()) {
+			let nextUrl: string = errUrl;
+			for (const [url, timeouted] of this.timeoutUrls.entries()) {
 				if (timeouted < n) {
 					n = timeouted;
-					nexturl = url;
+					nextUrl = url;
 				}
 			}
 			await delay(TIMEOUTDUR + n - Date.now());
-			const [account, botClients] = await getChainOperator(this.botConfig, nexturl);
+			const [account, botClients] = await getChainOperator(this.botConfig, nextUrl);
 			this.account = account;
 			this.botClients = botClients;
 		} else {
-			console.log("Updating Clients to: " + urlstring);
-			const [account, botClients] = await getChainOperator(this.botConfig, urlstring);
+			console.log("Updating Clients to: " + urlString);
+			const [account, botClients] = await getChainOperator(this.botConfig, urlString);
 			this.account = account;
 			this.botClients = botClients;
 		}
@@ -151,7 +151,7 @@ export class MempoolLoop {
 		try {
 			this.updateStateFunction(this.botClients, this.pools);
 		} catch (e) {
-			await this.errhandle(e, "http");
+			await this.errHandle(e, "http");
 		}
 
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig, this.errorpaths);
@@ -160,7 +160,7 @@ export class MempoolLoop {
 			try {
 				await this.trade(arbTrade);
 			} catch (e) {
-				await this.errhandle(e, "tx");
+				await this.errHandle(e, "tx");
 			}
 			return;
 		}
@@ -170,7 +170,7 @@ export class MempoolLoop {
 				const mempoolResult = await this.botClients.HttpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
 				this.mempool = mempoolResult.result;
 			} catch (e) {
-				await this.errhandle(e, "http");
+				await this.errHandle(e, "http");
 				break;
 			}
 
@@ -195,7 +195,7 @@ export class MempoolLoop {
 				try {
 					await this.trade(arbTrade);
 				} catch (e) {
-					await this.errhandle(e, "tx");
+					await this.errHandle(e, "tx");
 				}
 				break;
 			}
@@ -210,8 +210,13 @@ export class MempoolLoop {
 	/**
 	 *
 	 */
-	private async errhandle(err: any, src: string) {
-		console.error(err);
+	private async errHandle(err: unknown, src: string) {
+        console.error(err);
+        console.error(typeof err);
+        console.error(err.message);
+        console.error(err.errno);
+        console.error(err.code);
+        console.error(err.response.status);
 		// Catch errors, if status code is Timeout reconnect to next RPC and create/set new Clients. Else it does still quit the Bot.
 		if (src == "http") {
 			const errjsn = JSON.parse(err.message);
@@ -293,8 +298,8 @@ export class MempoolLoop {
 		await delay(15000);
 		//check tx result, if error put on cooldown. Catch if e.g TX not found after delay
 		try {
-			const txstatus = await this.botClients.TMClient.tx({ hash: sendResult.hash });
-			if (txstatus.result.code != 0) {
+			const txStatus = await this.botClients.TMClient.tx({ hash: sendResult.hash });
+			if (txStatus.result.code != 0) {
 				this.errorpaths.set(addrs, Date.now());
 			}
 		} catch {
