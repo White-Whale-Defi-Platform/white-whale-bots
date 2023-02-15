@@ -125,7 +125,8 @@ export class SkipLoop extends MempoolLoop {
 		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
 		const TX_FEE =
 			this.botConfig.txFees.get(arbTrade.path.pools.length) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size];
+			Array.from(this.botConfig.txFees.values())[this.botConfig.gasFees.size - 1];
+
 		const txRaw: TxRaw = await this.botClients.SigningCWClient.sign(
 			this.account.address,
 			msgs,
