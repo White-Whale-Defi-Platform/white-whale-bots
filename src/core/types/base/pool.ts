@@ -39,51 +39,77 @@ export interface Pool {
 	dexname: AmmDexName;
 	inputfee: number;
 	outputfee: number;
+	LPratio: number;
 	factoryAddress: string;
 	routerAddress: string;
 }
 
 /**
- *
+ * Function to calculate the expected received assets from a user perspective.
+ * @param pool The pool to trade on.
+ * @param offer_asset The offer asset the user wants to trade on the pool.
+ * @return [number, assetInfo] of the received asset by the user.
  */
-export function outGivenIn(pool: Pool, inputAsset: Asset): [number, AssetInfo] {
-	const outputfee = 1 - pool.outputfee / 100;
-	const inputfee = 1 - pool.inputfee / 100;
-	if (isMatchingAssetInfos(pool.assets[0].info, inputAsset.info)) {
-		// asset[0] from pool is inputasset
-
-		return [
-			Math.floor(
-				inputfee *
-					outputfee *
-					((+pool.assets[1].amount * +inputAsset.amount) /
-						(+pool.assets[0].amount + inputfee * +inputAsset.amount)),
-			),
-			pool.assets[1].info,
-		];
+export function outGivenIn(pool: Pool, offer_asset: Asset): [number, AssetInfo] {
+	const k = +pool.assets[0].amount * +pool.assets[1].amount;
+	const [asset_in, asset_out] = getAssetsOrder(pool, offer_asset.info) ?? [];
+	const a_in = +asset_in.amount;
+	const a_out = +asset_out.amount;
+	if (pool.inputfee > 0) {
+		// pool uses inputfees
+		const r1 = 1 - pool.inputfee / 100;
+		const amount_in_after_fee = Math.floor(+offer_asset.amount * r1);
+		const outGivenIn = Math.floor(a_out - k / (a_in + amount_in_after_fee));
+		return [outGivenIn, asset_out.info];
 	} else {
-		return [
-			Math.floor(
-				inputfee *
-					outputfee *
-					((+pool.assets[0].amount * +inputAsset.amount) /
-						(+pool.assets[1].amount + inputfee * +inputAsset.amount)),
-			),
-			pool.assets[0].info,
-		];
+		const r2 = 1 - pool.outputfee / 100;
+		const outGivenIn = Math.floor(r2 * Math.floor(a_out - k / (a_in + +offer_asset.amount)));
+		return [outGivenIn, asset_out.info];
 	}
 }
 
 /**
- *
+ * Function to apply a specific trade on a pool.
+ * @param pool The pool to apply the trade on.
+ * @param offer_asset The offer asset applied in the trade.
  */
 function applyTradeOnPool(pool: Pool, offer_asset: Asset) {
-	if (isMatchingAssetInfos(pool.assets[0].info, offer_asset.info)) {
-		pool.assets[0].amount = String(+pool.assets[0].amount + +offer_asset.amount);
-		pool.assets[1].amount = String(+pool.assets[1].amount - +outGivenIn(pool, offer_asset)[0]);
+	// K defines the constant product equilibrium
+	const k = +pool.assets[0].amount * +pool.assets[1].amount;
+	const [asset_in, asset_out] = getAssetsOrder(pool, offer_asset.info) ?? [];
+	const a_in = +asset_in.amount;
+	const a_out = +asset_out.amount;
+
+	// Check if pool uses input fees
+	if (pool.inputfee > 0) {
+		// Calculate the r1: the input fee as a rate
+		const r1 = 1 - pool.inputfee / 100;
+
+		// Calculate the input amount after the fee reduction
+		const amount_in_after_fee = Math.floor(+offer_asset.amount * r1);
+
+		// Calculate the LP_fee_amount, this value will stay in the pool as fee for the LP providers
+		const lp_fee_amount = Math.floor((+offer_asset.amount - Math.floor(amount_in_after_fee)) * pool.LPratio);
+
+		// Calculate the return amount based on the xy=k formula and offer_asset minus the fees
+		const outGivenIn = Math.floor(a_out - k / (a_in + amount_in_after_fee));
+
+		// Update the assets of the pool
+		asset_in.amount = String(a_in + Math.floor(amount_in_after_fee) + lp_fee_amount);
+		asset_out.amount = String(a_out - outGivenIn);
 	} else {
-		pool.assets[1].amount = String(+pool.assets[1].amount + +offer_asset.amount);
-		pool.assets[0].amount = String(+pool.assets[0].amount - +outGivenIn(pool, offer_asset)[0]);
+		//If pool uses output fees, calculate the rate of the fees that actually leave the pool: e.g. if the fee is 0.3%, of which 0.2% is LP fee, only .1% of the
+		// fees paid by the user actually leave the pool. The other .2% of the fees remains in the pool as fee for the LP providers
+		const outflowReducer = 1 - (pool.outputfee * pool.LPratio) / 100;
+
+		// Calculate return amount without deducting fees
+		const outGivenIn = Math.floor(a_out - k / (a_in + +offer_asset.amount));
+
+		// Update the assets of the pool
+		asset_in.amount = String(a_in + +offer_asset.amount);
+
+		// The outGivenIn amount is reduced with the outflowReducer
+		asset_out.amount = String(a_out - Math.floor(outGivenIn * outflowReducer));
 	}
 }
 /**
@@ -104,6 +130,11 @@ export function applyMempoolTradesOnPools(pools: Array<Pool>, mempoolTrades: Arr
 		if (poolToUpdate) {
 			// a direct swap or send to pool
 			if (isSwapMessage(msg) && trade.offer_asset !== undefined) {
+				console.log(
+					poolToUpdate,
+					poolToUpdate.assets.map((asset) => asset.info),
+				);
+				console.log(trade.offer_asset);
 				applyTradeOnPool(poolToUpdate, trade.offer_asset);
 			} else if (isSendMessage(msg) && trade.offer_asset !== undefined) {
 				applyTradeOnPool(poolToUpdate, trade.offer_asset);
@@ -225,6 +256,8 @@ export function getAssetsOrder(pool: Pool, assetInfo: AssetInfo) {
 		return [pool.assets[0], pool.assets[1]] as Array<Asset>;
 	} else if (isMatchingAssetInfos(pool.assets[1].info, assetInfo)) {
 		return [pool.assets[1], pool.assets[0]] as Array<Asset>;
+	} else {
+		return undefined;
 	}
 }
 

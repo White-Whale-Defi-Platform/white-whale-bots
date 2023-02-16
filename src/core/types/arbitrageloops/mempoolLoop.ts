@@ -261,6 +261,9 @@ export class MempoolLoop {
 	 *
 	 */
 	public reset() {
+		this.paths.forEach((path) => {
+			path.cooldown = false;
+		});
 		this.totalBytes = 0;
 		flushTxMemory();
 	}
@@ -296,7 +299,7 @@ export class MempoolLoop {
 		};
 
 		const TX_FEE =
-			this.botConfig.txFees.get(arbTrade.path.pools.length) ??
+			this.botConfig.txFees.get(nrOfMessages) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
 		// sign, encode and broadcast the transaction
