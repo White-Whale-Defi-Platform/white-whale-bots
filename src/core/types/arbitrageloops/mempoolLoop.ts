@@ -205,13 +205,11 @@ export class MempoolLoop {
 		}
 	}
 
-	/*
-	ERRORHANDLER 
-	TODO: Define other Error Codes. Not sure if TIMEOUT works.
-	*/
 
+	
 	/**
-	 *
+	 * ERRORHANDLER 
+	 * TODO: Define other Error Codes
 	 */
 	private async errHandle(err: any) {
 		if (err.code) {
