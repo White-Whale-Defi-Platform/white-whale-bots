@@ -1,4 +1,4 @@
-import { Asset, isNativeAsset } from "../types/base/asset";
+import { Asset } from "../types/base/asset";
 import { BotConfig } from "../types/base/botConfig";
 import { Path } from "../types/base/path";
 import { getOptimalTrade } from "./optimizers/analyticalOptimizer";
@@ -12,34 +12,32 @@ export interface OptimalTrade {
  *
  */
 export function trySomeArb(paths: Array<Path>, botConfig: BotConfig): OptimalTrade | undefined {
-	const [path, tradesize, profit] = getOptimalTrade(paths, botConfig.offerAssetInfo);
+	const optimalTrade: OptimalTrade | undefined = getOptimalTrade(paths, botConfig.offerAssetInfo);
 
-	if (path === undefined) {
+	if (!optimalTrade) {
 		return undefined;
 	} else {
-		const profitThreshold =
-			botConfig.profitThresholds.get(path.pools.length) ??
-			Array.from(botConfig.profitThresholds.values())[botConfig.profitThresholds.size];
-		if (profit < profitThreshold) {
+		if (!isAboveThreshold(botConfig, optimalTrade)) {
 			return undefined;
 		} else {
-			console.log("optimal tradesize: ", tradesize, " with profit: ", profit);
-			console.log("path: "),
-				path.pools.map((pool) => {
-					console.log(
-						pool.address,
-						isNativeAsset(pool.assets[0].info)
-							? pool.assets[0].info.native_token.denom
-							: pool.assets[0].info.token.contract_addr,
-						pool.assets[0].amount,
-						isNativeAsset(pool.assets[1].info)
-							? pool.assets[1].info.native_token.denom
-							: pool.assets[1].info.token.contract_addr,
-						pool.assets[1].amount,
-					);
-				});
-			const offerAsset: Asset = { amount: String(tradesize), info: botConfig.offerAssetInfo };
-			return { path, offerAsset, profit };
+			return optimalTrade;
 		}
 	}
+}
+
+/**
+ *
+ */
+function isAboveThreshold(botConfig: BotConfig, optimalTrade: OptimalTrade): boolean {
+	const profitThreshold =
+		botConfig.profitThresholds.get((optimalTrade.path.pools.length - 1) * 2 + 1) ??
+		Array.from(botConfig.profitThresholds.values())[botConfig.profitThresholds.size - 1];
+	if (botConfig.skipConfig) {
+		const skipBidRate = botConfig.skipConfig.skipBidRate;
+		return (
+			(1 - skipBidRate) * optimalTrade.profit - (botConfig.flashloanFee / 100) * +optimalTrade.offerAsset.amount >
+			profitThreshold
+		); //profit - skipbid*profit - flashloanfee*tradesize must be bigger than the set PROFIT_THRESHOLD + TX_FEE. The TX fees dont depend on tradesize nor profit
+	} else
+		return optimalTrade.profit - (botConfig.flashloanFee / 100) * +optimalTrade.offerAsset.amount > profitThreshold;
 }
