@@ -154,7 +154,7 @@ export class MempoolLoop {
 		try {
 			this.updateStateFunction(this.botClients, this.pools);
 		} catch (e) {
-			await this.errHandle(e, "http");
+			await this.errHandle(e);
 		}
 
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig, this.errorpaths);
@@ -163,7 +163,7 @@ export class MempoolLoop {
 			try {
 				await this.trade(arbTrade);
 			} catch (e) {
-				await this.errHandle(e, "tx");
+				await this.errHandle(e);
 			}
 			return;
 		}
@@ -173,7 +173,7 @@ export class MempoolLoop {
 				const mempoolResult = await this.botClients.HttpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
 				this.mempool = mempoolResult.result;
 			} catch (e) {
-				await this.errHandle(e, "http");
+				await this.errHandle(e);
 				break;
 			}
 
@@ -198,7 +198,7 @@ export class MempoolLoop {
 				try {
 					await this.trade(arbTrade);
 				} catch (e) {
-					await this.errHandle(e, "tx");
+					await this.errHandle(e);
 				}
 				break;
 			}
@@ -213,32 +213,47 @@ export class MempoolLoop {
 	/**
 	 *
 	 */
-	private async errHandle(err: any, src: string) {
-		console.error(err);
-		console.error(typeof err);
-		console.error(err.message);
-		console.error(err.errno);
-		console.error(err.code);
-		try {
-			console.error(err.response.status);
-		} catch {
-			console.log("err");
-		}
-
-		switch (err.code) {
-			case -32603:
-				console.error("error on broadcastTxCommit: tx already exists in cache. Path timeouted.");
-				break;
-			case -32000:
-				console.error("Server Error");
-				await this.getNewClients(this.botClients.rpcurl);
-				break;
-			case -41736:
-				console.error("SSL handshake failure");
-				await this.getNewClients(this.botClients.rpcurl);
-				break;
-			default:
-				console.error(err.code);
+	private async errHandle(err: any) {
+		if (err.code) {
+			switch (err.code) {
+				case -32603:
+					console.error("error on broadcastTxCommit: tx already exists in cache. Path timeouted.");
+					break;
+				case -32000:
+					console.error("Server Error");
+					await this.getNewClients(this.botClients.rpcurl);
+					break;
+				case -41736:
+					console.error("SSL handshake failure");
+					await this.getNewClients(this.botClients.rpcurl);
+					break;
+				case "ECONNRESET":
+				case "ENOTFOUND":
+				case "ETIMEDOUT":
+				case "ECONNREFUSED":
+					await this.getNewClients(this.botClients.rpcurl);
+					break;
+				default:
+					console.error(
+						"Not handled Error, please send to Discord Channel: \n" +
+							err.code +
+							" " +
+							err.errno +
+							" " +
+							err.name +
+							" \n" +
+							err.message,
+					);
+			}
+		} else {
+			console.error(
+				"Not handled Error, please send to Discord Channel: \n" +
+					err.errno +
+					" " +
+					err.name +
+					" \n" +
+					err.message,
+			);
 		}
 	}
 
@@ -251,9 +266,9 @@ export class MempoolLoop {
 	}
 
 	/**
-	 * Why not use broadcast_tx_commit if there is already a delay after sending the transaction.
+	 * 
 	 */
-	private async trade(arbTrade: OptimalTrade) {
+	public async trade(arbTrade: OptimalTrade) {
 		let addrs: any = [];
 		//Get Addresses from arbTrade.path.Pools and add to array
 		for (let i = 0; i < arbTrade.path.pools.length; i++) {
@@ -294,18 +309,17 @@ export class MempoolLoop {
 		);
 		const txBytes = TxRaw.encode(txRaw).finish();
 
-		//can use broadcastTxCommit?
-
 		const sendResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
 
 		this.sequence += 1;
 		await delay(15000);
-		//check tx result, if error put on cooldown. Catch if e.g TX not found after delay
+		//check tx result, if error --> put on cooldown. Catch if e.g TX not found after delay
 		try {
 			const txStatus = await this.botClients.TMClient.tx({ hash: sendResult.hash });
-			await this.logger?.sendMessage(txStatus.result.log, LogType.Console);
 			if (sendResult && txStatus.result.code != 0) {
 				this.errorpaths.set(addrs, Date.now());
+			} else {
+				await this.logger?.sendMessage("TX Success!\n", LogType.Console);
 			}
 		} catch {
 			this.errorpaths.set(addrs, Date.now());

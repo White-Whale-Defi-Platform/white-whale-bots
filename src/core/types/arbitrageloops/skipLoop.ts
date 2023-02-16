@@ -156,6 +156,9 @@ export class SkipLoop extends MempoolLoop {
 
 		if (res.result.code !== 0) {
 			logMessage += `\t **error code:** ${res.result.code}\n**error:** ${res.result.error}\n`;
+			if (res.result.code == 4){
+				await this.trade(arbTrade)
+			}
 		}
 
 		if (res.result.result_check_txs != undefined) {
