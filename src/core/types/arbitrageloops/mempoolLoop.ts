@@ -244,6 +244,7 @@ export class MempoolLoop {
 							" \n" +
 							err.message,
 					);
+					process.exit(1);
 			}
 		} else {
 			console.error(
@@ -254,6 +255,7 @@ export class MempoolLoop {
 					" \n" +
 					err.message,
 			);
+			process.exit(1);
 		}
 	}
 
@@ -266,7 +268,7 @@ export class MempoolLoop {
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public async trade(arbTrade: OptimalTrade) {
 		let addrs: any = [];
