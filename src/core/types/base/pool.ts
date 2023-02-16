@@ -130,6 +130,11 @@ export function applyMempoolTradesOnPools(pools: Array<Pool>, mempoolTrades: Arr
 		if (poolToUpdate) {
 			// a direct swap or send to pool
 			if (isSwapMessage(msg) && trade.offer_asset !== undefined) {
+				console.log(
+					poolToUpdate,
+					poolToUpdate.assets.map((asset) => asset.info),
+				);
+				console.log(trade.offer_asset);
 				applyTradeOnPool(poolToUpdate, trade.offer_asset);
 			} else if (isSendMessage(msg) && trade.offer_asset !== undefined) {
 				applyTradeOnPool(poolToUpdate, trade.offer_asset);
