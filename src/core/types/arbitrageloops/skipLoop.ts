@@ -8,10 +8,10 @@ import { WebClient } from "@slack/web-api";
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
+import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { Logger } from "../../logging";
 import { BotClients } from "../../node/chainoperator";
 import { SkipResult } from "../../node/skipclients";
-import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { BotConfig } from "../base/botConfig";
 import { LogType } from "../base/logging";
 import { MempoolTrade, processMempool } from "../base/mempool";
@@ -34,7 +34,11 @@ export class SkipLoop extends MempoolLoop {
 	public constructor(
 		pools: Array<Pool>,
 		paths: Array<Path>,
-		arbitrage: (paths: Array<Path>, botConfig: BotConfig, errorpaths: Map<string,number>) => OptimalTrade | undefined,
+		arbitrage: (
+			paths: Array<Path>,
+			botConfig: BotConfig,
+			errorpaths: Map<string, number>,
+		) => OptimalTrade | undefined,
 		updateState: (botclients: BotClients, pools: Array<Pool>) => void,
 		messageFunction: (
 			arbTrade: OptimalTrade,
@@ -50,7 +54,19 @@ export class SkipLoop extends MempoolLoop {
 		errorpaths: Map<string, number>,
 		logger: Logger | undefined,
 	) {
-		super(pools, paths, arbitrage, updateState, messageFunction, botClients, account, botConfig, timeouturls, errorpaths, logger);
+		super(
+			pools,
+			paths,
+			arbitrage,
+			updateState,
+			messageFunction,
+			botClients,
+			account,
+			botConfig,
+			timeouturls,
+			errorpaths,
+			logger,
+		);
 		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.logger = logger);
 	}
 
@@ -59,10 +75,19 @@ export class SkipLoop extends MempoolLoop {
 	 */
 	public async step(): Promise<void> {
 		this.iterations++;
-		this.updateStateFunction(this.botClients, this.pools);
+		try {
+			this.updateStateFunction(this.botClients, this.pools);
+		} catch (e) {
+			await this.errHandle(e);
+		}
 		while (true) {
-			const mempoolResult = await this.botClients.HttpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
-			this.mempool = mempoolResult.result;
+			try {
+				const mempoolResult = await this.botClients.HttpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
+				this.mempool = mempoolResult.result;
+			} catch (e) {
+				await this.errHandle(e);
+				break;
+			}
 
 			if (+this.mempool.total_bytes < this.totalBytes) {
 				break;
@@ -77,10 +102,23 @@ export class SkipLoop extends MempoolLoop {
 				continue;
 			} else {
 				for (const trade of mempoolTrades) {
-					applyMempoolTradesOnPools(this.pools, [trade]);
-					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig, this.errorpaths);
+					try {
+						applyMempoolTradesOnPools(this.pools, [trade]);
+					} catch {
+						console.log("error in apply mempooltradesonpools #51 on github");
+						continue
+					}
+					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(
+						this.paths,
+						this.botConfig,
+						this.errorpaths,
+					);
 					if (arbTrade) {
-						await this.skipTrade(arbTrade, trade);
+						try {
+							await this.skipTrade(arbTrade, trade);
+						} catch (e) {
+							await this.errHandle(e);
+						}
 						arbTrade.path.cooldown = true; //set the cooldown of this path to true so we dont trade it again in next callbacks
 						break;
 					}
@@ -160,8 +198,8 @@ export class SkipLoop extends MempoolLoop {
 
 		if (res.result.code !== 0) {
 			logMessage += `\t **error code:** ${res.result.code}\n**error:** ${res.result.error}\n`;
-			if (res.result.code == 4){
-				await this.trade(arbTrade)
+			if (res.result.code == 4) {
+				await this.trade(arbTrade);
 			}
 		}
 

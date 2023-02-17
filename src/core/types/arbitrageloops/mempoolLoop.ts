@@ -189,7 +189,11 @@ export class MempoolLoop {
 			if (mempoolTrades.length === 0) {
 				continue;
 			} else {
+				try{
 				applyMempoolTradesOnPools(this.pools, mempoolTrades);
+				} catch(e){
+					console.log("error in mempooltradesonpool")
+				}
 			}
 
 			const arbTrade = this.arbitrageFunction(this.paths, this.botConfig, this.errorpaths);
@@ -209,9 +213,9 @@ export class MempoolLoop {
 	
 	/**
 	 * ERRORHANDLER 
-	 * TODO: Define other Error Codes
+	 * TODO: Define other Error Codes.
 	 */
-	private async errHandle(err: any) {
+	public async errHandle(err: any) {
 		if (err.code) {
 			switch (err.code) {
 				case -32603:
