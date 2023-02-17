@@ -129,6 +129,7 @@ export class MempoolLoop {
 	 *
 	 */
 	public reset() {
+		// reset all paths that are on cooldown
 		this.paths.forEach((path) => {
 			path.cooldown = false;
 		});

@@ -29,6 +29,7 @@ export function trySomeArb(paths: Array<Path>, botConfig: BotConfig): OptimalTra
  *
  */
 function isAboveThreshold(botConfig: BotConfig, optimalTrade: OptimalTrade): boolean {
+	// We dont know the number of message required to execute the trade, so the profit threshold will be set to the most conservative value: nr_of_pools*2-1
 	const profitThreshold =
 		botConfig.profitThresholds.get((optimalTrade.path.pools.length - 1) * 2 + 1) ??
 		Array.from(botConfig.profitThresholds.values())[botConfig.profitThresholds.size - 1];
@@ -37,7 +38,7 @@ function isAboveThreshold(botConfig: BotConfig, optimalTrade: OptimalTrade): boo
 		return (
 			(1 - skipBidRate) * optimalTrade.profit - (botConfig.flashloanFee / 100) * +optimalTrade.offerAsset.amount >
 			profitThreshold
-		); //profit - skipbid*profit - flashloanfee*tradesize must be bigger than the set PROFIT_THRESHOLD + TX_FEE. The TX fees dont depend on tradesize nor profit
+		); //profit - skipbid*profit - flashloanfee*tradesize must be bigger than the set PROFIT_THRESHOLD + TX_FEE. The TX fees dont depend on tradesize nor profit so are set in config
 	} else
 		return optimalTrade.profit - (botConfig.flashloanFee / 100) * +optimalTrade.offerAsset.amount > profitThreshold;
 }
