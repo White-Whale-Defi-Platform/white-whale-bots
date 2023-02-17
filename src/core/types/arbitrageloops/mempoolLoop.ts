@@ -119,6 +119,7 @@ export class MempoolLoop {
 
 			if (arbTrade) {
 				await this.trade(arbTrade);
+				arbTrade.path.cooldown = true;
 				break;
 			}
 		}
@@ -128,6 +129,10 @@ export class MempoolLoop {
 	 *
 	 */
 	public reset() {
+		// reset all paths that are on cooldown
+		this.paths.forEach((path) => {
+			path.cooldown = false;
+		});
 		this.totalBytes = 0;
 		flushTxMemory();
 	}
@@ -136,6 +141,9 @@ export class MempoolLoop {
 	 *
 	 */
 	private async trade(arbTrade: OptimalTrade) {
+		if (arbTrade.path.cooldown) {
+			return;
+		}
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
 			this.account.address,
@@ -151,7 +159,7 @@ export class MempoolLoop {
 		};
 
 		const TX_FEE =
-			this.botConfig.txFees.get(arbTrade.path.pools.length) ??
+			this.botConfig.txFees.get(nrOfMessages) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
 		// sign, encode and broadcast the transaction

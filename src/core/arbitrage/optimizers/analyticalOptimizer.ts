@@ -1,6 +1,7 @@
 import { AssetInfo } from "../../types/base/asset";
 import { Path } from "../../types/base/path";
 import { getAssetsOrder, outGivenIn } from "../../types/base/pool";
+import { OptimalTrade } from "../arbitrage";
 
 // function to get the optimal tradsize and profit for a single path.
 // it assumes the token1 from pool1 is the same asset as token1 from pool2 and
@@ -114,20 +115,26 @@ function getTradesizeAndProfitForPath(path: Path, offerAssetInfo: AssetInfo): [n
  * @param paths Type `Array<Path>` to check for arbitrage.
  * @param offerAssetInfo Type `AssetInfo` to start the arbitrage from.
  */
-export function getOptimalTrade(paths: Array<Path>, offerAssetInfo: AssetInfo): [Path | undefined, number, number] {
+export function getOptimalTrade(paths: Array<Path>, offerAssetInfo: AssetInfo): OptimalTrade | undefined {
 	let maxTradesize = 0;
 	let maxProfit = 0;
 	let maxPath;
 
 	paths.map((path: Path) => {
-		const [tradesize, profit] = getOptimalTradeForPath(path, offerAssetInfo);
-		if (profit > maxProfit && tradesize > 0) {
-			maxProfit = profit;
-			maxTradesize = tradesize;
-			maxPath = path;
+		if (!path.cooldown) {
+			const [tradesize, profit] = getOptimalTradeForPath(path, offerAssetInfo);
+			if (profit > maxProfit && tradesize > 0) {
+				maxProfit = profit;
+				maxTradesize = tradesize;
+				maxPath = path;
+			}
 		}
 	});
-	return [maxPath, maxTradesize, maxProfit];
+	if (maxPath) {
+		return { path: maxPath, offerAsset: { amount: String(maxTradesize), info: offerAssetInfo }, profit: maxProfit };
+	} else {
+		return undefined;
+	}
 }
 
 /** Given an ordered route, calculate the optimal amount into the first pool that maximizes the profit of swapping through the route
