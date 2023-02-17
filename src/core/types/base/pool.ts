@@ -130,13 +130,14 @@ export function applyMempoolTradesOnPools(pools: Array<Pool>, mempoolTrades: Arr
 		if (poolToUpdate) {
 			// a direct swap or send to pool
 			if (isSwapMessage(msg) && trade.offer_asset !== undefined) {
-				console.log(
-					poolToUpdate,
-					poolToUpdate.assets.map((asset) => asset.info),
-				);
-				console.log(trade.offer_asset);
 				applyTradeOnPool(poolToUpdate, trade.offer_asset);
 			} else if (isSendMessage(msg) && trade.offer_asset !== undefined) {
+				console.log("---".repeat(10), "decoding send message", "---".repeat(10));
+				console.log(trade);
+				console.log(
+					poolToUpdate.address,
+					poolToUpdate.assets.map((asset) => asset.info),
+				);
 				applyTradeOnPool(poolToUpdate, trade.offer_asset);
 			} else if (isJunoSwapMessage(msg) && trade.offer_asset === undefined) {
 				// For JunoSwap messages we dont have an offerAsset provided in the message
@@ -225,6 +226,11 @@ export function applyMempoolTradesOnPools(pools: Array<Pool>, mempoolTrades: Arr
 							: { token: { contract_addr: operation.wyndex_swap.ask_asset_info.token } };
 						const currentPool = findPoolByInfos(poolsFromThisRouter, offerAssetInfo, askAssetInfo);
 						if (currentPool !== undefined) {
+							console.log("---".repeat(10), "decoding wynddao swap operations message", "---".repeat(10));
+							console.log(
+								currentPool.assets.map((asset) => asset.info),
+								offerAsset,
+							);
 							applyTradeOnPool(currentPool, offerAsset);
 							const [outGivenInNext, offerAssetInfoNext] = outGivenIn(currentPool, offerAsset);
 							offerAsset = { amount: String(outGivenInNext), info: offerAssetInfoNext };
