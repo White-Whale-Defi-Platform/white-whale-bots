@@ -82,7 +82,6 @@ Total Paths:** \t${paths.length}\n`;
 	setupMessage += "---".repeat(30);
 
 	startupMessage += setupMessage;
-	//console.log(startupMessage);
 	await logger.sendMessage(startupMessage, LogType.Console);
 
 	let loop;
