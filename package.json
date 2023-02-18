@@ -42,10 +42,10 @@
     ]
   },
   "dependencies": {
-    "@cosmjs/cosmwasm-stargate": "^0.29.4",
-    "@cosmjs/stargate": "^0.29.4",
-    "@cosmjs/tendermint-rpc": "^0.29.4",
-    "@skip-mev/skipjs": "^1.1.0",
+    "@cosmjs/cosmwasm-stargate": "^0.29.5",
+    "@cosmjs/stargate": "^0.29.5",
+    "@cosmjs/tendermint-rpc": "^0.29.5",
+    "@skip-mev/skipjs": "^1.4.0",
     "@slack/web-api": "^6.8.0",
     "discord.js": "^14.7.1",
     "dotenv": "^16.0.1"
