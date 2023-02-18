@@ -1,4 +1,4 @@
-import { Coin, StdFee } from "@cosmjs/stargate";
+import { StdFee } from "@cosmjs/stargate";
 import { assert } from "console";
 
 import { NativeAssetInfo } from "./asset";
@@ -16,6 +16,7 @@ export interface BotConfig {
 	maxPathPools: number;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
 	flashloanRouterAddress: string;
+	flashloanFee: number;
 	offerAssetInfo: NativeAssetInfo;
 	mnemonic: string;
 	useMempool: boolean;
@@ -43,10 +44,18 @@ export interface BotConfig {
 export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 	validateEnvs(envs);
 
-	const POOLS_ENVS = envs.POOLS.split(",\n").map((pool) => JSON.parse(pool));
-	const FACTORIES_TO_ROUTERS_MAPPING = envs.FACTORIES_TO_ROUTERS_MAPPING.split(",\n").map((mapping) =>
-		JSON.parse(mapping),
-	);
+	let pools = envs.POOLS.trim()
+		.replace(/\n|\r|\t/g, "")
+		.replace(/,\s*$/, "");
+	pools = pools.startsWith("[") && pools.endsWith("]") ? pools : `[${pools}]`;
+	const POOLS_ENVS = JSON.parse(pools);
+
+	let factories = envs.FACTORIES_TO_ROUTERS_MAPPING.trim()
+		.replace(/\n|\r|\t/g, "")
+		.replace(/,\s*$/, "");
+	factories = factories.startsWith("[") && factories.endsWith("]") ? factories : `[${factories}]`;
+	const FACTORIES_TO_ROUTERS_MAPPING = JSON.parse(factories);
+
 	const OFFER_ASSET_INFO: NativeAssetInfo = { native_token: { denom: envs.BASE_DENOM } };
 	const GAS_UNIT_PRICE = envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
 
@@ -64,23 +73,15 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
 		};
 	}
-	const FLASHLOAN_FEE = +envs.FLASHLOAN_FEE;
 	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
 
 	//set all required fees for the depth of the hops set by user;
-	const GAS_FEES = new Map<number, Coin>();
 	const TX_FEES = new Map<number, StdFee>();
 	const PROFIT_THRESHOLDS = new Map<number, number>();
-	for (let hops = 2; hops <= MAX_PATH_HOPS; hops++) {
+	for (let hops = 2; hops <= (MAX_PATH_HOPS - 1) * 2 + 1; hops++) {
 		const gasFee = { denom: envs.BASE_DENOM, amount: String(GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE) };
-		GAS_FEES.set(hops, gasFee);
 		TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) });
-		const profitThreshold: number =
-			skipConfig === undefined
-				? PROFIT_THRESHOLD / (1 - FLASHLOAN_FEE / 100) + +gasFee.amount //dont use skip bid on top of the threshold, include flashloan fee and gas fee
-				: PROFIT_THRESHOLD / (1 - FLASHLOAN_FEE / 100) +
-				  +gasFee.amount +
-				  skipConfig.skipBidRate * PROFIT_THRESHOLD; //need extra profit to provide the skip bid
+		const profitThreshold: number = PROFIT_THRESHOLD + +gasFee.amount;
 		PROFIT_THRESHOLDS.set(hops, profitThreshold);
 	}
 	const botConfig: BotConfig = {
@@ -90,6 +91,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		maxPathPools: MAX_PATH_HOPS,
 		mappingFactoryRouter: FACTORIES_TO_ROUTERS_MAPPING,
 		flashloanRouterAddress: envs.FLASHLOAN_ROUTER_ADDRESS,
+		flashloanFee: +envs.FLASHLOAN_FEE,
 		offerAssetInfo: OFFER_ASSET_INFO,
 		mnemonic: envs.WALLET_MNEMONIC,
 		useMempool: envs.USE_MEMPOOL == "1" ? true : false,

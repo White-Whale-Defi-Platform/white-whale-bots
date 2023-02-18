@@ -79,7 +79,7 @@ export class SkipLoop extends MempoolLoop {
 					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 					if (arbTrade) {
 						await this.skipTrade(arbTrade, trade);
-						break;
+						arbTrade.path.cooldown = true; //set the cooldown of this path to true so we dont trade it again in next callbacks
 					}
 				}
 			}
@@ -90,6 +90,10 @@ export class SkipLoop extends MempoolLoop {
 	 *
 	 */
 	private async skipTrade(arbTrade: OptimalTrade, toArbTrade: MempoolTrade) {
+		if (arbTrade.path.cooldown) {
+			// dont execute if path is on cooldown
+			return;
+		}
 		if (
 			!this.botConfig.skipConfig?.useSkip ||
 			this.botConfig.skipConfig?.skipRpcUrl === undefined ||
@@ -131,7 +135,7 @@ export class SkipLoop extends MempoolLoop {
 
 		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
 		const TX_FEE =
-			this.botConfig.txFees.get(arbTrade.path.pools.length) ??
+			this.botConfig.txFees.get(nrOfWasms) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
 		const txRaw: TxRaw = await this.botClients.SigningCWClient.sign(
