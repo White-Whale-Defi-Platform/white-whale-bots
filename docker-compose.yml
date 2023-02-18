@@ -1,0 +1,10 @@
+version: '3.9'
+
+services:
+  bot:
+    build: .
+    image: white-whale-bot
+    container_name: white-whale-bot
+    restart: always
+    stdin_open: true
+    tty: true
