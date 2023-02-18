@@ -5,6 +5,9 @@ services:
     build: .
     image: white-whale-bot
     container_name: white-whale-bot
+    env_file:
+      - .env
     restart: always
     stdin_open: true
     tty: true
+    
