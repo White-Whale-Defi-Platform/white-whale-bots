@@ -131,10 +131,14 @@ Total Paths:** \t${paths.length}\n`;
 	while (true) {
 		await loop.step();
 		loop.reset();
-		if ((startupTime - Date.now() + botConfig.signOfLife) <= 0) {
+		if ((startupTime - Date.now() + botConfig.signOfLife * 60000) <= 0) {
 			timeIt++
+			let mins = (botConfig.signOfLife*timeIt)%60
+			let hours = ~~((botConfig.signOfLife*timeIt)/60)
 			startupTime = Date.now()
-			const message = `**chain:** ${loop.chainid} **wallet:** ${account.address} **status:** running for ${loop.iterations} blocks or ${((botConfig.signOfLife)/60000)*timeIt} Minutes`;
+			const message = `**chain:** ${loop.chainid} **wallet:** ${account.address} **status:** running for ${
+				loop.iterations
+			} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
 			await logger.sendMessage(message);
 		}
 	}
