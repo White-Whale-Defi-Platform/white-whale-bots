@@ -132,6 +132,7 @@ export class SkipLoop extends MempoolLoop {
 	 */
 	private async skipTrade(arbTrade: OptimalTrade, toArbTrade: MempoolTrade) {
 		if (arbTrade.path.cooldown) {
+			// dont execute if path is on cooldown
 			return;
 		}
 		if (

@@ -204,6 +204,7 @@ export class MempoolLoop {
 				} catch (e) {
 					await this.errHandle(e);
 				}
+				arbTrade.path.cooldown = true;
 				break;
 			}
 		}
@@ -265,6 +266,7 @@ export class MempoolLoop {
 	 *
 	 */
 	public reset() {
+		// reset all paths that are on cooldown
 		this.paths.forEach((path) => {
 			path.cooldown = false;
 		});
@@ -285,7 +287,7 @@ export class MempoolLoop {
 		addrs = addrs.toString();
 
 		// Check if Tradepath is on Cooldown because of error
-		if (this.errorpaths.has(addrs) && this.errorpaths.get(addrs)! + PATHTIMEOUT > Date.now()) {
+		if (arbTrade.path.cooldown && this.errorpaths.has(addrs) && this.errorpaths.get(addrs)! + PATHTIMEOUT > Date.now()) {
 			return;
 		}
 		const [msgs, nrOfMessages] = this.messageFunction(
