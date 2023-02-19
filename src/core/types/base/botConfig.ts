@@ -57,7 +57,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 	factories = factories.startsWith("[") && factories.endsWith("]") ? factories : `[${factories}]`;
 	const FACTORIES_TO_ROUTERS_MAPPING = JSON.parse(factories);
 	
-	const SIGN_OF_LIFE = Number(envs.SIGN_OF_LIFE === undefined ? 30 : +envs.SIGN_OF_LIFE) * 60000;
+	const SIGN_OF_LIFE = Number(envs.SIGN_OF_LIFE === undefined ? 30 : +envs.SIGN_OF_LIFE);
 	const OFFER_ASSET_INFO: NativeAssetInfo = { native_token: { denom: envs.BASE_DENOM } };
 	const GAS_UNIT_PRICE = envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
 
