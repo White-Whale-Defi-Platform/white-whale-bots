@@ -59,7 +59,7 @@ declare namespace NodeJS {
 		 */
 		PROFIT_THRESHOLD: string;
 
-		SIGN_OF_LIFE: number;
+		SIGN_OF_LIFE: string;
 
 		GAS_USAGE_PER_HOP: string;
 		MAX_PATH_HOPS: string;
