@@ -1,6 +1,6 @@
 import { Asset, AssetInfo } from "../base/asset";
 
-export type SwapMessage = {
+export type DefaultSwapMessage = {
 	swap: {
 		max_spread: string;
 		offer_asset: Asset;
@@ -103,12 +103,19 @@ export function isTFMSwapOperationsMessage(msg: any): msg is TFMSwapOperationsMe
 /**
  * Checks if a provided `msg` is a swap.
  * @param msg The message object to be checked.
+ * @return True or false.
+ */
+export function isSwapMessage(msg: any): boolean {
+	return msg["swap" as keyof typeof msg] !== undefined;
+}
+
+/**
+ * Checks if a provided `msg` is a default swap message.
+ * @param msg The message object to be checked.
  * @return SwapMessage if the `msg` is one.
  */
-export function isSwapMessage(msg: any): msg is SwapMessage {
-	return (
-		msg["swap" as keyof typeof msg] !== undefined && msg.swap["offer_asset" as keyof typeof msg.swap] !== undefined
-	);
+export function isDefaultSwapMessage(msg: any): msg is DefaultSwapMessage {
+	return isSwapMessage(msg) && msg.swap["offer_asset" as keyof typeof msg.swap] !== undefined;
 }
 
 /**
