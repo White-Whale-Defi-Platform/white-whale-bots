@@ -4,4 +4,5 @@ export enum LogType {
 	Externals = "EXTERNALS",
 	Discord = "DISCORD",
 	Slack = "SLACK",
+	Telegram = "TELEGRAM",
 }

@@ -67,5 +67,10 @@ declare namespace NodeJS {
 
 		SLACK_TOKEN: string | undefined;
 		SLACK_CHANNEL: string | undefined;
+
+		DISCORD_WEBHOOK_URL: string | undefined;
+
+		TELEGRAM_BOT_TOKEN: string | undefined;
+		TELEGRAM_CHAT_ID: string | undefined;
 	}
 }
