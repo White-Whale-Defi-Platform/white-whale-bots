@@ -106,13 +106,34 @@ export class SkipLoop extends MempoolLoop {
 			);
 			return;
 		}
+
+		let thresholds = this.botConfig.skipConfig.skipThresholds
+		let newBidRate: number = this.botConfig.skipConfig.skipBidRate;
+
+		function alterBidRate(arr: Array<{bid: number; profit: number}>): any  {
+    		arr.find(element => {
+				if (arbTrade.profit > (element.profit * 1000000)) {
+					if (element.bid >= 1) {
+                        newBidRate = (arbTrade.profit - element.bid) / arbTrade.profit
+                        return newBidRate;
+                    } else {
+                        newBidRate = element.bid;
+                        return newBidRate;
+                    }
+				};
+    		})    
+		}
+		
+		alterBidRate(thresholds);
+		await this.logger?.sendMessage(`BidRate: ${newBidRate}, Profit: ${arbTrade.profit/1000000}`, LogType.Discord);
+
 		const bidMsg: MsgSend = MsgSend.fromJSON({
 			fromAddress: this.account.address,
 			toAddress: this.botConfig.skipConfig.skipBidWallet,
 			amount: [
 				{
 					denom: this.botConfig.offerAssetInfo.native_token.denom,
-					amount: String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651)),
+					amount: String(Math.max(Math.round(arbTrade.profit * newBidRate), 651)),
 				},
 			],
 		});

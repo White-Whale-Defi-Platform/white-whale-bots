@@ -8,6 +8,7 @@ interface SkipConfig {
 	skipRpcUrl: string;
 	skipBidWallet: string;
 	skipBidRate: number;
+	skipThresholds: Array<{ bid: number; profit: number }>; 
 }
 export interface BotConfig {
 	chainPrefix: string;
@@ -63,6 +64,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 			skipRpcUrl: envs.SKIP_URL ?? "",
 			skipBidWallet: envs.SKIP_BID_WALLET ?? "",
 			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
+			skipThresholds: envs.SKIP_THRESHOLDS === undefined ? [] : envs.SKIP_THRESHOLDS.split(";").map((bid) => JSON.parse(bid)),
 		};
 	}
 	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
