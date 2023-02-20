@@ -115,9 +115,7 @@ export function isSwapMessage(msg: any): boolean {
  * @return SwapMessage if the `msg` is one.
  */
 export function isDefaultSwapMessage(msg: any): msg is DefaultSwapMessage {
-	return (
-		msg["swap" as keyof typeof msg] !== undefined && msg.swap["offer_asset" as keyof typeof msg.swap] !== undefined
-	);
+	return isSwapMessage(msg) && msg.swap["offer_asset" as keyof typeof msg.swap] !== undefined;
 }
 
 /**
