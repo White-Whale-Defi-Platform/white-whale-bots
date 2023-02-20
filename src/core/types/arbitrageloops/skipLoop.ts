@@ -97,7 +97,7 @@ export class SkipLoop extends MempoolLoop {
 		if (
 			!this.botConfig.skipConfig?.useSkip ||
 			this.botConfig.skipConfig?.skipRpcUrl === undefined ||
-			this.botConfig.skipConfig?.skipBidRate === undefined ||
+			this.botConfig.skipConfig?.min_skip_bid_rate === undefined ||
 			this.botConfig.skipConfig?.skipBidWallet === undefined
 		) {
 			await this.logger?.sendMessage(
@@ -106,52 +106,60 @@ export class SkipLoop extends MempoolLoop {
 			);
 			return;
 		}
-		const bidMsg: MsgSend = MsgSend.fromJSON({
-			fromAddress: this.account.address,
-			toAddress: this.botConfig.skipConfig.skipBidWallet,
-			amount: [
-				{
-					denom: this.botConfig.offerAssetInfo.native_token.denom,
-					amount: String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651)),
-				},
-			],
-		});
-		const bidMsgEncodedObject: EncodeObject = {
-			typeUrl: "/cosmos.bank.v1beta1.MsgSend",
-			value: bidMsg,
-		};
+
+		let blockheight = Number(await (
+			await this.botClients.HttpClient.execute(createJsonRpcRequest("block"))
+		).result.block.height)
 
 		const signerData: SignerData = {
 			accountNumber: this.accountNumber,
 			sequence: this.sequence,
 			chainId: this.chainid,
 		};
-		const [msgs, nrOfWasms] = this.messageFunction(
+		let [msgs, nrOfWasms] = this.messageFunction(
 			arbTrade,
 			this.account.address,
 			this.botConfig.flashloanRouterAddress,
 		);
-		msgs.push(bidMsgEncodedObject);
 
 		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
 		const TX_FEE =
 			this.botConfig.txFees.get(nrOfWasms) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
-		const txRaw: TxRaw = await this.botClients.SigningCWClient.sign(
-			this.account.address,
-			msgs,
-			TX_FEE,
-			"",
-			signerData,
-		);
 		// const txBytes = TxRaw.encode(txRaw).finish();
 		// const normalResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
 		// console.log(normalResult);
+		let res: SkipResult = {
+			result: {
+				code: 7,
+				txs: [],
+				auction_fee: "",
+				bundle_size: "",
+				desired_height: "",
+				waited_for_simulation_results: true,
+				simulation_success: true,
+				result_check_txs: [],
+				result_deliver_txs: [],
+				error: "",
+			},
+			jsonrpc: "",
+			id: 0,
+		};
+		let tmp_raw: TxRaw;
 		const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
-		const signed = await this.skipClient.signBundle([txToArbRaw, txRaw], this.skipSigner, this.account.address);
+		let curr_bid = this.botConfig.skipConfig.min_skip_bid_rate - this.botConfig.skipConfig.bidding_steps;
+		let signed;
 
-		const res = <SkipResult>await this.skipClient.sendBundle(signed, 0, true);
+		while (
+			(!res.result.code || res.result.code == 7) &&
+			curr_bid + this.botConfig.skipConfig.bidding_steps <= this.botConfig.skipConfig.max_skip_bid_rate
+		) {
+			curr_bid = this.botConfig.skipConfig.min_skip_bid_rate + this.botConfig.skipConfig.bidding_steps;
+			tmp_raw = await this.createBidMsg(arbTrade, curr_bid, signerData, msgs, TX_FEE, this.botConfig.skipConfig.skipBidWallet);
+			signed = await this.skipClient.signBundle([txToArbRaw, tmp_raw], this.skipSigner, this.account.address);
+			res = <SkipResult>await this.skipClient.sendBundle(signed, blockheight, true);
+		}
 
 		let logItem = "";
 		let logMessage = `**wallet:** ${this.account.address}\t **block:** ${res.result.desired_height}\t **profit:** ${arbTrade.profit}`;
@@ -193,6 +201,39 @@ export class SkipLoop extends MempoolLoop {
 			await this.fetchRequiredChainData();
 		}
 		await delay(5000);
+	}
+
+
+
+	private async createBidMsg(
+		arbtrade: OptimalTrade,
+		bid: number,
+		signer: SignerData,
+		msgs: EncodeObject[],
+		tx_fee: any,
+		bid_wallet: string,
+	): Promise<TxRaw> {
+		let msg = msgs;
+		let bidMsg: MsgSend = MsgSend.fromJSON({
+			fromAddress: this.account.address,
+			toAddress: bid_wallet,
+			amount: [
+				{
+					denom: this.botConfig.offerAssetInfo.native_token.denom,
+					amount: String(Math.max(Math.round(arbtrade.profit * bid), 651)),
+				},
+			],
+		});
+
+		let bidMsgEncodedObject: EncodeObject = {
+			typeUrl: "/cosmos.bank.v1beta1.MsgSend",
+			value: bidMsg,
+		};
+
+		msg.push(bidMsgEncodedObject);
+		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
+
+		return await this.botClients.SigningCWClient.sign(this.account.address, msg, tx_fee, "", signer);
 	}
 }
 

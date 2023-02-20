@@ -7,7 +7,9 @@ interface SkipConfig {
 	useSkip: boolean;
 	skipRpcUrl: string;
 	skipBidWallet: string;
-	skipBidRate: number;
+	min_skip_bid_rate: number;
+	max_skip_bid_rate: number;
+	bidding_steps:number;
 }
 export interface BotConfig {
 	chainPrefix: string;
@@ -70,7 +72,9 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 			useSkip: true,
 			skipRpcUrl: envs.SKIP_URL ?? "",
 			skipBidWallet: envs.SKIP_BID_WALLET ?? "",
-			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
+			min_skip_bid_rate: envs.MIN_SKIP_BID_RATE === undefined ? 0 : +envs.MIN_SKIP_BID_RATE,
+			max_skip_bid_rate: envs.MAX_SKIP_BID_RATE === undefined ? 0 : +envs.MAX_SKIP_BID_RATE,
+			bidding_steps: envs.BIDDING_STEPS === undefined ? 0 : +envs.BIDDING_STEPS,
 		};
 	}
 	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
@@ -127,5 +131,7 @@ function validateEnvs(envs: NodeJS.ProcessEnv) {
 function validateSkipEnvs(envs: NodeJS.ProcessEnv) {
 	assert(envs.SKIP_URL, `Please set SKIP_URL in env or ".env" file`);
 	assert(envs.SKIP_BID_WALLET, `Please set SKIP_BID_WALLET in env or ".env" file`);
-	assert(envs.SKIP_BID_RATE, `Please set SKIP_BID_RATE in env or ".env" file`);
+	assert(envs.MAX_SKIP_BID_RATE, `Please set MAX_SKIP_BID_RATE in env or ".env" file`);
+	assert(envs.MIN_SKIP_BID_RATE, `Please set MIN_SKIP_BID_RATE in env or ".env" file`);
+	assert(envs.BIDDING_STEPS, `Please set BIDDING_STEPS in env or ".env" file`);
 }

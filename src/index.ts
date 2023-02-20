@@ -56,7 +56,6 @@ async function main() {
 	const chainId = await (
 		await botClients.HttpClient.execute(createJsonRpcRequest("block"))
 	).result.block.header.chain_id;
-
 	let setupMessage = `
 Connections Details:\n
 **Account Number:** ${accountNumber}
