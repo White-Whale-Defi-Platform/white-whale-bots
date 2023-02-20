@@ -9,7 +9,7 @@ import { AmmDexName, outGivenIn, Pool } from "../../../core/types/base/pool";
 import { IncreaseAllowanceMessage } from "../../../core/types/messages/allowance";
 import { FlashLoanMessage, WasmMessage } from "../../../core/types/messages/flashloanmessage";
 import { SendMessage } from "../../../core/types/messages/sendmessages";
-import { InnerSwapMessage, JunoSwapMessage, SwapMessage } from "../../../core/types/messages/swapmessages";
+import { InnerSwapMessage, JunoSwapMessage, DefaultSwapMessage } from "../../../core/types/messages/swapmessages";
 /**
  *
  */
@@ -58,10 +58,10 @@ function getWasmMessages(pool: Pool, offerAsset: Asset) {
 	const [outGivenInTrade, returnAssetInfo] = outGivenIn(pool, offerAsset);
 	const beliefPrice = Math.round((+offerAsset.amount / outGivenInTrade) * 1e6) / 1e6; //gives price per token bought
 	const nextOfferAsset: Asset = { amount: String(outGivenInTrade), info: returnAssetInfo };
-	let msg: SwapMessage | JunoSwapMessage | SendMessage;
+	let msg: DefaultSwapMessage | JunoSwapMessage | SendMessage;
 	if (pool.dexname === AmmDexName.default || pool.dexname === AmmDexName.wyndex) {
 		if (isNativeAsset(offerAsset.info)) {
-			msg = <SwapMessage>{
+			msg = <DefaultSwapMessage>{
 				swap: {
 					max_spread: "0.01",
 					offer_asset:

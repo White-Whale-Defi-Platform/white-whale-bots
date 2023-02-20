@@ -14,7 +14,7 @@ interface SkipConfig {
 export interface BotConfig {
 	chainPrefix: string;
 	rpcUrl: string;
-	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number }>;
+	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
 	maxPathPools: number;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
 	flashloanRouterAddress: string;
@@ -23,6 +23,7 @@ export interface BotConfig {
 	mnemonic: string;
 	useMempool: boolean;
 	baseDenom: string;
+	signOfLife: number;
 
 	gasPrice: string;
 	txFees: Map<number, StdFee>;
@@ -58,6 +59,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 	factories = factories.startsWith("[") && factories.endsWith("]") ? factories : `[${factories}]`;
 	const FACTORIES_TO_ROUTERS_MAPPING = JSON.parse(factories);
 
+	const SIGN_OF_LIFE = Number(envs.SIGN_OF_LIFE === undefined ? 30 : +envs.SIGN_OF_LIFE);
 	const OFFER_ASSET_INFO: NativeAssetInfo = { native_token: { denom: envs.BASE_DENOM } };
 	const GAS_UNIT_PRICE = envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
 
@@ -107,6 +109,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		slackChannel: envs.SLACK_CHANNEL,
 		discordWebhookUrl: envs.DISCORD_WEBHOOK_URL,
 		skipConfig: skipConfig,
+		signOfLife: SIGN_OF_LIFE,
 	};
 	return botConfig;
 }
