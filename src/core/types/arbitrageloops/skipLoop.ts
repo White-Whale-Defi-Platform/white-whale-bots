@@ -78,7 +78,6 @@ export class SkipLoop extends MempoolLoop {
 					applyMempoolTradesOnPools(this.pools, [trade]);
 					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 					if (arbTrade) {
-						arbTrade.path.cooldown = true;
 						await this.skipTrade(arbTrade, trade);
 						arbTrade.path.cooldown = true; //set the cooldown of this path to true so we dont trade it again in next callbacks
 					}
