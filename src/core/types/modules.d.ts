@@ -59,6 +59,7 @@ declare namespace NodeJS {
 		 */
 		PROFIT_THRESHOLD: string;
 
+		// only strings from the environment variables
 		SIGN_OF_LIFE: string;
 
 		GAS_USAGE_PER_HOP: string;
