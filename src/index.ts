@@ -40,6 +40,8 @@ async function main() {
 	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
 	let getPoolStates = chains.defaults.getPoolStates;
 	let initPools = chains.defaults.initPools;
+	let startupTime = Date.now();
+	let timeIt = 0;
 
 	await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
 		if (chainSetups === undefined) {
@@ -125,12 +127,17 @@ Total Paths:** \t${paths.length}\n`;
 	await loop.fetchRequiredChainData();
 
 	await logger.sendMessage("Starting loop...", LogType.All);
-
 	while (true) {
 		await loop.step();
 		loop.reset();
-		if (loop.iterations % 150 === 0) {
-			const message = `**chain:** ${loop.chainid} **wallet:** ${account.address} **status:** running for ${loop.iterations} blocks`;
+		if (startupTime - Date.now() + botConfig.signOfLife * 60000 <= 0) {
+			timeIt++;
+			const mins = (botConfig.signOfLife * timeIt) % 60;
+			const hours = ~~((botConfig.signOfLife * timeIt) / 60);
+			startupTime = Date.now();
+			const message = `**chain:** ${loop.chainid} **wallet:** ${account.address} **status:** running for ${
+				loop.iterations
+			} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
 			await logger.sendMessage(message);
 		}
 	}

@@ -129,9 +129,10 @@ export class MempoolLoop {
 	 *
 	 */
 	public reset() {
-		// this.paths.forEach((path) => {
-		// 	path.cooldown = false;
-		// });
+		// reset all paths that are on cooldown
+		this.paths.forEach((path) => {
+			path.cooldown = false;
+		});
 		this.totalBytes = 0;
 		flushTxMemory();
 	}

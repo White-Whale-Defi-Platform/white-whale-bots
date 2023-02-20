@@ -21,6 +21,7 @@ export interface BotConfig {
 	mnemonic: string;
 	useMempool: boolean;
 	baseDenom: string;
+	signOfLife: number;
 
 	gasPrice: string;
 	txFees: Map<number, StdFee>;
@@ -44,10 +45,19 @@ export interface BotConfig {
 export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 	validateEnvs(envs);
 
-	const POOLS_ENVS = envs.POOLS.split(",\n").map((pool) => JSON.parse(pool));
-	const FACTORIES_TO_ROUTERS_MAPPING = envs.FACTORIES_TO_ROUTERS_MAPPING.split(",\n").map((mapping) =>
-		JSON.parse(mapping),
-	);
+	let pools = envs.POOLS.trim()
+		.replace(/\n|\r|\t/g, "")
+		.replace(/,\s*$/, "");
+	pools = pools.startsWith("[") && pools.endsWith("]") ? pools : `[${pools}]`;
+	const POOLS_ENVS = JSON.parse(pools);
+
+	let factories = envs.FACTORIES_TO_ROUTERS_MAPPING.trim()
+		.replace(/\n|\r|\t/g, "")
+		.replace(/,\s*$/, "");
+	factories = factories.startsWith("[") && factories.endsWith("]") ? factories : `[${factories}]`;
+	const FACTORIES_TO_ROUTERS_MAPPING = JSON.parse(factories);
+	
+	const SIGN_OF_LIFE = Number(envs.SIGN_OF_LIFE === undefined ? 30 : +envs.SIGN_OF_LIFE);
 	const OFFER_ASSET_INFO: NativeAssetInfo = { native_token: { denom: envs.BASE_DENOM } };
 	const GAS_UNIT_PRICE = envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
 
@@ -95,6 +105,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		slackChannel: envs.SLACK_CHANNEL,
 		discordWebhookUrl: envs.DISCORD_WEBHOOK_URL,
 		skipConfig: skipConfig,
+		signOfLife: SIGN_OF_LIFE,
 	};
 	return botConfig;
 }

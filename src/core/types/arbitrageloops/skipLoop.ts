@@ -82,8 +82,7 @@ export class SkipLoop extends MempoolLoop {
 						arbTrade.path.cooldown = true;
 						console.log(arbTrade.path.pools.map((pool) => pool.address));
 						await this.skipTrade(arbTrade, trade);
-						//set the cooldown of this path to true so we dont trade it again in next callbacks
-						break;
+						arbTrade.path.cooldown = true; //set the cooldown of this path to true so we dont trade it again in next callbacks
 					}
 				}
 			}
@@ -94,6 +93,10 @@ export class SkipLoop extends MempoolLoop {
 	 *
 	 */
 	private async skipTrade(arbTrade: OptimalTrade, toArbTrade: MempoolTrade) {
+		if (arbTrade.path.cooldown) {
+			// dont execute if path is on cooldown
+			return;
+		}
 		if (
 			!this.botConfig.skipConfig?.useSkip ||
 			this.botConfig.skipConfig?.skipRpcUrl === undefined ||
