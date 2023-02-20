@@ -53,8 +53,6 @@ export class Logger {
 				}
 
 				if (this.telegramLogger && [LogType.All, LogType.Externals, LogType.Telegram].includes(type)) {
-					console.log("send telegram msg");
-					
 					await this.telegramLogger.sendMessage(message);
 				}
 
