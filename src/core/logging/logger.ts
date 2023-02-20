@@ -2,6 +2,7 @@ import { BotConfig } from "../types/base/botConfig";
 import { LogType } from "../types/base/logging";
 import { DiscordLogger } from "./discordLogger";
 import { SlackLogger } from "./slackLogger";
+import { TelegramLogger } from "./telegramLogger";
 
 /**
  *
@@ -10,6 +11,7 @@ export class Logger {
 	private botConfig: BotConfig;
 	public discordLogger?: DiscordLogger;
 	public slackLogger?: SlackLogger;
+	private telegramLogger?: TelegramLogger; 
 
 	// Codes that are not sent to external sources (discord, slack)
 	private externalExemptCodes: Array<number> = [4, 5, 6, 8];
@@ -22,6 +24,10 @@ export class Logger {
 
 		if (this.botConfig.discordWebhookUrl) {
 			this.discordLogger = new DiscordLogger(this.botConfig.discordWebhookUrl);
+		}
+
+		if (this.botConfig.telegramBotToken && this.botConfig.telegramChatId) {
+			this.telegramLogger = new TelegramLogger(this.botConfig.telegramBotToken, this.botConfig.telegramChatId)
 		}
 
 		if (this.botConfig.slackToken && this.botConfig.slackChannel) {
@@ -44,6 +50,12 @@ export class Logger {
 
 				if (this.discordLogger && [LogType.All, LogType.Externals, LogType.Discord].includes(type)) {
 					await this.discordLogger.sendMessage(message);
+				}
+
+				if (this.telegramLogger && [LogType.All, LogType.Externals, LogType.Telegram].includes(type)) {
+					console.log("send telegram msg");
+					
+					await this.telegramLogger.sendMessage(message);
 				}
 
 				if (this.slackLogger && [LogType.All, LogType.Externals, LogType.Slack].includes(type)) {

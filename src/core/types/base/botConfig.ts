@@ -34,6 +34,10 @@ export interface BotConfig {
 	slackChannel?: string | undefined;
 	// Discord webhook url
 	discordWebhookUrl?: string | undefined;
+	// Telegram bot token
+	telegramBotToken?: string | undefined;
+	// Telegram chatid the bot logs in to
+	telegramChatId?: string | undefined;
 
 	// Skip specific (optionally)
 	skipConfig: SkipConfig | undefined;
@@ -104,6 +108,8 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		slackToken: envs.SLACK_TOKEN,
 		slackChannel: envs.SLACK_CHANNEL,
 		discordWebhookUrl: envs.DISCORD_WEBHOOK_URL,
+		telegramChatId: envs.TELEGRAM_CHAT_ID,
+		telegramBotToken: envs.TELEGRAM_BOT_TOKEN,
 		skipConfig: skipConfig,
 		signOfLife: SIGN_OF_LIFE,
 	};
