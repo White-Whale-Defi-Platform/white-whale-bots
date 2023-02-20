@@ -12,7 +12,7 @@ interface SkipConfig {
 export interface BotConfig {
 	chainPrefix: string;
 	rpcUrl: string;
-	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number }>;
+	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
 	maxPathPools: number;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
 	flashloanRouterAddress: string;
