@@ -9,6 +9,7 @@ import {
 	isDefaultSwapMessage,
 	isJunoSwapMessage,
 	isJunoSwapOperationsMessage,
+	isSwapMessage,
 	isSwapOperationsMessage,
 	isTFMSwapOperationsMessage,
 	isWWSwapOperationsMessages,
@@ -122,7 +123,7 @@ export function processMempool(mempool: Mempool): Array<MempoolTrade> {
 								mempoolTrades.push(mempoolTrade);
 							}
 							continue;
-						} else {
+						} else if (isSwapMessage(msgJson)) {
 							// swap message inside a send message
 							const contract = containedMsg.send.contract;
 							const token_addr = msgExecuteContract.contract;
@@ -136,6 +137,8 @@ export function processMempool(mempool: Mempool): Array<MempoolTrade> {
 								offer_asset: offer_asset,
 								txBytes: txBytes,
 							});
+							continue;
+						} else {
 							continue;
 						}
 					} catch (e) {
