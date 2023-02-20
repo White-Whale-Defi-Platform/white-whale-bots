@@ -114,7 +114,7 @@ export class SkipLoop extends MempoolLoop {
     		arr.find(element => {
 				if (arbTrade.profit > (element.profit * 1000000)) {
 					if (element.bid >= 1) {
-                        newBidRate = (arbTrade.profit - element.bid) / arbTrade.profit
+                        newBidRate = (arbTrade.profit - element.bid * 1000000) / arbTrade.profit
                         return newBidRate;
                     } else {
                         newBidRate = element.bid;
