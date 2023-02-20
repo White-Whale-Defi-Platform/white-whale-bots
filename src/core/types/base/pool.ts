@@ -1,9 +1,9 @@
 import { isSendMessage } from "../messages/sendmessages";
 import {
 	isAstroSwapOperationsMessages,
+	isDefaultSwapMessage,
 	isJunoSwapMessage,
 	isJunoSwapOperationsMessage,
-	isSwapMessage,
 	isSwapOperationsMessage,
 	isTFMSwapOperationsMessage,
 	isWWSwapOperationsMessages,
@@ -130,7 +130,7 @@ export function applyMempoolTradesOnPools(pools: Array<Pool>, mempoolTrades: Arr
 			const msg = trade.message;
 			if (poolToUpdate) {
 				// a direct swap or send to pool
-				if (isSwapMessage(msg) && trade.offer_asset !== undefined) {
+				if (isDefaultSwapMessage(msg) && trade.offer_asset !== undefined) {
 					applyTradeOnPool(poolToUpdate, trade.offer_asset);
 				} else if (isSendMessage(msg) && trade.offer_asset !== undefined) {
 					applyTradeOnPool(poolToUpdate, trade.offer_asset);

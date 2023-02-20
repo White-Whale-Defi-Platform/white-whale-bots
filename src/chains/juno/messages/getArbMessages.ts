@@ -6,7 +6,7 @@ import { Asset, isMatchingAssetInfos, isNativeAsset } from "../../../core/types/
 import { Path } from "../../../core/types/base/path";
 import { AmmDexName, outGivenIn } from "../../../core/types/base/pool";
 import { SendMessage } from "../../../core/types/messages/sendmessages";
-import { InnerSwapMessage, JunoSwapMessage, SwapMessage } from "../../../core/types/messages/swapmessages";
+import { DefaultSwapMessage, InnerSwapMessage, JunoSwapMessage } from "../../../core/types/messages/swapmessages";
 /**
  *
  */
@@ -19,7 +19,7 @@ export function getArbMessages(path: Path, walletAddress: string, offerAsset0: A
 	console.log("outGivenIn0: ", outGivenIn0, "outGivenIn1: ", outGivenIn1);
 	if (isNativeAsset(returnAssetInfo0)) {
 		// double swap message as we trade only native assets
-		let swapMsg0: SwapMessage | JunoSwapMessage;
+		let swapMsg0: DefaultSwapMessage | JunoSwapMessage;
 		let encodedSwapMsg0: EncodeObject;
 		if (path.pools[0].dexname == AmmDexName.default) {
 			swapMsg0 = {
@@ -73,7 +73,7 @@ export function getArbMessages(path: Path, walletAddress: string, offerAsset0: A
 			};
 		}
 
-		let swapMsg1: SwapMessage | JunoSwapMessage;
+		let swapMsg1: DefaultSwapMessage | JunoSwapMessage;
 		let encodedSwapMsg1: EncodeObject;
 		if (path.pools[1].dexname == AmmDexName.default) {
 			swapMsg1 = {
@@ -128,7 +128,7 @@ export function getArbMessages(path: Path, walletAddress: string, offerAsset0: A
 		}
 		return [encodedSwapMsg0, encodedSwapMsg1];
 	} else {
-		let swapMsg0: SwapMessage | JunoSwapMessage;
+		let swapMsg0: DefaultSwapMessage | JunoSwapMessage;
 		let encodedSwapMsg0: EncodeObject;
 		if (path.pools[0].dexname == AmmDexName.default) {
 			swapMsg0 = {
