@@ -34,7 +34,7 @@ function isAboveThreshold(botConfig: BotConfig, optimalTrade: OptimalTrade): boo
 		botConfig.profitThresholds.get((optimalTrade.path.pools.length - 1) * 2 + 1) ??
 		Array.from(botConfig.profitThresholds.values())[botConfig.profitThresholds.size - 1];
 	if (botConfig.skipConfig) {
-		const skipBidRate = botConfig.skipConfig.skipBidRate;
+		const skipBidRate = botConfig.skipConfig.max_skip_bid_rate;
 		return (
 			(1 - skipBidRate) * optimalTrade.profit - (botConfig.flashloanFee / 100) * +optimalTrade.offerAsset.amount >
 			profitThreshold
