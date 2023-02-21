@@ -98,6 +98,7 @@ export class SkipLoop extends MempoolLoop {
 			!this.botConfig.skipConfig?.useSkip ||
 			this.botConfig.skipConfig?.skipRpcUrl === undefined ||
 			this.botConfig.skipConfig?.min_skip_bid_rate === undefined ||
+			this.botConfig.skipConfig?.max_skip_bid_rate === undefined ||
 			this.botConfig.skipConfig?.skipBidWallet === undefined
 		) {
 			await this.logger?.sendMessage(
