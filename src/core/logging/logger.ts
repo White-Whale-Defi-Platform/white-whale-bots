@@ -11,10 +11,10 @@ export class Logger {
 	private botConfig: BotConfig;
 	public discordLogger?: DiscordLogger;
 	public slackLogger?: SlackLogger;
-	private telegramLogger?: TelegramLogger; 
+	private telegramLogger?: TelegramLogger;
 
 	// Codes that are not sent to external sources (discord, slack)
-	private externalExemptCodes: Array<number> = [4, 5, 6, 8];
+	private externalExemptCodes: Array<number> = [];
 
 	/**
 	 *
@@ -22,16 +22,24 @@ export class Logger {
 	constructor(config: BotConfig) {
 		this.botConfig = config;
 
-		if (this.botConfig.discordWebhookUrl) {
-			this.discordLogger = new DiscordLogger(this.botConfig.discordWebhookUrl);
+		this.externalExemptCodes = this.botConfig.loggerConfig.externalExemptCodes ?? [];
+
+		if (this.botConfig.loggerConfig.discordWebhookUrl) {
+			this.discordLogger = new DiscordLogger(this.botConfig.loggerConfig.discordWebhookUrl);
 		}
 
-		if (this.botConfig.telegramBotToken && this.botConfig.telegramChatId) {
-			this.telegramLogger = new TelegramLogger(this.botConfig.telegramBotToken, this.botConfig.telegramChatId);
+		if (this.botConfig.loggerConfig.telegramBotToken && this.botConfig.loggerConfig.telegramChatId) {
+			this.telegramLogger = new TelegramLogger(
+				this.botConfig.loggerConfig.telegramBotToken,
+				this.botConfig.loggerConfig.telegramChatId,
+			);
 		}
 
-		if (this.botConfig.slackToken && this.botConfig.slackChannel) {
-			this.slackLogger = new SlackLogger(this.botConfig.slackToken, this.botConfig.slackChannel);
+		if (this.botConfig.loggerConfig.slackToken && this.botConfig.loggerConfig.slackChannel) {
+			this.slackLogger = new SlackLogger(
+				this.botConfig.loggerConfig.slackToken,
+				this.botConfig.loggerConfig.slackChannel,
+			);
 		}
 	}
 
