@@ -139,7 +139,9 @@ export class SkipLoop extends MempoolLoop {
 		let res: SkipResult | undefined;
 		let bid_raw: TxRaw;
 		const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
-		let curr_bid = this.botConfig.skipConfig.min_skip_bid_rate - this.botConfig.skipConfig.bidding_steps;
+		const bidding_steps: number =
+			(this.botConfig.skipConfig.max_skip_bid_rate - this.botConfig.skipConfig.min_skip_bid_rate) / 5;
+		let curr_bid = this.botConfig.skipConfig.min_skip_bid_rate - bidding_steps;
 		let signed;
 
 		// Loop until the skip respond code ist not 7 = The bundle was not simulated -- usually this means it lost the auction or arrived too late
@@ -147,9 +149,9 @@ export class SkipLoop extends MempoolLoop {
 
 		while (
 			(!res || !res.result.code || res.result.code == 7) &&
-			curr_bid + this.botConfig.skipConfig.bidding_steps <= this.botConfig.skipConfig.max_skip_bid_rate
+			curr_bid + bidding_steps <= this.botConfig.skipConfig.max_skip_bid_rate
 		) {
-			curr_bid = curr_bid + this.botConfig.skipConfig.bidding_steps;
+			curr_bid = curr_bid + bidding_steps;
 			bid_raw = await this.createBidMsg(
 				arbTrade,
 				curr_bid,

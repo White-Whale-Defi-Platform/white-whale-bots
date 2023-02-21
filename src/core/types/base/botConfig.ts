@@ -9,7 +9,6 @@ interface SkipConfig {
 	skipBidWallet: string;
 	min_skip_bid_rate: number;
 	max_skip_bid_rate: number;
-	bidding_steps:number;
 }
 export interface BotConfig {
 	chainPrefix: string;
@@ -76,7 +75,6 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 			skipBidWallet: envs.SKIP_BID_WALLET ?? "",
 			min_skip_bid_rate: envs.MIN_SKIP_BID_RATE === undefined ? 0 : +envs.MIN_SKIP_BID_RATE,
 			max_skip_bid_rate: envs.MAX_SKIP_BID_RATE === undefined ? 0 : +envs.MAX_SKIP_BID_RATE,
-			bidding_steps: envs.BIDDING_STEPS === undefined ? 0 : +envs.BIDDING_STEPS,
 		};
 	}
 	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
