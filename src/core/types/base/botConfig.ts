@@ -134,5 +134,4 @@ function validateSkipEnvs(envs: NodeJS.ProcessEnv) {
 	assert(envs.SKIP_BID_WALLET, `Please set SKIP_BID_WALLET in env or ".env" file`);
 	assert(envs.MAX_SKIP_BID_RATE, `Please set MAX_SKIP_BID_RATE in env or ".env" file`);
 	assert(envs.MIN_SKIP_BID_RATE, `Please set MIN_SKIP_BID_RATE in env or ".env" file`);
-	assert(envs.BIDDING_STEPS, `Please set BIDDING_STEPS in env or ".env" file`);
 }
