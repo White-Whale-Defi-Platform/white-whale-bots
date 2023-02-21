@@ -27,7 +27,7 @@ export class Logger {
 		}
 
 		if (this.botConfig.telegramBotToken && this.botConfig.telegramChatId) {
-			this.telegramLogger = new TelegramLogger(this.botConfig.telegramBotToken, this.botConfig.telegramChatId)
+			this.telegramLogger = new TelegramLogger(this.botConfig.telegramBotToken, this.botConfig.telegramChatId);
 		}
 
 		if (this.botConfig.slackToken && this.botConfig.slackChannel) {
