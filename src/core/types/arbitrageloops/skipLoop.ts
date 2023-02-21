@@ -107,16 +107,19 @@ export class SkipLoop extends MempoolLoop {
 			return;
 		}
 
-		let blockheight = Number(await (
-			await this.botClients.HttpClient.execute(createJsonRpcRequest("block"))
-		).result.block.height)
+		const blockheight =
+			Number(
+				await (
+					await this.botClients.HttpClient.execute(createJsonRpcRequest("block"))
+				).result.block.header.height,
+			) + 1;
 
 		const signerData: SignerData = {
 			accountNumber: this.accountNumber,
 			sequence: this.sequence,
 			chainId: this.chainid,
 		};
-		let [msgs, nrOfWasms] = this.messageFunction(
+		const [msgs, nrOfWasms] = this.messageFunction(
 			arbTrade,
 			this.account.address,
 			this.botConfig.flashloanRouterAddress,
@@ -146,7 +149,7 @@ export class SkipLoop extends MempoolLoop {
 			jsonrpc: "",
 			id: 0,
 		};
-		let tmp_raw: TxRaw;
+		let bid_raw: TxRaw;
 		const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
 		let curr_bid = this.botConfig.skipConfig.min_skip_bid_rate - this.botConfig.skipConfig.bidding_steps;
 		let signed;
@@ -155,9 +158,16 @@ export class SkipLoop extends MempoolLoop {
 			(!res.result.code || res.result.code == 7) &&
 			curr_bid + this.botConfig.skipConfig.bidding_steps <= this.botConfig.skipConfig.max_skip_bid_rate
 		) {
-			curr_bid = this.botConfig.skipConfig.min_skip_bid_rate + this.botConfig.skipConfig.bidding_steps;
-			tmp_raw = await this.createBidMsg(arbTrade, curr_bid, signerData, msgs, TX_FEE, this.botConfig.skipConfig.skipBidWallet);
-			signed = await this.skipClient.signBundle([txToArbRaw, tmp_raw], this.skipSigner, this.account.address);
+			curr_bid = curr_bid + this.botConfig.skipConfig.bidding_steps;
+			bid_raw = await this.createBidMsg(
+				arbTrade,
+				curr_bid,
+				signerData,
+				msgs,
+				TX_FEE,
+				this.botConfig.skipConfig.skipBidWallet,
+			);
+			signed = await this.skipClient.signBundle([txToArbRaw, bid_raw], this.skipSigner, this.account.address);
 			res = <SkipResult>await this.skipClient.sendBundle(signed, blockheight, true);
 		}
 
@@ -203,18 +213,19 @@ export class SkipLoop extends MempoolLoop {
 		await delay(5000);
 	}
 
-
-
+	/**
+	 * 
+	 */
 	private async createBidMsg(
 		arbtrade: OptimalTrade,
 		bid: number,
 		signer: SignerData,
-		msgs: EncodeObject[],
+		msgs: Array<EncodeObject>,
 		tx_fee: any,
 		bid_wallet: string,
 	): Promise<TxRaw> {
-		let msg = msgs;
-		let bidMsg: MsgSend = MsgSend.fromJSON({
+		const msg = msgs;
+		const bidMsg: MsgSend = MsgSend.fromJSON({
 			fromAddress: this.account.address,
 			toAddress: bid_wallet,
 			amount: [
@@ -225,7 +236,7 @@ export class SkipLoop extends MempoolLoop {
 			],
 		});
 
-		let bidMsgEncodedObject: EncodeObject = {
+		const bidMsgEncodedObject: EncodeObject = {
 			typeUrl: "/cosmos.bank.v1beta1.MsgSend",
 			value: bidMsg,
 		};
