@@ -108,6 +108,7 @@ export class SkipLoop extends MempoolLoop {
 			return;
 		}
 
+		// Needed to Bid for the next block
 		const blockheight =
 			Number(
 				await (
@@ -134,12 +135,15 @@ export class SkipLoop extends MempoolLoop {
 		// const txBytes = TxRaw.encode(txRaw).finish();
 		// const normalResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
 		// console.log(normalResult);
-		// eslint-disable-next-line no-undef-init
+
 		let res: SkipResult | undefined;
 		let bid_raw: TxRaw;
 		const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
 		let curr_bid = this.botConfig.skipConfig.min_skip_bid_rate - this.botConfig.skipConfig.bidding_steps;
 		let signed;
+
+		// Loop until the skip respond code ist not 7 = The bundle was not simulated -- usually this means it lost the auction or arrived too late
+		// or curr_bid will be bigger than max skip rate
 
 		while (
 			(!res || !res.result.code || res.result.code == 7) &&
@@ -156,6 +160,11 @@ export class SkipLoop extends MempoolLoop {
 			);
 			signed = await this.skipClient.signBundle([txToArbRaw, bid_raw], this.skipSigner, this.account.address);
 			res = <SkipResult>await this.skipClient.sendBundle(signed, blockheight, true);
+		}
+
+		//prevent undefined error
+		if (!res){
+			return
 		}
 
 		let logItem = "";
@@ -201,7 +210,7 @@ export class SkipLoop extends MempoolLoop {
 	}
 
 	/**
-	 * 
+	 * Creates the Bidmsg
 	 */
 	private async createBidMsg(
 		arbtrade: OptimalTrade,
