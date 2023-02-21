@@ -133,29 +133,15 @@ export class SkipLoop extends MempoolLoop {
 		// const txBytes = TxRaw.encode(txRaw).finish();
 		// const normalResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
 		// console.log(normalResult);
-		let res: SkipResult = {
-			result: {
-				code: 7,
-				txs: [],
-				auction_fee: "",
-				bundle_size: "",
-				desired_height: "",
-				waited_for_simulation_results: true,
-				simulation_success: true,
-				result_check_txs: [],
-				result_deliver_txs: [],
-				error: "",
-			},
-			jsonrpc: "",
-			id: 0,
-		};
+		// eslint-disable-next-line no-undef-init
+		let res: SkipResult | undefined;
 		let bid_raw: TxRaw;
 		const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
 		let curr_bid = this.botConfig.skipConfig.min_skip_bid_rate - this.botConfig.skipConfig.bidding_steps;
 		let signed;
 
 		while (
-			(!res.result.code || res.result.code == 7) &&
+			(!res || !res.result.code || res.result.code == 7) &&
 			curr_bid + this.botConfig.skipConfig.bidding_steps <= this.botConfig.skipConfig.max_skip_bid_rate
 		) {
 			curr_bid = curr_bid + this.botConfig.skipConfig.bidding_steps;
