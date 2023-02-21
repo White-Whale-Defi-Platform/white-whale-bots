@@ -9,6 +9,16 @@ interface SkipConfig {
 	skipBidWallet: string;
 	skipBidRate: number;
 }
+
+interface LoggerConfig {
+	slackToken?: string;
+	slackChannel?: string;
+	discordWebhookUrl?: string;
+	telegramBotToken?: string;
+	telegramChatId?: string;
+	externalExemptCodes?: Array<number>;
+}
+
 export interface BotConfig {
 	chainPrefix: string;
 	rpcUrl: string;
@@ -27,17 +37,8 @@ export interface BotConfig {
 	txFees: Map<number, StdFee>;
 	profitThresholds: Map<number, number>;
 
-	// logging specific (optionally)
-	// Slack OAuth2 token for the specific SlackApp
-	slackToken?: string | undefined;
-	// channel the bot logs in to
-	slackChannel?: string | undefined;
-	// Discord webhook url
-	discordWebhookUrl?: string | undefined;
-	// Telegram bot token
-	telegramBotToken?: string | undefined;
-	// Telegram chatid the bot logs in to
-	telegramChatId?: string | undefined;
+	// Logger specific config.
+	loggerConfig: LoggerConfig;
 
 	// Skip specific (optionally)
 	skipConfig: SkipConfig | undefined;
@@ -79,6 +80,21 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
 		};
 	}
+
+	// setup logger config.
+	const externalExemptCodesStr = envs.EXTERNAL_EXEMPT_CODES?.split(",") ?? [];
+	const externalExemptCodes = externalExemptCodesStr.map((el) => {
+		return parseInt(el);
+	});
+	const loggerConfig: LoggerConfig = {
+		slackChannel: envs.SLACK_CHANNEL,
+		slackToken: envs.SLACK_TOKEN,
+		discordWebhookUrl: envs.DISCORD_WEBHOOK_URL,
+		telegramBotToken: envs.TELEGRAM_BOT_TOKEN,
+		telegramChatId: envs.TELEGRAM_CHAT_ID,
+		externalExemptCodes: externalExemptCodes,
+	};
+
 	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
 
 	//set all required fees for the depth of the hops set by user;
@@ -105,12 +121,8 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		gasPrice: envs.GAS_UNIT_PRICE,
 		profitThresholds: PROFIT_THRESHOLDS,
 		txFees: TX_FEES,
-		slackToken: envs.SLACK_TOKEN,
-		slackChannel: envs.SLACK_CHANNEL,
-		discordWebhookUrl: envs.DISCORD_WEBHOOK_URL,
-		telegramChatId: envs.TELEGRAM_CHAT_ID,
-		telegramBotToken: envs.TELEGRAM_BOT_TOKEN,
 		skipConfig: skipConfig,
+		loggerConfig: loggerConfig,
 		signOfLife: SIGN_OF_LIFE,
 	};
 	return botConfig;
