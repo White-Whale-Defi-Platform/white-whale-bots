@@ -95,5 +95,21 @@ declare namespace NodeJS {
 		 * Codes that are not sent to external sources (discord, slack).
 		 */
 		EXTERNAL_EXEMPT_CODES: string | undefined;
+		/**
+		 * Denotes whether we use skip for submitting transaction bundles.
+		 */
+		USE_SKIP: string | undefined;
+		/**
+		 * The skip url to send transactions to.
+		 */
+		SKIP_URL: string | undefined;
+		/**
+		 * The auction house wallet that skip uses on this chain.
+		 */
+		SKIP_BID_WALLET: string | undefined;
+		/**
+		 * The ratio of the profit to send as a bid.
+		 */
+		SKIP_BID_RATE: string | undefined;
 	}
 }
