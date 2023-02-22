@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "prebuild": "npm run clean && echo \"building...\"",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
     "build": "tsc",
     "clean": "rimraf out",
     "start": "npm run build && node out/index.js",
