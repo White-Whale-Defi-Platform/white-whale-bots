@@ -51,21 +51,49 @@ declare namespace NodeJS {
 		 * The price of a GAS_UNIT on the specific chain, denominated by BASE_DENOM.
 		 */
 		GAS_UNIT_PRICE: string;
-		/**.
+		/**
 		 * Minimum profit threshold, denominated as a multiplier on the paid gas fee in BASE_DENOM.
 		 *
-		 * Meaning minprofit = PROFIT_THRESHOL*paid_gas_fee_in_base_denom
+		 * Meaning minprofit = PROFIT_THRESHOL*paid_gas_fee_in_base_denom.
 		 *
 		 */
 		PROFIT_THRESHOLD: string;
-
-		// only strings from the environment variables
+		/**
+		 * Sends Sign of life message every x minutes.
+		 */
 		SIGN_OF_LIFE: string;
-
+		/**
+		 * Gas usage per hop.
+		 * Hop = Number of pools that must be used to achieve the arbitrage.
+		 */
 		GAS_USAGE_PER_HOP: string;
+		/**
+		 * Max hops the bot should calculate trades for.
+		 */
 		MAX_PATH_HOPS: string;
-
+		/**
+		 * Slack bot token.
+		 */
 		SLACK_TOKEN: string | undefined;
+		/**
+		 * Name of slack channel.
+		 */
 		SLACK_CHANNEL: string | undefined;
+		/**
+		 * Discord Webhook to send logs to.
+		 */
+		DISCORD_WEBHOOK_URL: string | undefined;
+		/**
+		 * Telegram bot token.
+		 */
+		TELEGRAM_BOT_TOKEN: string | undefined;
+		/**
+		 * Telegram chat id.
+		 */
+		TELEGRAM_CHAT_ID: string | undefined;
+		/**
+		 * Codes that are not sent to external sources (discord, slack).
+		 */
+		EXTERNAL_EXEMPT_CODES: string | undefined;
 	}
 }
