@@ -4,11 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "prebuild": "npm run clean && clear && echo \"building...\"",
+    "prebuild": "npm run clean && echo \"building...\"",
     "build": "tsc",
     "clean": "rimraf out",
-    "start": "npm run build && clear && node out/index.js",
-    "test": "npm run build && clear && node out/tests/index.js",
+    "start": "npm run build && node out/index.js",
+    "test": "npm run build && node out/tests/index.js",
     "test-compile": "npm run build && ./node_modules/.bin/nyc mocha \"out/**/*.spec.js\" --recursive"
   },
   "author": "White Whale",
@@ -50,6 +50,7 @@
     "@cosmjs/tendermint-rpc": "^0.29.4",
     "@skip-mev/skipjs": "^1.1.0",
     "@slack/web-api": "^6.8.0",
+    "axios": "^1.3.3",
     "discord.js": "^14.7.1",
     "dotenv": "^16.0.1"
   }
