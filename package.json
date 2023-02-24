@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "prebuild": "prebuild": "npm run clean && npm run lint && echo \"building...\"",
+    "prebuild": "npm run clean && npm run lint:fix && echo \"building...\"",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "build": "tsc",
