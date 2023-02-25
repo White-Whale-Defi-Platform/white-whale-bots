@@ -60,7 +60,7 @@ export async function getPoolStates(botClients: BotClients, pools: Array<Pool>) 
  */
 export async function initPools(
 	botClients: BotClients,
-	poolAddresses: Array<{ pool: string; inputfee: number; outputfee: number }>,
+	poolAddresses: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>,
 	factoryMapping: Array<{ factory: string; router: string }>,
 ): Promise<Array<Pool>> {
 	const pools: Array<Pool> = [];
@@ -90,6 +90,7 @@ export async function initPools(
 			dexname: dexname,
 			inputfee: poolAddress.inputfee,
 			outputfee: poolAddress.outputfee,
+			LPratio: poolAddress.LPratio,
 			factoryAddress: factory,
 			routerAddress: router,
 		});
