@@ -145,12 +145,14 @@ export class SkipLoop extends MempoolLoop {
 			"",
 			signerData,
 		);
-		// const txBytes = TxRaw.encode(txRaw).finish();
-		// const normalResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
-		// console.log(normalResult);
-		const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
-		const signed = await this.skipClient.signBundle([txToArbRaw, txRaw], this.skipSigner, this.account.address);
 
+		const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
+		const txString = Buffer.from(TxRaw.encode(txRaw).finish()).toString("base64");
+		const txArbString = Buffer.from(TxRaw.encode(txToArbRaw).finish()).toString("base64");
+		// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+		// @ts-ignore
+		const privKey = (await this.skipSigner.getAccountsWithPrivkeys())[0].privkey;
+		const signed = await this.skipClient.signBundle([txArbString, txString], privKey);
 		const res = <SkipResult>await this.skipClient.sendBundle(signed, 0, true);
 
 		let logItem = "";
