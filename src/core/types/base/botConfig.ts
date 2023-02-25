@@ -9,10 +9,20 @@ interface SkipConfig {
 	skipBidWallet: string;
 	skipBidRate: number;
 }
+
+interface LoggerConfig {
+	slackToken?: string;
+	slackChannel?: string;
+	discordWebhookUrl?: string;
+	telegramBotToken?: string;
+	telegramChatId?: string;
+	externalExemptCodes?: Array<number>;
+}
+
 export interface BotConfig {
 	chainPrefix: string;
 	rpcUrl: string;
-	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number }>;
+	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
 	maxPathPools: number;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
 	flashloanRouterAddress: string;
@@ -21,18 +31,14 @@ export interface BotConfig {
 	mnemonic: string;
 	useMempool: boolean;
 	baseDenom: string;
+	signOfLife: number;
 
 	gasPrice: string;
 	txFees: Map<number, StdFee>;
 	profitThresholds: Map<number, number>;
 
-	// logging specific (optionally)
-	// Slack OAuth2 token for the specific SlackApp
-	slackToken?: string | undefined;
-	// channel the bot logs in to
-	slackChannel?: string | undefined;
-	// Discord webhook url
-	discordWebhookUrl?: string | undefined;
+	// Logger specific config.
+	loggerConfig: LoggerConfig;
 
 	// Skip specific (optionally)
 	skipConfig: SkipConfig | undefined;
@@ -44,10 +50,19 @@ export interface BotConfig {
 export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 	validateEnvs(envs);
 
-	const POOLS_ENVS = envs.POOLS.split(",\n").map((pool) => JSON.parse(pool));
-	const FACTORIES_TO_ROUTERS_MAPPING = envs.FACTORIES_TO_ROUTERS_MAPPING.split(",\n").map((mapping) =>
-		JSON.parse(mapping),
-	);
+	let pools = envs.POOLS.trim()
+		.replace(/\n|\r|\t/g, "")
+		.replace(/,\s*$/, "");
+	pools = pools.startsWith("[") && pools.endsWith("]") ? pools : `[${pools}]`;
+	const POOLS_ENVS = JSON.parse(pools);
+
+	let factories = envs.FACTORIES_TO_ROUTERS_MAPPING.trim()
+		.replace(/\n|\r|\t/g, "")
+		.replace(/,\s*$/, "");
+	factories = factories.startsWith("[") && factories.endsWith("]") ? factories : `[${factories}]`;
+	const FACTORIES_TO_ROUTERS_MAPPING = JSON.parse(factories);
+
+	const SIGN_OF_LIFE = Number(envs.SIGN_OF_LIFE === undefined ? 30 : +envs.SIGN_OF_LIFE);
 	const OFFER_ASSET_INFO: NativeAssetInfo = { native_token: { denom: envs.BASE_DENOM } };
 	const GAS_UNIT_PRICE = envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
 
@@ -65,6 +80,21 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
 		};
 	}
+
+	// setup logger config.
+	const externalExemptCodesStr = envs.EXTERNAL_EXEMPT_CODES?.split(",") ?? [];
+	const externalExemptCodes = externalExemptCodesStr.map((el) => {
+		return parseInt(el);
+	});
+	const loggerConfig: LoggerConfig = {
+		slackChannel: envs.SLACK_CHANNEL,
+		slackToken: envs.SLACK_TOKEN,
+		discordWebhookUrl: envs.DISCORD_WEBHOOK_URL,
+		telegramBotToken: envs.TELEGRAM_BOT_TOKEN,
+		telegramChatId: envs.TELEGRAM_CHAT_ID,
+		externalExemptCodes: externalExemptCodes,
+	};
+
 	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
 
 	//set all required fees for the depth of the hops set by user;
@@ -91,10 +121,9 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		gasPrice: envs.GAS_UNIT_PRICE,
 		profitThresholds: PROFIT_THRESHOLDS,
 		txFees: TX_FEES,
-		slackToken: envs.SLACK_TOKEN,
-		slackChannel: envs.SLACK_CHANNEL,
-		discordWebhookUrl: envs.DISCORD_WEBHOOK_URL,
 		skipConfig: skipConfig,
+		loggerConfig: loggerConfig,
+		signOfLife: SIGN_OF_LIFE,
 	};
 	return botConfig;
 }

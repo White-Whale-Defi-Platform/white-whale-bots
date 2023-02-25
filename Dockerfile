@@ -1,17 +1,15 @@
-FROM node:16
+FROM node:19
 
+ENV TERM=xterm
+RUN mkdir /usr/src/app
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-
 RUN npm install
 
-COPY . .
-
+COPY .eslintrc ./
+COPY tsconfig.json ./
+COPY src ./src
 RUN npm run build
-RUN mkdir /logs
 
-VOLUME ["/logs:/logs"]
-CMD ["node", "out/index.js", " > ", "logs/log.txt"]
-
-
+CMD ["node", "out/index.js"]

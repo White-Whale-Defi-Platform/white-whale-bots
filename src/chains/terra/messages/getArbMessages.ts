@@ -6,7 +6,7 @@ import { Asset, isNativeAsset } from "../../../core/types/base/asset";
 import { Path } from "../../../core/types/base/path";
 import { outGivenIn } from "../../../core/types/base/pool";
 import { SendMessage } from "../../../core/types/messages/sendmessages";
-import { InnerSwapMessage, SwapMessage } from "../../../core/types/messages/swapmessages";
+import { DefaultSwapMessage, InnerSwapMessage } from "../../../core/types/messages/swapmessages";
 /**
  *
  */
@@ -19,14 +19,14 @@ export function getArbMessages(path: Path, walletAddress: string, offerAsset0: A
 	console.log("outGivenIn0: ", outGivenIn0, "outGivenIn1: ", outGivenIn1);
 	if (isNativeAsset(returnAssetInfo0)) {
 		// double swap message as we trade only native assets
-		const swapMsg0: SwapMessage = {
+		const swapMsg0: DefaultSwapMessage = {
 			swap: {
 				max_spread: "0.0005",
 				offer_asset: offerAsset0,
 				belief_price: String(beliefPrice0),
 			},
 		};
-		const swapMsg1: SwapMessage = {
+		const swapMsg1: DefaultSwapMessage = {
 			swap: {
 				max_spread: "0.0005",
 				offer_asset: offerAsset1,
@@ -54,7 +54,7 @@ export function getArbMessages(path: Path, walletAddress: string, offerAsset0: A
 		});
 	} else {
 		// not both assets are native, we trade a native token into a cw20
-		const swapMsg0: SwapMessage = {
+		const swapMsg0: DefaultSwapMessage = {
 			swap: { max_spread: "0.0005", offer_asset: offerAsset0, belief_price: String(beliefPrice0) },
 		};
 		const innerSwapMsg: InnerSwapMessage = { swap: { belief_price: String(beliefPrice1), max_spread: "0.0005" } };
