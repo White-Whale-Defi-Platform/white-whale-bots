@@ -22,7 +22,9 @@ export class TelegramLogger {
 	async sendMessage(message: string) {
 		if (this.token && this.chatId) {
 			try {
-				const { status } = await axios.get(`https://api.telegram.org/bot${this.token}/sendMessage`, { params: { chat_id: this.chatId, text: message } })
+				const { status } = await axios.get(`https://api.telegram.org/bot${this.token}/sendMessage`, {
+					params: { chat_id: this.chatId, text: message },
+				});
 				if (status === 200) {
 					return true;
 				} else {
