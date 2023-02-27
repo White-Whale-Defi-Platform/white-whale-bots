@@ -18,6 +18,7 @@ import { applyMempoolTradesOnPools, Pool } from "../base/pool";
 export class MempoolLoop {
 	pools: Array<Pool>;
 	paths: Array<Path>;
+	CDpaths: Array<{ path: Path; num: number }>;
 	botClients: BotClients;
 	account: AccountData;
 	accountNumber = 0;
@@ -60,6 +61,7 @@ export class MempoolLoop {
 		logger: Logger | undefined,
 	) {
 		this.pools = pools;
+		this.CDpaths = new Array<{ path: Path; num: number }>();
 		this.paths = paths;
 		this.arbitrageFunction = arbitrage;
 		this.updateStateFunction = updateState;
@@ -93,6 +95,8 @@ export class MempoolLoop {
 
 		if (arbTrade) {
 			await this.trade(arbTrade);
+			//arbTrade.path.cooldown = true;
+			this.cdPaths(arbTrade.path);
 			return;
 		}
 
@@ -119,7 +123,8 @@ export class MempoolLoop {
 
 			if (arbTrade) {
 				await this.trade(arbTrade);
-				arbTrade.path.cooldown = true;
+				//arbTrade.path.cooldown = true;
+				this.cdPaths(arbTrade.path);
 				break;
 			}
 		}
@@ -130,9 +135,10 @@ export class MempoolLoop {
 	 */
 	public reset() {
 		// reset all paths that are on cooldown
-		this.paths.forEach((path) => {
-			path.cooldown = false;
-		});
+		//this.paths.forEach((path) => {
+		//	path.cooldown = false;
+		//});
+		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();
 	}
@@ -141,9 +147,9 @@ export class MempoolLoop {
 	 *
 	 */
 	private async trade(arbTrade: OptimalTrade) {
-		if (arbTrade.path.cooldown) {
-			return;
-		}
+		//if (arbTrade.path.cooldown) {
+		//	return;
+		//}
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
 			this.account.address,
@@ -178,6 +184,70 @@ export class MempoolLoop {
 		this.sequence += 1;
 		await delay(5000);
 		await this.fetchRequiredChainData();
+	}
+	/**
+	 * Put path on Cooldown, add to CDPaths with iteration number as block.
+	 * Updates this.Path. More than half (0.5) of pool addrss should be different. 
+	 */
+	public cdPaths(path: Path) {
+		const tmp = this.getAddrfromPath(path);
+		const out = new Array<Path>();
+		for (let i = 0; i < this.paths.length; i++) {
+			const addset = this.getAddrfromPath(this.paths[i]);
+			const symdiff = this.symmetricDifference(addset, tmp);
+			if (symdiff.size <= (addset.size + tmp.size) * 0.5) {
+				this.CDpaths.push({ path: this.paths[i], num: this.iterations });
+			} else {
+				out.push(this.paths[i]);
+			}
+		}
+		this.paths = out;
+	}
+
+	/**
+	 *
+	 * Updates the CD Paths if path.num + Cooldownblocks <= this.iterations
+	 * ADDS to this.paths.
+	 */
+	public unCDPaths() {
+		const COOLDOWNBLOCKS = 20;
+		const tmp = this.CDpaths;
+		//prevent Loops if the first item isnt ready yet
+
+		if (tmp[0] && tmp[0].num + COOLDOWNBLOCKS <= this.iterations) {
+			// Get Paths to clear of CD
+			const clearpaths = this.CDpaths.filter((c) => c.num + COOLDOWNBLOCKS <= this.iterations);
+			// Delete from CDs
+			this.CDpaths = tmp.filter((n) => !clearpaths.includes(n));
+			//Add Cooldowned Paths back to active Paths
+			clearpaths.forEach((n) => this.paths.push(n.path));
+		}
+	}
+
+	/**
+	 * Returns Set of Addresses in Path.
+	 */
+	private getAddrfromPath(path: Path) {
+		const out = new Set<string>();
+		for (let i = 0; i < path.pools.length; i++) {
+			out.add(path.pools[i].address);
+		}
+		return out;
+	}
+
+	/**
+	 * SymmetricDifference of 2 Address Sets.
+	 */
+	private symmetricDifference(setA: Set<string>, setB: Set<string>) {
+		const _difference = new Set(setA);
+		for (const elem of setB) {
+			if (_difference.has(elem)) {
+				_difference.delete(elem);
+			} else {
+				_difference.add(elem);
+			}
+		}
+		return _difference;
 	}
 }
 
