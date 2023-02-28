@@ -68,7 +68,7 @@ Connections Details:\n
 
 	const allPools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
 	const graph = newGraph(allPools);
-	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools, 0.5) ?? [];
 
 	const filteredPools = removedUnusedPools(allPools, paths);
 	setupMessage += `**\nDerived Paths for Arbitrage:

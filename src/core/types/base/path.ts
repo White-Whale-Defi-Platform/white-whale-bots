@@ -2,5 +2,6 @@ import { Pool } from "./pool";
 
 export interface Path {
 	pools: Array<Pool>;
-	cooldown: boolean;
+	addresses: Set<string>;
+	equalpaths: Array<Set<string>>
 }

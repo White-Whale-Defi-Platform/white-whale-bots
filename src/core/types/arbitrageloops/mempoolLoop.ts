@@ -187,17 +187,22 @@ export class MempoolLoop {
 	}
 	/**
 	 * Put path on Cooldown, add to CDPaths with iteration number as block.
-	 * Updates this.Path. More than half (0.5) of pool addrss should be different. 
+	 * Updates this.Path. More than half (0.5) of pool addrss should be different.
 	 */
 	public cdPaths(path: Path) {
-		const tmp = this.getAddrfromPath(path);
+		const tmp = path.equalpaths;
 		const out = new Array<Path>();
+		let pushed = false;
 		for (let i = 0; i < this.paths.length; i++) {
-			const addset = this.getAddrfromPath(this.paths[i]);
-			const symdiff = this.symmetricDifference(addset, tmp);
-			if (symdiff.size <= (addset.size + tmp.size) * 0.5) {
-				this.CDpaths.push({ path: this.paths[i], num: this.iterations });
-			} else {
+			pushed = false;
+			for (let x = 0; x < tmp.length; x++) {
+				if (this.paths[i].addresses == tmp[x] || this.paths[i].addresses == path.addresses) {
+					this.CDpaths.push({ path: this.paths[i], num: this.iterations });
+					pushed = true;
+					break;
+				}
+			}
+			if (!pushed) {
 				out.push(this.paths[i]);
 			}
 		}
@@ -222,32 +227,6 @@ export class MempoolLoop {
 			//Add Cooldowned Paths back to active Paths
 			clearpaths.forEach((n) => this.paths.push(n.path));
 		}
-	}
-
-	/**
-	 * Returns Set of Addresses in Path.
-	 */
-	private getAddrfromPath(path: Path) {
-		const out = new Set<string>();
-		for (let i = 0; i < path.pools.length; i++) {
-			out.add(path.pools[i].address);
-		}
-		return out;
-	}
-
-	/**
-	 * SymmetricDifference of 2 Address Sets.
-	 */
-	private symmetricDifference(setA: Set<string>, setB: Set<string>) {
-		const _difference = new Set(setA);
-		for (const elem of setB) {
-			if (_difference.has(elem)) {
-				_difference.delete(elem);
-			} else {
-				_difference.add(elem);
-			}
-		}
-		return _difference;
 	}
 }
 
