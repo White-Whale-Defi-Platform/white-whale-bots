@@ -91,7 +91,7 @@ export class SkipLoop extends MempoolLoop {
 	 */
 	private async skipTrade(arbTrade: OptimalTrade, toArbTrade: MempoolTrade) {
 		//if (arbTrade.path.cooldown) {
-			// dont execute if path is on cooldown
+		// dont execute if path is on cooldown
 		//	return;
 		//}
 		if (
@@ -187,10 +187,9 @@ export class SkipLoop extends MempoolLoop {
 			await this.logger?.sendMessage(logItem, LogType.Console);
 		}
 		if (res.result.code != 4) {
-			this.cdPaths(arbTrade.path)
+			this.cdPaths(arbTrade.path);
 		}
-		
-		if (res.result.code === 0) {
+		if (res.result.code === 0 ) {
 			this.sequence += 1;
 		} else {
 			await this.fetchRequiredChainData();

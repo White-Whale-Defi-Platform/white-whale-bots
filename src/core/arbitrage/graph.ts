@@ -59,7 +59,7 @@ function getVertex(graph: Graph, name: string): Vertex {
 /**
  *
  */
-export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number): Array<Path> | undefined {
+export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number, similar:number): Array<Path> | undefined {
 	const startingAssetName = isNativeAsset(startingAsset)
 		? startingAsset.native_token.denom
 		: startingAsset.token.contract_addr;
@@ -90,10 +90,52 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 		}
 		paths.push({
 			pools: poolList,
-			cooldown: false,
+			addresses: getAddrfromPools(poolList),
+			equalpaths: new Array<Set<string>>
 		});
 	}
-	return paths;
+	let idx= 0
+	let updatedPaths = paths
+	for(const path of paths){
+		for(const path2 of paths){
+			const symdiff = symmetricDifference(path.addresses, path2.addresses);
+			if (
+				symdiff.size <= (path.addresses.size + path2.addresses.size) * similar &&
+				path.addresses != path2.addresses
+			) {
+				updatedPaths[idx].equalpaths?.push(path2.addresses)
+			}
+			
+		}
+		idx++
+	}
+	return updatedPaths;
+}
+
+/**
+	 * SymmetricDifference of 2 Address Sets.
+	 */
+function symmetricDifference(setA: Set<string>, setB: Set<string>) {
+	const _difference = new Set(setA);
+	for (const elem of setB) {
+		if (_difference.has(elem)) {
+			_difference.delete(elem);
+		} else {
+			_difference.add(elem);
+		}
+	}
+	return _difference;
+}
+
+/**
+ * Returns Set of Addresses in Pools.
+ */
+function getAddrfromPools(pools: Array<Pool>) {
+	const out = new Set<string>();
+	for (let i = 0; i < pools.length; i++) {
+		out.add(pools[i].address);
+	}
+	return out;
 }
 
 // *************************************** VERTEX **************************************** \\
