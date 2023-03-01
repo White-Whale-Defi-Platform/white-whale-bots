@@ -59,7 +59,7 @@ function getVertex(graph: Graph, name: string): Vertex {
 /**
  *
  */
-export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number, similar:number): Array<Path> | undefined {
+export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number): Array<Path> | undefined {
 	const startingAssetName = isNativeAsset(startingAsset)
 		? startingAsset.native_token.denom
 		: startingAsset.token.contract_addr;
@@ -83,50 +83,59 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number, 
 		poolLists.push(...newPoolLists);
 	}
 	const paths: Array<Path> = [];
-	// create paths
+	// create paths and sets identifier number starting at 0
+	let identifier = 0;
 	for (const poolList of poolLists) {
-		if (poolList.length < 2) {
-			continue;
+		if (poolList.length > 2) {
+			paths.push({
+				pools: poolList,
+				addresses: getAddrfromPools(poolList),
+				equalpaths: new Array<Set<string>>(),
+				identifier: identifier,
+			});
+			identifier++;
 		}
-		paths.push({
-			pools: poolList,
-			addresses: getAddrfromPools(poolList),
-			equalpaths: new Array<Set<string>>
-		});
 	}
-	let idx= 0
-	let updatedPaths = paths
-	for(const path of paths){
-		for(const path2 of paths){
-			const symdiff = symmetricDifference(path.addresses, path2.addresses);
-			if (
-				symdiff.size <= (path.addresses.size + path2.addresses.size) * similar &&
-				path.addresses != path2.addresses
-			) {
-				updatedPaths[idx].equalpaths?.push(path2.addresses)
+	let idx = 0;
+	const updatedPaths = paths;
+
+	// ADDs similar Paths (path2) that should be timouted together with path (path), to path (path)
+	// both paths need an intersection bigger than 1 and are not allowed to have equal pool at the same step of their path
+	for (const path of paths) {
+		const setarr = [...path.addresses];
+		for (const path2 of paths) {
+			const intersection = new Set(setarr.filter((x) => path2.addresses.has(x)));
+			const setarr2 = [...path2.addresses];
+			const sameElemOrder = sameElemAtIdx(setarr, setarr2);
+
+			if (intersection.size > 1 && sameElemOrder >= 1) {
+				updatedPaths[idx].equalpaths?.push(path2.addresses);
 			}
-			
 		}
-		idx++
+		idx++;
 	}
 	return updatedPaths;
 }
 
 /**
-	 * SymmetricDifference of 2 Address Sets.
-	 */
-function symmetricDifference(setA: Set<string>, setB: Set<string>) {
-	const _difference = new Set(setA);
-	for (const elem of setB) {
-		if (_difference.has(elem)) {
-			_difference.delete(elem);
-		} else {
-			_difference.add(elem);
+ * Determines how many Elements are at the same place in each Array.
+ */
+function sameElemAtIdx(setarr: Array<string>, setarr2: Array<string>) {
+	let len = 0;
+	let out = 0;
+	if (setarr2.length < setarr.length) {
+		len = setarr2.length;
+	} else {
+		len = setarr.length;
+	}
+
+	for (let x = 0; x < len; x++) {
+		if (setarr[x] === setarr2[x]) {
+			out++;
 		}
 	}
-	return _difference;
+	return out;
 }
-
 /**
  * Returns Set of Addresses in Pools.
  */

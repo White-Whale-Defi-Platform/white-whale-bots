@@ -18,7 +18,7 @@ import { applyMempoolTradesOnPools, Pool } from "../base/pool";
 export class MempoolLoop {
 	pools: Array<Pool>;
 	paths: Array<Path>;
-	CDpaths: Array<{ path: Path; num: number }>;
+	CDpaths: Map<Set<string>, [number, number]>;
 	botClients: BotClients;
 	account: AccountData;
 	accountNumber = 0;
@@ -30,6 +30,7 @@ export class MempoolLoop {
 	totalBytes = 0;
 	mempool!: Mempool;
 	iterations = 0;
+	pathlib: Array<Path>;
 
 	/**
 	 *
@@ -59,9 +60,10 @@ export class MempoolLoop {
 		account: AccountData,
 		botConfig: BotConfig,
 		logger: Logger | undefined,
+		pathlib: Array<Path>,
 	) {
 		this.pools = pools;
-		this.CDpaths = new Array<{ path: Path; num: number }>();
+		this.CDpaths = new Map<Set<string>, [number, number]>();
 		this.paths = paths;
 		this.arbitrageFunction = arbitrage;
 		this.updateStateFunction = updateState;
@@ -70,6 +72,7 @@ export class MempoolLoop {
 		this.account = account;
 		this.botConfig = botConfig;
 		this.logger = logger;
+		this.pathlib = pathlib;
 	}
 
 	/**
@@ -134,10 +137,6 @@ export class MempoolLoop {
 	 *
 	 */
 	public reset() {
-		// reset all paths that are on cooldown
-		//this.paths.forEach((path) => {
-		//	path.cooldown = false;
-		//});
 		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();
@@ -147,9 +146,6 @@ export class MempoolLoop {
 	 *
 	 */
 	private async trade(arbTrade: OptimalTrade) {
-		//if (arbTrade.path.cooldown) {
-		//	return;
-		//}
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
 			this.account.address,
@@ -187,7 +183,8 @@ export class MempoolLoop {
 	}
 	/**
 	 * Put path on Cooldown, add to CDPaths with iteration number as block.
-	 * Updates this.Path. More than half (0.5) of pool addrss should be different.
+	 * Updates the iteration count of elements in CDpaths if its in equalpath of param: path
+	 * Updates this.Path.
 	 */
 	public cdPaths(path: Path) {
 		const tmp = path.equalpaths;
@@ -196,8 +193,14 @@ export class MempoolLoop {
 		for (let i = 0; i < this.paths.length; i++) {
 			pushed = false;
 			for (let x = 0; x < tmp.length; x++) {
+				const inCD = this.CDpaths.get(tmp[x]);
+				if (inCD && inCD[1] != this.iterations) {
+					this.CDpaths.set(tmp[x], [inCD[0], this.iterations]);
+					pushed = true;
+					break;
+				}
 				if (this.paths[i].addresses == tmp[x] || this.paths[i].addresses == path.addresses) {
-					this.CDpaths.push({ path: this.paths[i], num: this.iterations });
+					this.CDpaths.set(this.paths[i].addresses, [this.paths[i].identifier, this.iterations]);
 					pushed = true;
 					break;
 				}
@@ -211,22 +214,22 @@ export class MempoolLoop {
 
 	/**
 	 *
-	 * Updates the CD Paths if path.num + Cooldownblocks <= this.iterations
-	 * ADDS to this.paths.
+	 * Removes the CD Paths if CD iteration number of path + Cooldownblocks <= this.iterations
+	 * ADDS the path from pathlibary to this.paths.
 	 */
 	public unCDPaths() {
-		const COOLDOWNBLOCKS = 20;
-		const tmp = this.CDpaths;
-		//prevent Loops if the first item isnt ready yet
+		const COOLDOWNBLOCKS = 5;
+		const out: Map<Set<string>, [number, number]> = new Map(this.CDpaths);
 
-		if (tmp[0] && tmp[0].num + COOLDOWNBLOCKS <= this.iterations) {
-			// Get Paths to clear of CD
-			const clearpaths = this.CDpaths.filter((c) => c.num + COOLDOWNBLOCKS <= this.iterations);
-			// Delete from CDs
-			this.CDpaths = tmp.filter((n) => !clearpaths.includes(n));
-			//Add Cooldowned Paths back to active Paths
-			clearpaths.forEach((n) => this.paths.push(n.path));
+		const iter = this.CDpaths.entries();
+		for (let x = 0; x < this.CDpaths.size; x++) {
+			const elem = iter.next();
+			if (elem.value[1][1] + COOLDOWNBLOCKS <= this.iterations) {
+				this.paths.push(this.pathlib[elem.value[1][0]]);
+				out.delete(elem.value[0]);
+			}
 		}
+		this.CDpaths = out;
 	}
 }
 

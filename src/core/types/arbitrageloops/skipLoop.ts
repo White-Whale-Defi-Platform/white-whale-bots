@@ -47,8 +47,9 @@ export class SkipLoop extends MempoolLoop {
 		skipClient: SkipBundleClient,
 		skipSigner: DirectSecp256k1HdWallet,
 		logger: Logger | undefined,
+		pathlib: Array<Path>,
 	) {
-		super(pools, paths, arbitrage, updateState, messageFunction, botClients, account, botConfig, logger);
+		super(pools, paths, arbitrage, updateState, messageFunction, botClients, account, botConfig, logger, pathlib);
 		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.logger = logger);
 	}
 
@@ -155,7 +156,7 @@ export class SkipLoop extends MempoolLoop {
 
 		let logItem = "";
 		let logMessage = `**wallet:** ${this.account.address}\t **block:** ${res.result.desired_height}\t **profit:** ${arbTrade.profit}`;
-
+		console.log(arbTrade.path.addresses);
 		if (res.result.code !== 0) {
 			logMessage += `\t **error code:** ${res.result.code}\n**error:** ${res.result.error}\n`;
 		}
@@ -189,7 +190,7 @@ export class SkipLoop extends MempoolLoop {
 		if (res.result.code != 4) {
 			this.cdPaths(arbTrade.path);
 		}
-		if (res.result.code === 0 ) {
+		if (res.result.code === 0) {
 			this.sequence += 1;
 		} else {
 			await this.fetchRequiredChainData();
