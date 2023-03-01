@@ -68,7 +68,7 @@ Connections Details:\n
 
 	const allPools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
 	const graph = newGraph(allPools);
-	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools, 0.5) ?? [];
+	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 
 	const filteredPools = removedUnusedPools(allPools, paths);
 	setupMessage += `**\nDerived Paths for Arbitrage:
@@ -104,6 +104,7 @@ Total Paths:** \t${paths.length}\n`;
 			skipClient,
 			skipSigner,
 			logger,
+			paths,
 		);
 	} else if (botConfig.useMempool === true) {
 		await logger.sendMessage("Initializing mempool loop...", LogType.Console);
@@ -118,6 +119,7 @@ Total Paths:** \t${paths.length}\n`;
 			account,
 			botConfig,
 			logger,
+			paths,
 		);
 	} else {
 		await logger.sendMessage("**Info:** loop without mempool or skip not implemented yet");
