@@ -17,8 +17,9 @@ import { applyMempoolTradesOnPools, Pool } from "../base/pool";
  */
 export class MempoolLoop {
 	pools: Array<Pool>;
-	paths: Array<Path>;
-	CDpaths: Map<Set<string>, [number, number]>;
+	paths: Array<Path>; //holds all known paths minus cooldowned paths
+	pathlib: Array<Path>; //holds all known paths
+	CDpaths: Map<string, [number, number]>; //holds all cooldowned paths' identifiers
 	botClients: BotClients;
 	account: AccountData;
 	accountNumber = 0;
@@ -30,7 +31,6 @@ export class MempoolLoop {
 	totalBytes = 0;
 	mempool!: Mempool;
 	iterations = 0;
-	pathlib: Array<Path>;
 
 	/**
 	 *
@@ -63,7 +63,7 @@ export class MempoolLoop {
 		pathlib: Array<Path>,
 	) {
 		this.pools = pools;
-		this.CDpaths = new Map<Set<string>, [number, number]>();
+		this.CDpaths = new Map<string, [number, number]>();
 		this.paths = paths;
 		this.arbitrageFunction = arbitrage;
 		this.updateStateFunction = updateState;
@@ -137,7 +137,12 @@ export class MempoolLoop {
 	 *
 	 */
 	public reset() {
+		console.log("resetting: ", this.iterations);
+		console.log("cdpaths: ", this.CDpaths.size);
+		console.log("active paths: ", this.paths.length);
 		this.unCDPaths();
+		console.log("cdpaths after reset: ", this.CDpaths.size);
+		console.log("active paths after reset: ", this.paths.length);
 		this.totalBytes = 0;
 		flushTxMemory();
 	}
@@ -187,29 +192,20 @@ export class MempoolLoop {
 	 * Updates this.Path.
 	 */
 	public cdPaths(path: Path) {
-		const tmp = path.equalpaths;
-		const out = new Array<Path>();
-		let pushed = false;
-		for (let i = 0; i < this.paths.length; i++) {
-			pushed = false;
-			for (let x = 0; x < tmp.length; x++) {
-				const inCD = this.CDpaths.get(tmp[x]);
-				if (inCD && inCD[1] != this.iterations) {
-					this.CDpaths.set(tmp[x], [inCD[0], this.iterations]);
-					pushed = true;
-					break;
-				}
-				if (this.paths[i].addresses == tmp[x] || this.paths[i].addresses == path.addresses) {
-					this.CDpaths.set(this.paths[i].addresses, [this.paths[i].identifier, this.iterations]);
-					pushed = true;
-					break;
-				}
-			}
-			if (!pushed) {
-				out.push(this.paths[i]);
-			}
+		//add equalpaths to the CDPath array
+		for (const equalpath of path.equalpaths) {
+			this.CDpaths.set(equalpath, [this.iterations, 5]);
 		}
-		this.paths = out;
+		//add self to the CDPath array
+		this.CDpaths.set(path.identifier, [this.iterations, 10]);
+
+		//remove all equal paths from this.paths if this.paths'identifier overlaps with one in equalpaths
+		this.paths.forEach((activePath, index) => {
+			//if our updated cdpaths contains the path still active, make sure to remove it from the active paths
+			if (this.CDpaths.get(activePath.identifier)) {
+				this.paths.splice(index, 1);
+			}
+		});
 	}
 
 	/**
@@ -218,18 +214,17 @@ export class MempoolLoop {
 	 * ADDS the path from pathlibary to this.paths.
 	 */
 	public unCDPaths() {
-		const COOLDOWNBLOCKS = 5;
-		const out: Map<Set<string>, [number, number]> = new Map(this.CDpaths);
-
-		const iter = this.CDpaths.entries();
-		for (let x = 0; x < this.CDpaths.size; x++) {
-			const elem = iter.next();
-			if (elem.value[1][1] + COOLDOWNBLOCKS <= this.iterations) {
-				this.paths.push(this.pathlib[elem.value[1][0]]);
-				out.delete(elem.value[0]);
+		this.CDpaths.forEach((value, key) => {
+			// if time set to cooldown (in iteration numbers) + cooldown amount < current iteration, remove it from cd
+			if (value[0] + value[1] < this.iterations) {
+				this.CDpaths.delete(key);
 			}
-		}
-		this.CDpaths = out;
+			//add the path back to active paths
+			const pathToAdd = this.pathlib.find((p) => p.identifier === key);
+			if (pathToAdd) {
+				this.paths.push(pathToAdd);
+			}
+		});
 	}
 }
 
