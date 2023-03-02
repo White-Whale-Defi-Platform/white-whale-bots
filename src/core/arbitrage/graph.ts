@@ -124,25 +124,6 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 }
 
 /**
- * Determines how many Elements are at the same place in each Array.
- */
-function sameElemAtIdx(setarr: Array<string>, setarr2: Array<string>) {
-	let len = 0;
-	let out = 0;
-	if (setarr2.length < setarr.length) {
-		len = setarr2.length;
-	} else {
-		len = setarr.length;
-	}
-
-	for (let x = 0; x < len; x++) {
-		if (setarr[x] === setarr2[x]) {
-			out++;
-		}
-	}
-	return out;
-}
-/**
  * Returns Set of Addresses in Pools.
  */
 function getAddrfromPools(pools: Array<Pool>) {
