@@ -19,7 +19,7 @@ export class MempoolLoop {
 	pools: Array<Pool>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
 	pathlib: Array<Path>; //holds all known paths
-	CDpaths: Map<string, [number, number]>; //holds all cooldowned paths' identifiers
+	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	botClients: BotClients;
 	account: AccountData;
 	accountNumber = 0;
@@ -63,7 +63,7 @@ export class MempoolLoop {
 		pathlib: Array<Path>,
 	) {
 		this.pools = pools;
-		this.CDpaths = new Map<string, [number, number]>();
+		this.CDpaths = new Map<string, [number, number, number]>();
 		this.paths = paths;
 		this.arbitrageFunction = arbitrage;
 		this.updateStateFunction = updateState;
@@ -194,15 +194,15 @@ export class MempoolLoop {
 	public cdPaths(path: Path) {
 		//add equalpaths to the CDPath array
 		for (const equalpath of path.equalpaths) {
-			this.CDpaths.set(equalpath, [this.iterations, 5]);
+			this.CDpaths.set(equalpath[0], [this.iterations, 5, equalpath[1]]);
 		}
 		//add self to the CDPath array
-		this.CDpaths.set(path.identifier, [this.iterations, 10]);
+		this.CDpaths.set(path.identifier[0], [this.iterations, 10, path.identifier[1]]);
 
 		//remove all equal paths from this.paths if this.paths'identifier overlaps with one in equalpaths
 		this.paths.forEach((activePath, index) => {
 			//if our updated cdpaths contains the path still active, make sure to remove it from the active paths
-			if (this.CDpaths.get(activePath.identifier)) {
+			if (this.CDpaths.get(activePath.identifier[0])) {
 				this.paths.splice(index, 1);
 			}
 		});
@@ -218,11 +218,8 @@ export class MempoolLoop {
 			// if time set to cooldown (in iteration numbers) + cooldown amount < current iteration, remove it from cd
 			if (value[0] + value[1] < this.iterations) {
 				this.CDpaths.delete(key);
-			}
-			//add the path back to active paths
-			const pathToAdd = this.pathlib.find((p) => p.identifier === key);
-			if (pathToAdd) {
-				this.paths.push(pathToAdd);
+				//add the path back to active paths
+				this.paths.push(this.pathlib[value[2]]);
 			}
 		});
 	}

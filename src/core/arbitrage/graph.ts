@@ -83,14 +83,16 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 		poolLists.push(...newPoolLists);
 	}
 	const paths: Array<Path> = [];
+	let idx = 0;
 	// create paths and sets identifier number starting at 0
 	for (const poolList of poolLists) {
 		if (poolList.length >= 2) {
 			paths.push({
 				pools: poolList,
-				equalpaths: new Array<string>(),
-				identifier: getAddrfromPools(poolList),
+				equalpaths: new Array<[string, number]>(),
+				identifier: [getAddrfromPools(poolList), idx],
 			});
+			idx++;
 		}
 	}
 
