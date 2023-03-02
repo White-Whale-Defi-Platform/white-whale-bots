@@ -10,16 +10,19 @@
     "build": "tsc",
     "clean": "rimraf out",
     "start": "npm run build && node out/index.js",
-    "test": "npm run build && node out/tests/index.js",
-    "test-compile": "npm run build && ./node_modules/.bin/nyc mocha \"out/**/*.spec.js\" --recursive"
+    "test": "mocha -r ts-node/register src/tests/**/*.spec.ts",
+    "test:coverage": "nyc npm run test"
   },
   "author": "White Whale",
   "license": "MIT",
   "devDependencies": {
+    "@istanbuljs/nyc-config-typescript": "^1.0.2",
+    "@types/chai": "^4.3.4",
     "@types/mocha": "^10.0.1",
     "@types/node": "^18.14.0",
     "@typescript-eslint/eslint-plugin": "^5.52.0",
     "@typescript-eslint/parser": "^5.52.0",
+    "chai": "^4.3.7",
     "eslint": "^8.34.0",
     "eslint-config-prettier": "^8.6.0",
     "eslint-plugin-jsdoc": "^40.0.0",
@@ -31,21 +34,27 @@
     "nyc": "^15.1.0",
     "prettier": "^2.8.4",
     "rimraf": "4.1.2",
+    "ts-node": "^10.9.1",
     "typescript": "=4.9.5"
   },
   "nyc": {
+    "extends": "@istanbuljs/nyc-config-typescript",
+    "check-coverage": true,
     "all": true,
-    "recursive": true,
     "parallel": true,
-    "reporter": [
-      "lcov",
-      "text-summary",
-      "text"
-    ],
     "include": [
-      "out/**/*.js"
-    ]
-  },
+        "src/**/!(*.spec.*).[tj]s?(x)"
+    ],
+    "exclude": [
+      "src/tests/**/*.*"
+    ],
+    "reporter": [
+        "lcov",
+        "text",
+        "text-summary"
+    ],
+    "report-dir": "coverage"
+},
   "dependencies": {
     "@cosmjs/cosmwasm-stargate": "^0.29.4",
     "@cosmjs/stargate": "^0.29.4",
