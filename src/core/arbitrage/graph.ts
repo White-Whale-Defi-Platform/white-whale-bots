@@ -84,37 +84,41 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 	}
 	const paths: Array<Path> = [];
 	// create paths and sets identifier number starting at 0
-	let identifier = 0;
 	for (const poolList of poolLists) {
-		if (poolList.length > 2) {
+		if (poolList.length >= 2) {
 			paths.push({
 				pools: poolList,
-				addresses: getAddrfromPools(poolList),
-				equalpaths: new Array<Set<string>>(),
-				identifier: identifier,
+				equalpaths: new Array<string>(),
+				identifier: getAddrfromPools(poolList),
 			});
-			identifier++;
 		}
 	}
-	let idx = 0;
-	const updatedPaths = paths;
 
 	// ADDs similar Paths (path2) that should be timouted together with path (path), to path (path)
 	// both paths need an intersection bigger than 1 and are not allowed to have equal pool at the same step of their path
 	for (const path of paths) {
-		const setarr = [...path.addresses];
+		const setarr = [...path.pools.map((pool) => pool.address)];
 		for (const path2 of paths) {
-			const intersection = new Set(setarr.filter((x) => path2.addresses.has(x)));
-			const setarr2 = [...path2.addresses];
-			const sameElemOrder = sameElemAtIdx(setarr, setarr2);
-
-			if (intersection.size > 1 && sameElemOrder >= 1) {
-				updatedPaths[idx].equalpaths?.push(path2.addresses);
+			const intersection = path2.pools.filter((pool2) => setarr.find((address) => address === pool2.address));
+			let sameIndexed = 0;
+			for (const pool of intersection) {
+				if (
+					path.pools.findIndex((pathpool) => pathpool.address === pool.address) ===
+					path2.pools.findIndex((pathpool) => pathpool.address === pool.address)
+				) {
+					sameIndexed = sameIndexed + 1;
+				}
+			}
+			//if at least 1 equal pool and half of them is on the same index?
+			if (
+				intersection.length > Math.floor(path.pools.length / 2) &&
+				sameIndexed >= Math.floor(intersection.length / 2)
+			) {
+				path.equalpaths.push(path2.identifier);
 			}
 		}
-		idx++;
 	}
-	return updatedPaths;
+	return paths;
 }
 
 /**
@@ -140,9 +144,9 @@ function sameElemAtIdx(setarr: Array<string>, setarr2: Array<string>) {
  * Returns Set of Addresses in Pools.
  */
 function getAddrfromPools(pools: Array<Pool>) {
-	const out = new Set<string>();
+	let out = "";
 	for (let i = 0; i < pools.length; i++) {
-		out.add(pools[i].address);
+		out = out + pools[i].address;
 	}
 	return out;
 }

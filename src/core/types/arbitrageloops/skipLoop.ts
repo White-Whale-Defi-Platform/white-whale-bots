@@ -156,7 +156,6 @@ export class SkipLoop extends MempoolLoop {
 
 		let logItem = "";
 		let logMessage = `**wallet:** ${this.account.address}\t **block:** ${res.result.desired_height}\t **profit:** ${arbTrade.profit}`;
-		console.log(arbTrade.path.addresses);
 		if (res.result.code !== 0) {
 			logMessage += `\t **error code:** ${res.result.code}\n**error:** ${res.result.error}\n`;
 		}
