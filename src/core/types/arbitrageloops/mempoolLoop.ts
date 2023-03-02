@@ -98,7 +98,6 @@ export class MempoolLoop {
 
 		if (arbTrade) {
 			await this.trade(arbTrade);
-			//arbTrade.path.cooldown = true;
 			this.cdPaths(arbTrade.path);
 			return;
 		}
@@ -126,7 +125,6 @@ export class MempoolLoop {
 
 			if (arbTrade) {
 				await this.trade(arbTrade);
-				//arbTrade.path.cooldown = true;
 				this.cdPaths(arbTrade.path);
 				break;
 			}
@@ -137,12 +135,7 @@ export class MempoolLoop {
 	 *
 	 */
 	public reset() {
-		console.log("resetting: ", this.iterations);
-		console.log("cdpaths: ", this.CDpaths.size);
-		console.log("active paths: ", this.paths.length);
 		this.unCDPaths();
-		console.log("cdpaths after reset: ", this.CDpaths.size);
-		console.log("active paths after reset: ", this.paths.length);
 		this.totalBytes = 0;
 		flushTxMemory();
 	}
@@ -199,13 +192,15 @@ export class MempoolLoop {
 		//add self to the CDPath array
 		this.CDpaths.set(path.identifier[0], [this.iterations, 10, path.identifier[1]]);
 
+		const out = new Array<Path>();
 		//remove all equal paths from this.paths if this.paths'identifier overlaps with one in equalpaths
-		this.paths.forEach((activePath, index) => {
+		this.paths.forEach((activePath) => {
 			//if our updated cdpaths contains the path still active, make sure to remove it from the active paths
-			if (this.CDpaths.get(activePath.identifier[0])) {
-				this.paths.splice(index, 1);
+			if (!this.CDpaths.get(activePath.identifier[0])) {
+				out.push(activePath);
 			}
 		});
+		this.paths = out;
 	}
 
 	/**
