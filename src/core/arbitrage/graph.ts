@@ -106,7 +106,8 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 			for (const pool of intersection) {
 				if (
 					path.pools.findIndex((pathpool) => pathpool.address === pool.address) ===
-					path2.pools.findIndex((pathpool) => pathpool.address === pool.address)
+						path2.pools.findIndex((pathpool) => pathpool.address === pool.address) ||
+					path.pools[path.pools.length - 1].address === path2.pools[path2.pools.length - 1].address
 				) {
 					sameIndexed = sameIndexed + 1;
 				}
