@@ -121,13 +121,13 @@ export function getOptimalTrade(paths: Array<Path>, offerAssetInfo: AssetInfo): 
 	let maxPath;
 
 	paths.map((path: Path) => {
-		if (!path.cooldown) {
-			const [tradesize, profit] = getOptimalTradeForPath(path, offerAssetInfo);
-			if (profit > maxProfit && tradesize > 0) {
-				maxProfit = profit;
-				maxTradesize = tradesize;
-				maxPath = path;
-			}
+
+		const [tradesize, profit] = getOptimalTradeForPath(path, offerAssetInfo);
+		if (profit > maxProfit && tradesize > 0) {
+			maxProfit = profit;
+			maxTradesize = tradesize;
+			maxPath = path;
+
 		}
 	});
 	if (maxPath) {

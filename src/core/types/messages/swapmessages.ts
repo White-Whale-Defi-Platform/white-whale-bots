@@ -153,7 +153,9 @@ export function isSwapOperationsMessage(msg: any): msg is SwapOperationsMessage 
  * @return WWSwapOperations if the `msg` is one.
  */
 export function isWWSwapOperationsMessages(msg: SwapOperationsInnerMessageOperations): msg is Array<WWSwapOperation> {
-	return msg[0]["terra_swap" as keyof typeof msg[0]] !== undefined;
+
+	return msg[0]["terra_swap" as keyof (typeof msg)[0]] !== undefined;
+
 }
 
 /**
@@ -164,7 +166,9 @@ export function isWWSwapOperationsMessages(msg: SwapOperationsInnerMessageOperat
 export function isAstroSwapOperationsMessages(
 	msg: SwapOperationsInnerMessageOperations,
 ): msg is Array<AstroSwapOperation> {
-	return msg[0]["astro_swap" as keyof typeof msg[0]] !== undefined;
+
+	return msg[0]["astro_swap" as keyof (typeof msg)[0]] !== undefined;
+
 }
 
 /**
@@ -173,5 +177,7 @@ export function isAstroSwapOperationsMessages(
 export function isWyndDaoSwapOperationsMessages(
 	msg: SwapOperationsInnerMessageOperations,
 ): msg is Array<WyndSwapOperations> {
-	return msg[0]["wyndex_swap" as keyof typeof msg[0]] !== undefined;
+
+	return msg[0]["wyndex_swap" as keyof (typeof msg)[0]] !== undefined;
+
 }

@@ -17,7 +17,9 @@ import { applyMempoolTradesOnPools, Pool } from "../base/pool";
  */
 export class MempoolLoop {
 	pools: Array<Pool>;
-	paths: Array<Path>;
+	paths: Array<Path>; //holds all known paths minus cooldowned paths
+	pathlib: Array<Path>; //holds all known paths
+	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	botClients: BotClients;
 	account: AccountData;
 	accountNumber = 0;
@@ -58,8 +60,11 @@ export class MempoolLoop {
 		account: AccountData,
 		botConfig: BotConfig,
 		logger: Logger | undefined,
+		pathlib: Array<Path>,
 	) {
 		this.pools = pools;
+		this.CDpaths = new Map<string, [number, number, number]>();
+
 		this.paths = paths;
 		this.arbitrageFunction = arbitrage;
 		this.updateStateFunction = updateState;
@@ -68,6 +73,8 @@ export class MempoolLoop {
 		this.account = account;
 		this.botConfig = botConfig;
 		this.logger = logger;
+		this.pathlib = pathlib;
+
 	}
 
 	/**
@@ -93,6 +100,7 @@ export class MempoolLoop {
 
 		if (arbTrade) {
 			await this.trade(arbTrade);
+			this.cdPaths(arbTrade.path);
 			return;
 		}
 
@@ -119,7 +127,9 @@ export class MempoolLoop {
 
 			if (arbTrade) {
 				await this.trade(arbTrade);
-				arbTrade.path.cooldown = true;
+
+				this.cdPaths(arbTrade.path);
+
 				break;
 			}
 		}
@@ -129,10 +139,7 @@ export class MempoolLoop {
 	 *
 	 */
 	public reset() {
-		// reset all paths that are on cooldown
-		this.paths.forEach((path) => {
-			path.cooldown = false;
-		});
+		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();
 	}
@@ -141,9 +148,6 @@ export class MempoolLoop {
 	 *
 	 */
 	private async trade(arbTrade: OptimalTrade) {
-		if (arbTrade.path.cooldown) {
-			return;
-		}
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
 			this.account.address,
@@ -179,6 +183,47 @@ export class MempoolLoop {
 		await delay(5000);
 		await this.fetchRequiredChainData();
 	}
+
+	/**
+	 * Put path on Cooldown, add to CDPaths with iteration number as block.
+	 * Updates the iteration count of elements in CDpaths if its in equalpath of param: path
+	 * Updates this.Path.
+	 */
+	public cdPaths(path: Path) {
+		//add equalpaths to the CDPath array
+		for (const equalpath of path.equalpaths) {
+			this.CDpaths.set(equalpath[0], [this.iterations, 5, equalpath[1]]);
+		}
+		//add self to the CDPath array
+		this.CDpaths.set(path.identifier[0], [this.iterations, 10, path.identifier[1]]);
+
+		const out = new Array<Path>();
+		//remove all equal paths from this.paths if this.paths'identifier overlaps with one in equalpaths
+		this.paths.forEach((activePath) => {
+			//if our updated cdpaths contains the path still active, make sure to remove it from the active paths
+			if (!this.CDpaths.get(activePath.identifier[0])) {
+				out.push(activePath);
+			}
+		});
+		this.paths = out;
+	}
+
+	/**
+	 *
+	 * Removes the CD Paths if CD iteration number of path + Cooldownblocks <= this.iterations
+	 * ADDS the path from pathlibary to this.paths.
+	 */
+	public unCDPaths() {
+		this.CDpaths.forEach((value, key) => {
+			// if time set to cooldown (in iteration numbers) + cooldown amount < current iteration, remove it from cd
+			if (value[0] + value[1] < this.iterations) {
+				this.CDpaths.delete(key);
+				//add the path back to active paths
+				this.paths.push(this.pathlib[value[2]]);
+			}
+		});
+	}
+
 }
 
 /**

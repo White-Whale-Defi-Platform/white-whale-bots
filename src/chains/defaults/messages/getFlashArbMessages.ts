@@ -9,7 +9,7 @@ import { AmmDexName, outGivenIn, Pool } from "../../../core/types/base/pool";
 import { IncreaseAllowanceMessage } from "../../../core/types/messages/allowance";
 import { FlashLoanMessage, WasmMessage } from "../../../core/types/messages/flashloanmessage";
 import { SendMessage } from "../../../core/types/messages/sendmessages";
-import { InnerSwapMessage, JunoSwapMessage, DefaultSwapMessage } from "../../../core/types/messages/swapmessages";
+import { DefaultSwapMessage, InnerSwapMessage, JunoSwapMessage } from "../../../core/types/messages/swapmessages";
 /**
  *
  */
