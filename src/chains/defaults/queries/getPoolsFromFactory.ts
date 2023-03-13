@@ -1,5 +1,7 @@
+
 import { BotClients } from "../../../core/node/chainoperator";
 import { AssetInfo } from "../../../core/types/base/asset";
+
 
 interface FactoryStatePair {
 	asset_infos: Array<AssetInfo>;
