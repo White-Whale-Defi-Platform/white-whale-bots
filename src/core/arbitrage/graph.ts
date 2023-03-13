@@ -83,18 +83,61 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 		poolLists.push(...newPoolLists);
 	}
 	const paths: Array<Path> = [];
-	// create paths
+
+	let idx = 0;
+	// create paths and sets identifier number starting at 0
 	for (const poolList of poolLists) {
-		if (poolList.length < 2) {
-			continue;
+		if (poolList.length >= 2) {
+			paths.push({
+				pools: poolList,
+				equalpaths: new Array<[string, number]>(),
+				identifier: [getAddrfromPools(poolList), idx],
+			});
+			idx++;
 		}
-		paths.push({
-			pools: poolList,
-			cooldown: false,
-		});
+	}
+
+	// ADDs similar Paths (path2) that should be timouted together with path (path), to path (path)
+	// both paths need an intersection bigger than 1 and are not allowed to have equal pool at the same step of their path
+	for (const path of paths) {
+		const setarr = [...path.pools.map((pool) => pool.address)];
+		for (const path2 of paths) {
+			const intersection = path2.pools.filter((pool2) => setarr.find((address) => address === pool2.address));
+			let sameIndexed = 0;
+			for (const pool of intersection) {
+				if (
+					path.pools.findIndex((pathpool) => pathpool.address === pool.address) ===
+						path2.pools.findIndex((pathpool) => pathpool.address === pool.address) ||
+					path.pools[path.pools.length - 1].address === path2.pools[path2.pools.length - 1].address
+				) {
+					sameIndexed = sameIndexed + 1;
+				}
+			}
+			//if at least 1 equal pool and half of them is on the same index?
+			if (
+				intersection.length > Math.floor(path.pools.length / 2) &&
+				sameIndexed >= Math.floor(intersection.length / 2)
+			) {
+				path.equalpaths.push(path2.identifier);
+			}
+		}
+
 	}
 	return paths;
 }
+
+
+/**
+ * Returns Set of Addresses in Pools.
+ */
+function getAddrfromPools(pools: Array<Pool>) {
+	let out = "";
+	for (let i = 0; i < pools.length; i++) {
+		out = out + pools[i].address;
+	}
+	return out;
+}
+
 
 // *************************************** VERTEX **************************************** \\
 

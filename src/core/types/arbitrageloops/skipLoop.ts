@@ -47,8 +47,10 @@ export class SkipLoop extends MempoolLoop {
 		skipClient: SkipBundleClient,
 		skipSigner: DirectSecp256k1HdWallet,
 		logger: Logger | undefined,
+
+		pathlib: Array<Path>,
 	) {
-		super(pools, paths, arbitrage, updateState, messageFunction, botClients, account, botConfig, logger);
+		super(pools, paths, arbitrage, updateState, messageFunction, botClients, account, botConfig, logger, pathlib);
 		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.logger = logger);
 	}
 
@@ -79,7 +81,6 @@ export class SkipLoop extends MempoolLoop {
 					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 					if (arbTrade) {
 						await this.skipTrade(arbTrade, trade);
-						arbTrade.path.cooldown = true; //set the cooldown of this path to true so we dont trade it again in next callbacks
 					}
 				}
 			}
@@ -90,10 +91,6 @@ export class SkipLoop extends MempoolLoop {
 	 *
 	 */
 	private async skipTrade(arbTrade: OptimalTrade, toArbTrade: MempoolTrade) {
-		if (arbTrade.path.cooldown) {
-			// dont execute if path is on cooldown
-			return;
-		}
 		if (
 			!this.botConfig.skipConfig?.useSkip ||
 			this.botConfig.skipConfig?.skipRpcUrl === undefined ||
@@ -185,6 +182,10 @@ export class SkipLoop extends MempoolLoop {
 
 		if (logItem.length > 0) {
 			await this.logger?.sendMessage(logItem, LogType.Console);
+		}
+
+		if (res.result.code != 4) {
+			this.cdPaths(arbTrade.path);
 		}
 
 		if (res.result.code === 0) {
