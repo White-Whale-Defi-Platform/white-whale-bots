@@ -83,6 +83,7 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 		poolLists.push(...newPoolLists);
 	}
 	const paths: Array<Path> = [];
+
 	let idx = 0;
 	// create paths and sets identifier number starting at 0
 	for (const poolList of poolLists) {
@@ -120,9 +121,11 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 				path.equalpaths.push(path2.identifier);
 			}
 		}
+
 	}
 	return paths;
 }
+
 
 /**
  * Returns Set of Addresses in Pools.
@@ -134,6 +137,7 @@ function getAddrfromPools(pools: Array<Pool>) {
 	}
 	return out;
 }
+
 
 // *************************************** VERTEX **************************************** \\
 

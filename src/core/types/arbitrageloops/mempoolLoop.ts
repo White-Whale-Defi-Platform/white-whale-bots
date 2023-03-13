@@ -64,6 +64,7 @@ export class MempoolLoop {
 	) {
 		this.pools = pools;
 		this.CDpaths = new Map<string, [number, number, number]>();
+
 		this.paths = paths;
 		this.arbitrageFunction = arbitrage;
 		this.updateStateFunction = updateState;
@@ -73,6 +74,7 @@ export class MempoolLoop {
 		this.botConfig = botConfig;
 		this.logger = logger;
 		this.pathlib = pathlib;
+
 	}
 
 	/**
@@ -125,7 +127,9 @@ export class MempoolLoop {
 
 			if (arbTrade) {
 				await this.trade(arbTrade);
+
 				this.cdPaths(arbTrade.path);
+
 				break;
 			}
 		}
@@ -179,6 +183,7 @@ export class MempoolLoop {
 		await delay(5000);
 		await this.fetchRequiredChainData();
 	}
+
 	/**
 	 * Put path on Cooldown, add to CDPaths with iteration number as block.
 	 * Updates the iteration count of elements in CDpaths if its in equalpath of param: path
@@ -218,6 +223,7 @@ export class MempoolLoop {
 			}
 		});
 	}
+
 }
 
 /**
