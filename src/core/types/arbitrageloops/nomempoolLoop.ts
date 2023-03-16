@@ -1,27 +1,23 @@
-import { AccountData } from "@cosmjs/amino";
 import { EncodeObject } from "@cosmjs/proto-signing";
-import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { Logger } from "../../logging";
-import { BotClients } from "../../node/chainoperator";
+import { ChainOperator, InjectiveClients } from "../../node/chainoperator";
 import { BotConfig } from "../base/botConfig";
 import { LogType } from "../base/logging";
-import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../base/mempool";
+import { flushTxMemory, Mempool } from "../base/mempool";
 import { Path } from "../base/path";
-import { applyMempoolTradesOnPools, Pool } from "../base/pool";
+import { Pool } from "../base/pool";
 
 /**
  *
  */
-export class MempoolLoop {
+export class NoMempoolLoop {
 	pools: Array<Pool>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
-	botClients: BotClients;
-	account: AccountData;
+	chainOperator: ChainOperator;
 	accountNumber = 0;
 	sequence = 0;
 	chainid = "";
@@ -36,7 +32,7 @@ export class MempoolLoop {
 	 *
 	 */
 	arbitrageFunction: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined;
-	updateStateFunction: (botClients: BotClients, pools: Array<Pool>) => void;
+	updateStateFunction: (chainOperator: ChainOperator, pools: Array<Pool>) => void;
 	messageFunction: (
 		arbTrade: OptimalTrade,
 		walletAddress: string,
@@ -50,14 +46,13 @@ export class MempoolLoop {
 		pools: Array<Pool>,
 		paths: Array<Path>,
 		arbitrage: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined,
-		updateState: (botclients: BotClients, pools: Array<Pool>) => void,
+		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => void,
 		messageFunction: (
 			arbTrade: OptimalTrade,
 			walletAddress: string,
 			flashloancontract: string,
 		) => [Array<EncodeObject>, number],
-		botClients: BotClients,
-		account: AccountData,
+		chainOperator: ChainOperator,
 		botConfig: BotConfig,
 		logger: Logger | undefined,
 		pathlib: Array<Path>,
@@ -69,24 +64,21 @@ export class MempoolLoop {
 		this.arbitrageFunction = arbitrage;
 		this.updateStateFunction = updateState;
 		this.messageFunction = messageFunction;
-		this.botClients = botClients;
-		this.account = account;
+		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
 		this.logger = logger;
 		this.pathlib = pathlib;
-
 	}
 
 	/**
 	 *
 	 */
 	public async fetchRequiredChainData() {
-		const { accountNumber, sequence } = await this.botClients.SigningCWClient.getSequence(this.account.address);
-		this.sequence = sequence;
-		this.accountNumber = accountNumber;
-
-		const chainId = await this.botClients.SigningCWClient.getChainId();
-		this.chainid = chainId;
+		// const { accountNumber, sequence } = await this.botClients.SigningCWClient.getSequence(this.account.address);
+		// this.sequence = sequence;
+		// this.accountNumber = accountNumber;
+		// const chainId = await this.botClients.SigningCWClient.getChainId();
+		// this.chainid = chainId;
 	}
 
 	/**
@@ -94,7 +86,7 @@ export class MempoolLoop {
 	 */
 	public async step() {
 		this.iterations++;
-		this.updateStateFunction(this.botClients, this.pools);
+		this.updateStateFunction(this.chainOperator, this.pools);
 
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
@@ -102,36 +94,6 @@ export class MempoolLoop {
 			await this.trade(arbTrade);
 			this.cdPaths(arbTrade.path);
 			return;
-		}
-
-		while (true) {
-			const mempoolResult = await this.botClients.HttpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
-			this.mempool = mempoolResult.result;
-
-			if (+this.mempool.total_bytes < this.totalBytes) {
-				break;
-			} else if (+this.mempool.total_bytes === this.totalBytes) {
-				continue;
-			} else {
-				this.totalBytes = +this.mempool.total_bytes;
-			}
-
-			const mempoolTrades: Array<MempoolTrade> = processMempool(this.mempool);
-			if (mempoolTrades.length === 0) {
-				continue;
-			} else {
-				applyMempoolTradesOnPools(this.pools, mempoolTrades);
-			}
-
-			const arbTrade = this.arbitrageFunction(this.paths, this.botConfig);
-
-			if (arbTrade) {
-				await this.trade(arbTrade);
-
-				this.cdPaths(arbTrade.path);
-
-				break;
-			}
 		}
 	}
 
@@ -148,42 +110,22 @@ export class MempoolLoop {
 	 *
 	 */
 	private async trade(arbTrade: OptimalTrade) {
+		const publicAddress = (<InjectiveClients>this.chainOperator.clients).SignAndBroadcastClient.privateKey
+			.toPublicKey()
+			.toAddress().address;
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
-			this.account.address,
+			publicAddress,
 			this.botConfig.flashloanRouterAddress,
 		);
 
 		await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
 
-		const signerData = {
-			accountNumber: this.accountNumber,
-			sequence: this.sequence,
-			chainId: this.chainid,
-		};
-
-		const TX_FEE =
-			this.botConfig.txFees.get(nrOfMessages) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
-
-		// sign, encode and broadcast the transaction
-		const txRaw = await this.botClients.SigningCWClient.sign(
-			this.account.address,
+		await (<InjectiveClients>this.chainOperator.clients).broadcast(
+			(<InjectiveClients>this.chainOperator.clients).SignAndBroadcastClient,
 			msgs,
-			TX_FEE,
-			"memo",
-			signerData,
 		);
-		const txBytes = TxRaw.encode(txRaw).finish();
-		const sendResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
-
-		await this.logger?.sendMessage(JSON.stringify(sendResult), LogType.Console);
-
-		this.sequence += 1;
-		await delay(5000);
-		await this.fetchRequiredChainData();
 	}
-
 	/**
 	 * Put path on Cooldown, add to CDPaths with iteration number as block.
 	 * Updates the iteration count of elements in CDpaths if its in equalpath of param: path
@@ -223,7 +165,6 @@ export class MempoolLoop {
 			}
 		});
 	}
-
 }
 
 /**

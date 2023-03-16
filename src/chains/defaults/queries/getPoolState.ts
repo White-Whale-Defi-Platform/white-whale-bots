@@ -1,4 +1,4 @@
-import { BotClients } from "../../../core/node/chainoperator";
+import { ChainOperator, CosmjsClients } from "../../../core/node/chainoperator";
 import {
 	Asset,
 	isJunoSwapNativeAssetInfo,
@@ -29,11 +29,12 @@ interface PoolState {
  * @param client The cosmwasm client to send requests from, including wasmextension.
  * @param pools An array of Pool objects to obtain the chain states for.
  */
-export async function getPoolStates(botClients: BotClients, pools: Array<Pool>) {
+export async function getPoolStates(chainOperator: ChainOperator, pools: Array<Pool>) {
+	const cosmjsClients = <CosmjsClients>chainOperator.clients;
 	await Promise.all(
 		pools.map(async (pool) => {
 			if (pool.dexname === AmmDexName.junoswap) {
-				const poolState: JunoSwapPoolState = await botClients.WasmQueryClient.wasm.queryContractSmart(
+				const poolState: JunoSwapPoolState = await cosmjsClients.WasmQueryClient.wasm.queryContractSmart(
 					pool.address,
 					{ info: {} },
 				);
@@ -41,7 +42,7 @@ export async function getPoolStates(botClients: BotClients, pools: Array<Pool>) 
 				pool.assets[1].amount = poolState.token2_reserve;
 				return;
 			} else {
-				const poolState: PoolState = await botClients.WasmQueryClient.wasm.queryContractSmart(pool.address, {
+				const poolState: PoolState = await cosmjsClients.WasmQueryClient.wasm.queryContractSmart(pool.address, {
 					pool: {},
 				});
 				const [assets] = processPoolStateAssets(poolState);
@@ -59,24 +60,24 @@ export async function getPoolStates(botClients: BotClients, pools: Array<Pool>) 
  * @returns An array of instantiated Pool objects.
  */
 export async function initPools(
-	botClients: BotClients,
+	cosmjsClients: CosmjsClients,
 	poolAddresses: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>,
 	factoryMapping: Array<{ factory: string; router: string }>,
 ): Promise<Array<Pool>> {
 	const pools: Array<Pool> = [];
-	const factoryPools = await getPoolsFromFactory(botClients, factoryMapping);
+	const factoryPools = await getPoolsFromFactory(cosmjsClients, factoryMapping);
 	for (const poolAddress of poolAddresses) {
 		let assets: Array<Asset> = [];
 		let dexname: AmmDexName;
 		let totalShare: string;
 		try {
 			const poolState = <PoolState>(
-				await botClients.WasmQueryClient.wasm.queryContractSmart(poolAddress.pool, { pool: {} })
+				await cosmjsClients.WasmQueryClient.wasm.queryContractSmart(poolAddress.pool, { pool: {} })
 			);
 			[assets, dexname, totalShare] = processPoolStateAssets(poolState);
 		} catch (error) {
 			const poolState = <JunoSwapPoolState>(
-				await botClients.WasmQueryClient.wasm.queryContractSmart(poolAddress.pool, { info: {} })
+				await cosmjsClients.WasmQueryClient.wasm.queryContractSmart(poolAddress.pool, { info: {} })
 			);
 			[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
 		}
