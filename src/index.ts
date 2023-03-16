@@ -1,17 +1,14 @@
-import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import dotenv from "dotenv";
 
 import * as chains from "./chains";
 import { trySomeArb } from "./core/arbitrage/arbitrage";
 import { getPaths, newGraph } from "./core/arbitrage/graph";
 import { Logger } from "./core/logging";
-import { getChainOperator } from "./core/node/chainoperator";
-import { getSkipClient } from "./core/node/skipclients";
-import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
-import { SkipLoop } from "./core/types/arbitrageloops/skipLoop";
+import { ChainOperator, CosmjsClients, getChainOperator } from "./core/node/chainoperator";
+import { NoMempoolLoop } from "./core/types/arbitrageloops/nomempoolLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
 import { LogType } from "./core/types/base/logging";
-import { removedUnusedPools } from "./core/types/base/pool";
+import { Pool, removedUnusedPools } from "./core/types/base/pool";
 // load env files
 dotenv.config();
 const botConfig = setBotConfig(process.env);
@@ -35,10 +32,15 @@ startupMessage += "---".repeat(30);
 /**
  * Runs the main program.
  */
+
+let getPoolStates: (chainOperator: ChainOperator, pools: Array<Pool>) => void;
+/**
+ *
+ */
 async function main() {
 	const logger = new Logger(botConfig);
 	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
-	let getPoolStates = chains.defaults.getPoolStates;
+	getPoolStates = chains.defaults.getPoolStates;
 	let initPools = chains.defaults.initPools;
 	let startupTime = Date.now();
 	let timeIt = 0;
@@ -53,20 +55,15 @@ async function main() {
 		return;
 	});
 
-	const [account, botClients] = await getChainOperator(botConfig);
-	const { accountNumber, sequence } = await botClients.SigningCWClient.getSequence(account.address);
-	const chainId = await (
-		await botClients.HttpClient.execute(createJsonRpcRequest("block"))
-	).result.block.header.chain_id;
+	const chainOperator = await getChainOperator(botConfig);
 
-	let setupMessage = `
-Connections Details:\n
-**Account Number:** ${accountNumber}
-**Sequence:** \t${sequence}
-**Chain Id:** \t${chainId}\n`;
-	setupMessage += "---".repeat(30);
+	let setupMessage = "---".repeat(30);
 
-	const allPools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+	const allPools = await initPools(
+		<CosmjsClients>chainOperator.clients,
+		botConfig.poolEnvs,
+		botConfig.mappingFactoryRouter,
+	);
 	const graph = newGraph(allPools);
 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 
@@ -84,49 +81,18 @@ Total Paths:** \t${paths.length}\n`;
 	startupMessage += setupMessage;
 	await logger.sendMessage(startupMessage, LogType.Console);
 
-	let loop;
-	if (botConfig.skipConfig) {
-		await logger.sendMessage("Initializing skip loop...", LogType.Console);
-		const [skipClient, skipSigner] = await getSkipClient(
-			botConfig.skipConfig.skipRpcUrl,
-			botConfig.mnemonic,
-			botConfig.chainPrefix,
-		);
-		loop = new SkipLoop(
-			filteredPools,
-			paths,
-			trySomeArb,
-			getPoolStates,
-			getFlashArbMessages,
-			botClients,
-			account,
-			botConfig,
-			skipClient,
-			skipSigner,
-			logger,
-			[...paths],
+	const loop = new NoMempoolLoop(
+		filteredPools,
+		paths,
+		trySomeArb,
+		getPoolStates,
+		getFlashArbMessages,
+		chainOperator,
+		botConfig,
+		logger,
+		[...paths],
+	);
 
-		);
-	} else if (botConfig.useMempool === true) {
-		await logger.sendMessage("Initializing mempool loop...", LogType.Console);
-
-		loop = new MempoolLoop(
-			filteredPools,
-			paths,
-			trySomeArb,
-			getPoolStates,
-			getFlashArbMessages,
-			botClients,
-			account,
-			botConfig,
-			logger,
-			[...paths],
-
-		);
-	} else {
-		await logger.sendMessage("**Info:** loop without mempool or skip not implemented yet");
-		return;
-	}
 	// main loop of the bot
 	await loop.fetchRequiredChainData();
 
@@ -139,7 +105,7 @@ Total Paths:** \t${paths.length}\n`;
 			const mins = (botConfig.signOfLife * timeIt) % 60;
 			const hours = ~~((botConfig.signOfLife * timeIt) / 60);
 			startupTime = Date.now();
-			const message = `**chain:** ${loop.chainid} **wallet:** ${account.address} **status:** running for ${
+			const message = `**chain:** ${loop.chainid} **wallet:**  **status:** running for ${
 				loop.iterations
 			} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
 			await logger.sendMessage(message);
