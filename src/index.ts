@@ -1,16 +1,17 @@
 import dotenv from "dotenv";
+import { inspect } from "util";
 
 import * as chains from "./chains";
 import { trySomeArb } from "./core/arbitrage/arbitrage";
 import { getPaths, newGraph } from "./core/arbitrage/graph";
+import { ChainOperator } from "./core/chainOperator/chainoperator";
 import { Logger } from "./core/logging";
-import { ChainOperator, CosmjsClients, getChainOperator } from "./core/node/chainoperator";
 import { NoMempoolLoop } from "./core/types/arbitrageloops/nomempoolLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
 import { LogType } from "./core/types/base/logging";
-import { Pool, removedUnusedPools } from "./core/types/base/pool";
+import { removedUnusedPools } from "./core/types/base/pool";
 // load env files
-dotenv.config();
+dotenv.config({ path: "injective.env" });
 const botConfig = setBotConfig(process.env);
 
 let startupMessage = "===".repeat(30);
@@ -33,40 +34,37 @@ startupMessage += "---".repeat(30);
  * Runs the main program.
  */
 
-let getPoolStates: (chainOperator: ChainOperator, pools: Array<Pool>) => void;
+// let getPoolStates: (chainOperator: ChainOperator, pools: Array<Pool>) => void;
 /**
  *
  */
 async function main() {
 	const logger = new Logger(botConfig);
-	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
-	getPoolStates = chains.defaults.getPoolStates;
-	let initPools = chains.defaults.initPools;
+	const getFlashArbMessages = chains.defaults.getFlashArbMessages;
+	const getPoolStates = chains.defaults.getPoolStates;
+	const initPools = chains.defaults.initPools;
 	let startupTime = Date.now();
 	let timeIt = 0;
 
-	await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
-		if (chainSetups === undefined) {
-			await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
-		}
-		getFlashArbMessages = chainSetups.getFlashArbMessages;
-		getPoolStates = chainSetups.getPoolStates;
-		initPools = chainSetups.initPools;
-		return;
-	});
+	// await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
+	// 	if (chainSetups === undefined) {
+	// 		await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
+	// 	}
+	// 	getFlashArbMessages = chainSetups.getFlashArbMessages;
+	// 	getPoolStates = chainSetups.getPoolStates;
+	// 	initPools = chainSetups.initPools;
+	// 	return;
+	// });
 
-	const chainOperator = await getChainOperator(botConfig);
-
+	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 	let setupMessage = "---".repeat(30);
 
-	const allPools = await initPools(
-		<CosmjsClients>chainOperator.clients,
-		botConfig.poolEnvs,
-		botConfig.mappingFactoryRouter,
-	);
+	const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+	console.log(inspect(allPools, { showHidden: true, depth: null, colors: true }));
 	const graph = newGraph(allPools);
 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 
+	await getPoolStates(chainOperator, allPools);
 	const filteredPools = removedUnusedPools(allPools, paths);
 	setupMessage += `**\nDerived Paths for Arbitrage:
 Total Paths:** \t${paths.length}\n`;
@@ -94,7 +92,7 @@ Total Paths:** \t${paths.length}\n`;
 	);
 
 	// main loop of the bot
-	await loop.fetchRequiredChainData();
+	// await loop.fetchRequiredChainData();
 
 	await logger.sendMessage("Starting loop...", LogType.All);
 	while (true) {
