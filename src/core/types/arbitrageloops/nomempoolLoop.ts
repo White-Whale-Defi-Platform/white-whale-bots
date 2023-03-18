@@ -1,10 +1,10 @@
 import { EncodeObject } from "@cosmjs/proto-signing";
+import { inspect } from "util";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
+import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
-import { ChainOperator, InjectiveClients } from "../../node/chainoperator";
 import { BotConfig } from "../base/botConfig";
-import { LogType } from "../base/logging";
 import { flushTxMemory, Mempool } from "../base/mempool";
 import { Path } from "../base/path";
 import { Pool } from "../base/pool";
@@ -32,7 +32,7 @@ export class NoMempoolLoop {
 	 *
 	 */
 	arbitrageFunction: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined;
-	updateStateFunction: (chainOperator: ChainOperator, pools: Array<Pool>) => void;
+	updateStateFunction: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>;
 	messageFunction: (
 		arbTrade: OptimalTrade,
 		walletAddress: string,
@@ -46,7 +46,7 @@ export class NoMempoolLoop {
 		pools: Array<Pool>,
 		paths: Array<Path>,
 		arbitrage: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined,
-		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => void,
+		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
 		messageFunction: (
 			arbTrade: OptimalTrade,
 			walletAddress: string,
@@ -86,11 +86,14 @@ export class NoMempoolLoop {
 	 */
 	public async step() {
 		this.iterations++;
-		this.updateStateFunction(this.chainOperator, this.pools);
+		await this.updateStateFunction(this.chainOperator, this.pools);
 
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
 		if (arbTrade) {
+			console.log(inspect(arbTrade.path.pools, { showHidden: true, depth: 4, colors: true }));
+			console.log(inspect(arbTrade.offerAsset, { showHidden: true, depth: 3, colors: true }));
+			console.log("expected profit: ", arbTrade.profit);
 			await this.trade(arbTrade);
 			this.cdPaths(arbTrade.path);
 			return;
@@ -110,21 +113,16 @@ export class NoMempoolLoop {
 	 *
 	 */
 	private async trade(arbTrade: OptimalTrade) {
-		const publicAddress = (<InjectiveClients>this.chainOperator.clients).SignAndBroadcastClient.privateKey
-			.toPublicKey()
-			.toAddress().address;
+		const publicAddress = this.chainOperator.client.publicAddress;
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
 			publicAddress,
 			this.botConfig.flashloanRouterAddress,
 		);
 
-		await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
-
-		await (<InjectiveClients>this.chainOperator.clients).broadcast(
-			(<InjectiveClients>this.chainOperator.clients).SignAndBroadcastClient,
-			msgs,
-		);
+		const txResponse = await this.chainOperator.signAndBroadcast(publicAddress, msgs, "test");
+		console.log(txResponse);
+		await delay(10000);
 	}
 	/**
 	 * Put path on Cooldown, add to CDPaths with iteration number as block.
