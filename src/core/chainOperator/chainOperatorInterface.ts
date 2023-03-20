@@ -2,10 +2,8 @@ import { JsonObject } from "@cosmjs/cosmwasm-stargate";
 import { EncodeObject } from "@cosmjs/proto-signing";
 
 export interface ChainOperatorInterface {
-<<<<<<< HEAD
-=======
 	publicAddress: string;
->>>>>>> 44f02fa (feat: injectiveclient abstraction)
+
 	signAndBroadcast: (senderAddress: string, msgs: Array<EncodeObject>, memo?: string) => Promise<TxResponse>;
 	// execute: (
 	// 	senderAddress: string,

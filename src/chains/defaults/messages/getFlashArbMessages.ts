@@ -38,11 +38,7 @@ export function getFlashArbMessages(
 function getFlashArbMessage(path: Path, offerAsset0: Asset): FlashLoanMessage {
 	const wasmMsgs = [];
 	const loanOfferAsset = { amount: String(Math.floor(+offerAsset0.amount)), info: offerAsset0.info };
-<<<<<<< HEAD
 	let offerAsset = { amount: String(Math.floor(+offerAsset0.amount)), info: offerAsset0.info };
-=======
-	let offerAsset = offerAsset0;
->>>>>>> 44f02fa (feat: injectiveclient abstraction)
 	for (const pool of path.pools) {
 		const [wasmMsgsPool, offerAssetNext] = getWasmMessages(pool, offerAsset);
 		wasmMsgs.push(...wasmMsgsPool);
