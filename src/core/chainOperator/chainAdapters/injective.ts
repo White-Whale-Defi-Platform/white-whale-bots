@@ -1,7 +1,6 @@
 import { JsonObject } from "@cosmjs/cosmwasm-stargate";
 import { fromBase64, fromUtf8 } from "@cosmjs/encoding";
 import { DirectSecp256k1HdWallet, EncodeObject, OfflineDirectSigner } from "@cosmjs/proto-signing";
-import { StdFee } from "@cosmjs/stargate";
 import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
 import {
 	BaseAccount,
@@ -14,16 +13,15 @@ import {
 	PrivateKey,
 	PublicKey,
 } from "@injectivelabs/sdk-ts";
-import { AccountDetails } from "@injectivelabs/sdk-ts/dist/types/auth";
 import { ChainId } from "@injectivelabs/ts-types";
 
 import { BotConfig } from "../../types/base/botConfig";
-import { TxResponse } from "../chainOperatorInterface";
+import { ChainOperatorInterface, TxResponse } from "../chainOperatorInterface";
 
 /**
  *
  */
-class InjectiveAdapter {
+class InjectiveAdapter implements ChainOperatorInterface {
 	signAndBroadcastClient: MsgBroadcasterWithPk;
 	spotQueryClient: IndexerGrpcSpotApi;
 	wasmQueryClient: ChainGrpcWasmApi;
@@ -33,9 +31,9 @@ class InjectiveAdapter {
 	publicAddress: string;
 	ethereumAddress: string;
 	subAccountId: string;
-	baseAccount!: BaseAccount;
-	accountDetails!: AccountDetails;
 	signer!: OfflineDirectSigner;
+	accountNumber = 0;
+	sequence = 0;
 
 	/**
 	 *
@@ -63,8 +61,10 @@ class InjectiveAdapter {
 		const restEndpoint = getNetworkEndpoints(this.network).rest;
 		const chainRestAuthApi = new ChainRestAuthApi(restEndpoint);
 		const accountDetailsResponse = await chainRestAuthApi.fetchAccount(this.publicAddress);
-		this.baseAccount = BaseAccount.fromRestApi(accountDetailsResponse);
-		this.accountDetails = this.baseAccount.toAccountDetails();
+		const baseAccount = BaseAccount.fromRestApi(accountDetailsResponse);
+		const accountDetails = baseAccount.toAccountDetails();
+		this.accountNumber = accountDetails.accountNumber;
+		this.sequence = accountDetails.sequence;
 		const signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
 			prefix: botConfig.chainPrefix,
 		});
@@ -84,12 +84,7 @@ class InjectiveAdapter {
 	/**
 	 *
 	 */
-	async signAndBroadcast(
-		signerAddress: string,
-		messages: Array<EncodeObject>,
-		fee: StdFee | "auto" | number,
-		memo?: string,
-	): Promise<TxResponse> {
+	async signAndBroadcast(signerAddress: string, messages: Array<EncodeObject>, memo?: string): Promise<TxResponse> {
 		const preppedMsgs = this.prepair(messages);
 		if (!preppedMsgs) {
 			console.log("cannot create txRaw from encodeMessage");
@@ -144,7 +139,7 @@ class InjectiveAdapter {
 				// Provide LP: Funds isint being handled proper, before we were sending 1 coin, now we are sending it all but getting invalid coins
 				const params = {
 					funds: isLPMessage ? funds : funds?.[0],
-					sender: this.accountDetails.address,
+					sender: this.publicAddress,
 					contractAddress: contract,
 					exec: executeMessageJson,
 				};

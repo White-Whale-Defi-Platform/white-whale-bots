@@ -1,17 +1,17 @@
 import dotenv from "dotenv";
-import { inspect } from "util";
 
 import * as chains from "./chains";
 import { trySomeArb } from "./core/arbitrage/arbitrage";
 import { getPaths, newGraph } from "./core/arbitrage/graph";
 import { ChainOperator } from "./core/chainOperator/chainoperator";
 import { Logger } from "./core/logging";
+import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
 import { NoMempoolLoop } from "./core/types/arbitrageloops/nomempoolLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
 import { LogType } from "./core/types/base/logging";
 import { removedUnusedPools } from "./core/types/base/pool";
 // load env files
-dotenv.config({ path: "injective.env" });
+dotenv.config({ path: "juno.env" });
 const botConfig = setBotConfig(process.env);
 
 let startupMessage = "===".repeat(30);
@@ -40,31 +40,28 @@ startupMessage += "---".repeat(30);
  */
 async function main() {
 	const logger = new Logger(botConfig);
-	const getFlashArbMessages = chains.defaults.getFlashArbMessages;
-	const getPoolStates = chains.defaults.getPoolStates;
-	const initPools = chains.defaults.initPools;
+	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
+	let getPoolStates = chains.defaults.getPoolStates;
+	let initPools = chains.defaults.initPools;
 	let startupTime = Date.now();
 	let timeIt = 0;
 
-	// await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
-	// 	if (chainSetups === undefined) {
-	// 		await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
-	// 	}
-	// 	getFlashArbMessages = chainSetups.getFlashArbMessages;
-	// 	getPoolStates = chainSetups.getPoolStates;
-	// 	initPools = chainSetups.initPools;
-	// 	return;
-	// });
+	await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
+		if (chainSetups === undefined) {
+			await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
+		}
+		getFlashArbMessages = chainSetups.getFlashArbMessages;
+		getPoolStates = chainSetups.getPoolStates;
+		initPools = chainSetups.initPools;
+		return;
+	});
 
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 	let setupMessage = "---".repeat(30);
 
 	const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-	console.log(inspect(allPools, { showHidden: true, depth: null, colors: true }));
 	const graph = newGraph(allPools);
 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
-
-	await getPoolStates(chainOperator, allPools);
 	const filteredPools = removedUnusedPools(allPools, paths);
 	setupMessage += `**\nDerived Paths for Arbitrage:
 Total Paths:** \t${paths.length}\n`;
@@ -79,17 +76,56 @@ Total Paths:** \t${paths.length}\n`;
 	startupMessage += setupMessage;
 	await logger.sendMessage(startupMessage, LogType.Console);
 
-	const loop = new NoMempoolLoop(
-		filteredPools,
-		paths,
-		trySomeArb,
-		getPoolStates,
-		getFlashArbMessages,
-		chainOperator,
-		botConfig,
-		logger,
-		[...paths],
-	);
+	let loop;
+	// if (botConfig.skipConfig) {
+	// 	await logger.sendMessage("Initializing skip loop...", LogType.Console);
+	// 	// const [skipClient, skipSigner] = await getSkipClient(
+	// 	// 	botConfig.skipConfig.skipRpcUrl,
+	// 	// 	botConfig.mnemonic,
+	// 	// 	botConfig.chainPrefix,
+	// 	// );
+	// 	// loop = new SkipLoop(
+	// 	// 	filteredPools,
+	// 	// 	paths,
+	// 	// 	trySomeArb,
+	// 	// 	getPoolStates,
+	// 	// 	getFlashArbMessages,
+	// 	// 	chainOperator,
+	// 	// 	botConfig,
+	// 	// 	skipClient,
+	// 	// 	skipSigner,
+	// 	// 	logger,
+	// 	// 	[...paths],
+	// 	// );
+	// } else
+	if (botConfig.useMempool === true) {
+		await logger.sendMessage("Initializing mempool loop...", LogType.Console);
+
+		loop = new MempoolLoop(
+			filteredPools,
+			paths,
+			trySomeArb,
+			getPoolStates,
+			getFlashArbMessages,
+			chainOperator,
+			botConfig,
+			logger,
+			[...paths],
+		);
+	} else {
+		await logger.sendMessage("Initializing non-mempool loop...", LogType.Console);
+		loop = new NoMempoolLoop(
+			filteredPools,
+			paths,
+			trySomeArb,
+			getPoolStates,
+			getFlashArbMessages,
+			chainOperator,
+			botConfig,
+			logger,
+			[...paths],
+		);
+	}
 
 	// main loop of the bot
 	// await loop.fetchRequiredChainData();
