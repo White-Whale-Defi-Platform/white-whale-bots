@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-import { inspect } from "util";
 
 import * as chains from "./chains";
 import { trySomeArb } from "./core/arbitrage/arbitrage";
@@ -9,9 +8,12 @@ import { ChainOperator } from "./core/chainOperator/chainoperator";
 import { getSkipClient } from "./core/chainOperator/skipclients";
 import { Logger } from "./core/logging";
 import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
+<<<<<<< HEAD
 =======
 import { Logger } from "./core/logging";
 >>>>>>> 44f02fa (feat: injectiveclient abstraction)
+=======
+>>>>>>> 43d9cec (feat: nomempool loop and injective client support)
 import { NoMempoolLoop } from "./core/types/arbitrageloops/nomempoolLoop";
 import { SkipLoop } from "./core/types/arbitrageloops/skipLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
@@ -19,10 +21,14 @@ import { LogType } from "./core/types/base/logging";
 import { removedUnusedPools } from "./core/types/base/pool";
 // load env files
 <<<<<<< HEAD
+<<<<<<< HEAD
 dotenv.config({ path: "juno.env" });
 =======
 dotenv.config({ path: "injective.env" });
 >>>>>>> 44f02fa (feat: injectiveclient abstraction)
+=======
+dotenv.config({ path: "juno.env" });
+>>>>>>> 43d9cec (feat: nomempool loop and injective client support)
 const botConfig = setBotConfig(process.env);
 
 let startupMessage = "===".repeat(30);
@@ -51,6 +57,7 @@ startupMessage += "---".repeat(30);
  */
 async function main() {
 	const logger = new Logger(botConfig);
+<<<<<<< HEAD
 <<<<<<< HEAD
 	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
 	let getPoolStates = chains.defaults.getPoolStates;
@@ -84,11 +91,29 @@ async function main() {
 	// 	return;
 	// });
 >>>>>>> 44f02fa (feat: injectiveclient abstraction)
+=======
+	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
+	let getPoolStates = chains.defaults.getPoolStates;
+	let initPools = chains.defaults.initPools;
+	let startupTime = Date.now();
+	let timeIt = 0;
+
+	await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
+		if (chainSetups === undefined) {
+			await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
+		}
+		getFlashArbMessages = chainSetups.getFlashArbMessages;
+		getPoolStates = chainSetups.getPoolStates;
+		initPools = chainSetups.initPools;
+		return;
+	});
+>>>>>>> 43d9cec (feat: nomempool loop and injective client support)
 
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 	let setupMessage = "---".repeat(30);
 
 	const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+<<<<<<< HEAD
 <<<<<<< HEAD
 	const graph = newGraph(allPools);
 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
@@ -99,6 +124,10 @@ async function main() {
 
 	await getPoolStates(chainOperator, allPools);
 >>>>>>> 44f02fa (feat: injectiveclient abstraction)
+=======
+	const graph = newGraph(allPools);
+	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+>>>>>>> 43d9cec (feat: nomempool loop and injective client support)
 	const filteredPools = removedUnusedPools(allPools, paths);
 	setupMessage += `**\nDerived Paths for Arbitrage:
 Total Paths:** \t${paths.length}\n`;
@@ -114,6 +143,7 @@ Total Paths:** \t${paths.length}\n`;
 	await logger.sendMessage(startupMessage, LogType.Console);
 
 	let loop;
+<<<<<<< HEAD
 	if (botConfig.skipConfig) {
 		await logger.sendMessage("Initializing skip loop...", LogType.Console);
 		const [skipClient, skipSigner] = await getSkipClient(
@@ -135,6 +165,30 @@ Total Paths:** \t${paths.length}\n`;
 			[...paths],
 		);
 	} else if (botConfig.useMempool === true) {
+=======
+	// if (botConfig.skipConfig) {
+	// 	await logger.sendMessage("Initializing skip loop...", LogType.Console);
+	// 	// const [skipClient, skipSigner] = await getSkipClient(
+	// 	// 	botConfig.skipConfig.skipRpcUrl,
+	// 	// 	botConfig.mnemonic,
+	// 	// 	botConfig.chainPrefix,
+	// 	// );
+	// 	// loop = new SkipLoop(
+	// 	// 	filteredPools,
+	// 	// 	paths,
+	// 	// 	trySomeArb,
+	// 	// 	getPoolStates,
+	// 	// 	getFlashArbMessages,
+	// 	// 	chainOperator,
+	// 	// 	botConfig,
+	// 	// 	skipClient,
+	// 	// 	skipSigner,
+	// 	// 	logger,
+	// 	// 	[...paths],
+	// 	// );
+	// } else
+	if (botConfig.useMempool === true) {
+>>>>>>> 43d9cec (feat: nomempool loop and injective client support)
 		await logger.sendMessage("Initializing mempool loop...", LogType.Console);
 
 		loop = new MempoolLoop(

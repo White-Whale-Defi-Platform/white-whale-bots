@@ -18,11 +18,8 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	wasmQueryClient!: QueryClient & WasmExtension; //used to query wasm methods (contract states)
 	account!: AccountData;
 	publicAddress!: string;
-<<<<<<< HEAD
 	accountNumber = 0;
 	sequence = 0;
-=======
->>>>>>> 44f02fa (feat: injectiveclient abstraction)
 
 	/**
 	 *
@@ -38,10 +35,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		const signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
 			prefix: botConfig.chainPrefix,
 		});
-<<<<<<< HEAD
 
-=======
->>>>>>> 44f02fa (feat: injectiveclient abstraction)
 		// connect to client and querier
 		this.signingCWClient = await SigningCosmWasmClient.connectWithSigner(botConfig.rpcUrl, signer, {
 			prefix: botConfig.chainPrefix,
@@ -51,12 +45,9 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		this.tmClient = await Tendermint34Client.create(this.httpClient);
 		this.wasmQueryClient = QueryClient.withExtensions(this.tmClient, setupWasmExtension, setupAuthExtension);
 		this.account = (await signer.getAccounts())[0];
-<<<<<<< HEAD
 		const { accountNumber, sequence } = await this.signingCWClient.getSequence(this.account.address);
 		this.accountNumber = accountNumber;
 		this.sequence = sequence;
-=======
->>>>>>> 44f02fa (feat: injectiveclient abstraction)
 		this.publicAddress = this.account.address;
 	}
 	/**
