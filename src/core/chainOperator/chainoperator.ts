@@ -5,11 +5,11 @@ import { Network } from "@injectivelabs/networks";
 import { BotConfig } from "../types/base/botConfig";
 import CosmjsAdapter from "./chainAdapters/cosmjs";
 import InjectiveAdapter from "./chainAdapters/injective";
-import { TxResponse } from "./chainOperatorInterface";
+import { ChainOperatorInterface, TxResponse } from "./chainOperatorInterface";
 /**
  *
  */
-export class ChainOperator {
+export class ChainOperator implements ChainOperatorInterface {
 	client: CosmjsAdapter | InjectiveAdapter;
 	network: string;
 
@@ -52,7 +52,7 @@ export class ChainOperator {
 		msgs: Array<EncodeObject>,
 		memo?: string | undefined,
 	): Promise<TxResponse> {
-		return await this.client.signAndBroadcast(senderAddress, msgs, "auto", memo);
+		return await this.client.signAndBroadcast(senderAddress, msgs, memo);
 	}
 }
 

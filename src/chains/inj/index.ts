@@ -1,2 +1,2 @@
 export { getFlashArbMessages } from "../defaults/messages/getFlashArbMessages";
-export { getPoolState, initPools } from "./queries/getPoolState";
+export { getPoolStates, initPools } from "../defaults/queries/getPoolState";
