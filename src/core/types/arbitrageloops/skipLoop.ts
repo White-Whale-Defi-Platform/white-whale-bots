@@ -126,8 +126,8 @@ export class SkipLoop extends MempoolLoop {
 		};
 
 		const signerData: SignerData = {
-			accountNumber: this.accountNumber,
-			sequence: this.sequence,
+			accountNumber: this.chainOperator.client.accountNumber,
+			sequence: this.chainOperator.client.sequence,
 			chainId: this.chainid,
 		};
 		const [msgs, nrOfWasms] = this.messageFunction(
@@ -200,7 +200,7 @@ export class SkipLoop extends MempoolLoop {
 		}
 
 		if (res.result.code === 0) {
-			this.sequence += 1;
+			this.chainOperator.client.sequence += 1;
 		}
 		await delay(5000);
 	}

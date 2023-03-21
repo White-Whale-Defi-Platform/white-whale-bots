@@ -20,8 +20,6 @@ export class MempoolLoop {
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
-	accountNumber = 0;
-	sequence = 0;
 	chainid = "";
 	botConfig: BotConfig;
 	logger: Logger | undefined;
@@ -148,8 +146,8 @@ export class MempoolLoop {
 		await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
 
 		const signerData = {
-			accountNumber: this.accountNumber,
-			sequence: this.sequence,
+			accountNumber: this.chainOperator.client.accountNumber,
+			sequence: this.chainOperator.client.sequence,
 			chainId: this.chainid,
 		};
 
@@ -168,7 +166,7 @@ export class MempoolLoop {
 		const sendResult = await this.chainOperator.client.tmClient.broadcastTxSync({ tx: txBytes });
 
 		await this.logger?.sendMessage(JSON.stringify(sendResult), LogType.Console);
-		this.sequence += 1;
+		this.chainOperator.client.sequence += 1;
 		await delay(5000);
 		// await this.fetchRequiredChainData();
 	}
