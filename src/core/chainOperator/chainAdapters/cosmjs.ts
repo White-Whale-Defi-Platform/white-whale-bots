@@ -49,6 +49,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		this.accountNumber = accountNumber;
 		this.sequence = sequence;
 		this.publicAddress = this.account.address;
+		console.log(this.accountNumber, this.sequence, this.publicAddress);
 	}
 	/**
 	 *
