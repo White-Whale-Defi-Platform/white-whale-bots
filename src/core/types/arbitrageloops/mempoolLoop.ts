@@ -1,5 +1,6 @@
 import { EncodeObject } from "@cosmjs/proto-signing";
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
+import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import CosmjsAdapter from "../../chainOperator/chainAdapters/cosmjs";
@@ -10,7 +11,6 @@ import { LogType } from "../base/logging";
 import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../base/mempool";
 import { Path } from "../base/path";
 import { applyMempoolTradesOnPools, Pool } from "../base/pool";
-
 /**
  *
  */
@@ -138,6 +138,7 @@ export class MempoolLoop {
 	 *
 	 */
 	private async trade(arbTrade: OptimalTrade) {
+		this.chainOperator.client = <CosmjsAdapter>this.chainOperator.client;
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
 			this.chainOperator.client.publicAddress,
@@ -156,19 +157,17 @@ export class MempoolLoop {
 			this.botConfig.txFees.get(nrOfMessages) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
-		// sign, encode and broadcast the transaction
-		const txRaw = await this.chainOperator.signAndBroadcast(
+		const txRaw = await this.chainOperator.client.signingCWClient.sign(
 			this.chainOperator.client.publicAddress,
 			msgs,
-			// TX_FEE,
+			TX_FEE,
 			"memo",
-			// signerData,
+			signerData,
 		);
-		// const txBytes = TxRaw.encode(txRaw).finish();
-		// const sendResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
+		const txBytes = TxRaw.encode(txRaw).finish();
+		const sendResult = await this.chainOperator.client.tmClient.broadcastTxSync({ tx: txBytes });
 
-		await this.logger?.sendMessage(JSON.stringify(txRaw), LogType.Console);
-
+		await this.logger?.sendMessage(JSON.stringify(sendResult), LogType.Console);
 		this.sequence += 1;
 		await delay(5000);
 		// await this.fetchRequiredChainData();
