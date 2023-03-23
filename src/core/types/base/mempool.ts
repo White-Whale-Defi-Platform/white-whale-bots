@@ -74,7 +74,10 @@ export function processMempool(mempool: Mempool): Array<MempoolTrade> {
 		const txBytes = fromBase64(tx);
 		const txRaw = decodeTxRaw(txBytes);
 		for (const message of txRaw.body.messages) {
-			if (message.typeUrl == "/cosmwasm.wasm.v1.MsgExecuteContract") {
+			if (
+				message.typeUrl === "/cosmwasm.wasm.v1.MsgExecuteContract" ||
+				message.typeUrl === "/injective.wasmx.v1.MsgExecuteContractCompat"
+			) {
 				const msgExecuteContract: MsgExecuteContract = MsgExecuteContract.decode(message.value);
 				const containedMsg = JSON.parse(fromUtf8(msgExecuteContract.msg));
 

@@ -1,11 +1,17 @@
 import { JsonObject } from "@cosmjs/cosmwasm-stargate";
+import { stringToPath } from "@cosmjs/crypto/build/slip10";
 import { fromBase64, fromUtf8 } from "@cosmjs/encoding";
-import { DirectSecp256k1HdWallet, EncodeObject, OfflineDirectSigner } from "@cosmjs/proto-signing";
+import { EncodeObject } from "@cosmjs/proto-signing";
+import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
+import { StdFee } from "@cosmjs/stargate";
+import { HttpBatchClient } from "@cosmjs/tendermint-rpc";
+import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
 import {
 	BaseAccount,
 	ChainGrpcWasmApi,
 	ChainRestAuthApi,
+	createTransaction,
 	getDefaultSubaccountId,
 	IndexerGrpcSpotApi,
 	MsgBroadcasterWithPk,
@@ -14,24 +20,27 @@ import {
 	PublicKey,
 } from "@injectivelabs/sdk-ts";
 import { ChainId } from "@injectivelabs/ts-types";
+import { SkipBundleClient } from "@skip-mev/skipjs";
 
 import { BotConfig } from "../../types/base/botConfig";
+import { Mempool } from "../../types/base/mempool";
 import { ChainOperatorInterface, TxResponse } from "../chainOperatorInterface";
-
 /**
  *
  */
 class InjectiveAdapter implements ChainOperatorInterface {
+	privateKey: PrivateKey;
 	signAndBroadcastClient: MsgBroadcasterWithPk;
 	spotQueryClient: IndexerGrpcSpotApi;
 	wasmQueryClient: ChainGrpcWasmApi;
+	httpClient: HttpBatchClient;
 	chainId: ChainId;
 	network: Network;
 	publicKey: PublicKey;
 	publicAddress: string;
 	ethereumAddress: string;
 	subAccountId: string;
-	signer!: OfflineDirectSigner;
+	signer!: DirectSecp256k1HdWallet;
 	accountNumber = 0;
 	sequence = 0;
 
@@ -40,13 +49,15 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 */
 	constructor(botConfig: BotConfig, network: Network = Network.MainnetK8s) {
 		const endpoints = getNetworkEndpoints(network);
-		const privateKey = PrivateKey.fromMnemonic(botConfig.mnemonic);
+		const privateKey = PrivateKey.fromMnemonic(botConfig.mnemonic, "m/44'/60'/0'/0/0");
+		this.privateKey = privateKey;
 		this.signAndBroadcastClient = new MsgBroadcasterWithPk({
 			network: network,
 			privateKey: privateKey,
 		});
 		this.spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
 		this.wasmQueryClient = new ChainGrpcWasmApi(endpoints.grpc);
+		this.httpClient = new HttpBatchClient(botConfig.rpcUrl);
 		this.chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
 		this.network = network;
 		this.publicKey = privateKey.toPublicKey();
@@ -65,10 +76,12 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		const accountDetails = baseAccount.toAccountDetails();
 		this.accountNumber = accountDetails.accountNumber;
 		this.sequence = accountDetails.sequence;
-		const signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
+
+		const hdPath = stringToPath("m/44'/60'/0'/0/0");
+		this.signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
 			prefix: botConfig.chainPrefix,
+			hdPaths: [hdPath],
 		});
-		this.signer = signer;
 	}
 	/**
 	 *
@@ -84,30 +97,50 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	async signAndBroadcast(signerAddress: string, messages: Array<EncodeObject>, memo?: string): Promise<TxResponse> {
+	async queryMempool(): Promise<Mempool> {
+		const mempoolResult = await this.httpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
+		return mempoolResult.result;
+	}
+	/**
+	 *
+	 */
+	async signAndBroadcast(messages: Array<EncodeObject>, fee?: StdFee | "auto", memo?: string): Promise<TxResponse> {
 		const preppedMsgs = this.prepair(messages);
 		if (!preppedMsgs) {
 			console.log("cannot create txRaw from encodeMessage");
 			process.exit(1);
 		}
-		const broadcasterOptions = {
-			msgs: preppedMsgs,
-			injectiveAddress: this.publicAddress,
-			ethereumAddress: this.ethereumAddress,
-			gasLimit: 1400000,
-		};
 		try {
-			const simRes = await this.signAndBroadcastClient.simulate(broadcasterOptions);
-			const res = await this.signAndBroadcastClient.broadcast(broadcasterOptions);
-			console.log("simulation succesful: \n", simRes);
-			return {
-				height: res.height,
-				code: res.code,
-				transactionHash: res.txHash,
-				rawLog: res.rawLog,
-			};
+			if (!fee || fee === "auto") {
+				const broadcasterOptions = {
+					msgs: preppedMsgs,
+					injectiveAddress: this.publicAddress,
+				};
+				const simRes = await this.signAndBroadcastClient.simulate(broadcasterOptions);
+				console.log("simulation succesful: \n", simRes);
+				const res = await this.signAndBroadcastClient.broadcast(broadcasterOptions);
+				return {
+					height: res.height,
+					code: res.code,
+					transactionHash: res.txHash,
+					rawLog: res.rawLog,
+				};
+			} else {
+				const broadcasterOptions = {
+					msgs: preppedMsgs,
+					injectiveAddress: this.publicAddress,
+					gasLimit: +fee.gas,
+				};
+				const res = await this.signAndBroadcastClient.broadcast(broadcasterOptions);
+				return {
+					height: res.height,
+					code: res.code,
+					transactionHash: res.txHash,
+					rawLog: res.rawLog,
+				};
+			}
 		} catch (e) {
-			console.log("error in simulation:\n");
+			console.log("error in broadcasting:\n");
 			console.log(e);
 
 			return {
@@ -118,10 +151,42 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			}; // console.log("simres: \n", simRes);
 		}
 	}
+
 	/**
 	 *
 	 */
-	private prepair(messages: Array<EncodeObject>, send = true) {
+	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string) {
+		const preppedMsgs = this.prepair(messages);
+		if (!preppedMsgs) {
+			return;
+		}
+		const { signBytes, txRaw, bodyBytes, authInfoBytes } = createTransaction({
+			fee: fee,
+			memo: memo,
+			chainId: this.chainId,
+			message: preppedMsgs.map((msg) => msg.toDirectSign()),
+			pubKey: this.publicKey.toBase64(),
+			sequence: this.sequence,
+			accountNumber: this.accountNumber,
+		});
+		const signature = await this.privateKey.sign(Buffer.from(signBytes));
+
+		txRaw.setSignaturesList([signature]);
+		const cosmTxRaw = {
+			signatures: txRaw.getSignaturesList_asU8(),
+			bodyBytes: bodyBytes,
+			authInfoBytes: authInfoBytes,
+		};
+		const skipBundleClient = new SkipBundleClient("https://injective-1-api.skip.money");
+		const signingAddress = (await this.signer.getAccounts())[0].address;
+		const signed = await skipBundleClient.signBundle([cosmTxRaw], this.signer, signingAddress);
+		const res = await skipBundleClient.sendBundle(signed, 0, true);
+		return res;
+	}
+	/**
+	 *
+	 */
+	private prepair(messages: Array<EncodeObject>) {
 		try {
 			const encodedExecuteMsg = messages.map((msg, idx) => {
 				const { msgT, contract, funds } = msg?.value || {};
