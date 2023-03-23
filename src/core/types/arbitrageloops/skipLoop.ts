@@ -1,12 +1,10 @@
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { EncodeObject } from "@cosmjs/proto-signing";
-import { SignerData } from "@cosmjs/stargate";
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { SkipBundleClient } from "@skip-mev/skipjs";
 import { WebClient } from "@slack/web-api";
-import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
+import { getSendMessage } from "../../../chains/defaults/messages/getSendMessage";
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import CosmjsAdapter from "../../chainOperator/chainAdapters/cosmjs";
 import { ChainOperator } from "../../chainOperator/chainoperator";
@@ -60,11 +58,6 @@ export class SkipLoop extends MempoolLoop {
 		this.iterations++;
 		this.updateStateFunction(this.chainOperator, this.pools);
 		while (true) {
-			if (!this.chainOperator.client["httpClient" as keyof typeof this.chainOperator.client]) {
-				console.log("skip loop not yet available with Injective SDK clients");
-				process.exit(1);
-			}
-			this.chainOperator.client = <CosmjsAdapter>this.chainOperator.client;
 			const mempoolResult = await this.chainOperator.client.httpClient.execute(
 				createJsonRpcRequest("unconfirmed_txs"),
 			);
@@ -110,57 +103,26 @@ export class SkipLoop extends MempoolLoop {
 			return;
 		}
 		this.chainOperator.client = <CosmjsAdapter>this.chainOperator.client;
-		const bidMsg: MsgSend = MsgSend.fromJSON({
-			fromAddress: this.chainOperator.client.publicAddress,
-			toAddress: this.botConfig.skipConfig.skipBidWallet,
-			amount: [
-				{
-					denom: this.botConfig.offerAssetInfo.native_token.denom,
-					amount: String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651)),
-				},
-			],
-		});
-		const bidMsgEncodedObject: EncodeObject = {
-			typeUrl: "/cosmos.bank.v1beta1.MsgSend",
-			value: bidMsg,
-		};
-
-		const signerData: SignerData = {
-			accountNumber: this.chainOperator.client.accountNumber,
-			sequence: this.chainOperator.client.sequence,
-			chainId: this.chainid,
-		};
+		const bidMsgEncoded = getSendMessage(
+			String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651)),
+			"inj",
+			this.chainOperator.client.publicAddress,
+			this.botConfig.skipConfig.skipBidWallet,
+		);
 		const [msgs, nrOfWasms] = this.messageFunction(
 			arbTrade,
 			this.chainOperator.client.publicAddress,
 			this.botConfig.flashloanRouterAddress,
 		);
-		msgs.push(bidMsgEncodedObject);
+		msgs.push(bidMsgEncoded);
 
 		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
 		const TX_FEE =
 			this.botConfig.txFees.get(nrOfWasms) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
-		const txRaw: TxRaw = await this.chainOperator.client.signingCWClient.sign(
-			this.chainOperator.client.publicAddress,
-			msgs,
-			TX_FEE,
-			"",
-			signerData,
-		);
-		// const txBytes = TxRaw.encode(txRaw).finish();
-		// const normalResult = await this.botClients.TMClient.broadcastTxSync({ tx: txBytes });
-		// console.log(normalResult);
-		const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
-		const signed = await this.skipClient.signBundle(
-			[txToArbRaw, txRaw],
-			this.skipSigner,
-			this.chainOperator.client.publicAddress,
-		);
-
-		const res = <SkipResult>await this.skipClient.sendBundle(signed, 0, true);
-
+		const res = <SkipResult>await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE);
+		console.log(res);
 		let logItem = "";
 		let logMessage = `**wallet:** ${this.chainOperator.client.publicAddress}\t **block:** ${res.result.desired_height}\t **profit:** ${arbTrade.profit}`;
 

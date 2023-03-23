@@ -1,10 +1,13 @@
 import { JsonObject } from "@cosmjs/cosmwasm-stargate";
 import { EncodeObject } from "@cosmjs/proto-signing";
+import { StdFee } from "@cosmjs/stargate";
+
+import { Mempool } from "../types/base/mempool";
 
 export interface ChainOperatorInterface {
 	publicAddress: string;
 
-	signAndBroadcast: (senderAddress: string, msgs: Array<EncodeObject>, memo?: string) => Promise<TxResponse>;
+	signAndBroadcast: (msgs: Array<EncodeObject>, fee?: StdFee | "auto", memo?: string) => Promise<TxResponse>;
 	// execute: (
 	// 	senderAddress: string,
 	// 	contractAddress: string,
@@ -20,6 +23,7 @@ export interface ChainOperatorInterface {
 	// getChainId: () => Promise<string>;
 	// getNetwork: () => Promise<string>;
 	// getBalance: (address: string, searchDenom: string) => Promise<Coin>;
+	queryMempool: () => Promise<Mempool>;
 }
 
 export interface TxResponse {

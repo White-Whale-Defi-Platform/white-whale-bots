@@ -1,6 +1,4 @@
 import { EncodeObject } from "@cosmjs/proto-signing";
-import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import CosmjsAdapter from "../../chainOperator/chainAdapters/cosmjs";
@@ -20,7 +18,6 @@ export class MempoolLoop {
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
-	chainid = "";
 	botConfig: BotConfig;
 	logger: Logger | undefined;
 	// CACHE VALUES
@@ -86,15 +83,7 @@ export class MempoolLoop {
 		}
 
 		while (true) {
-			if (!this.chainOperator.client["httpClient" as keyof typeof this.chainOperator.client]) {
-				console.log("mempool loop not yet available with Injective SDK clients");
-				process.exit(1);
-			}
-			this.chainOperator.client = <CosmjsAdapter>this.chainOperator.client;
-			const mempoolResult = await this.chainOperator.client.httpClient.execute(
-				createJsonRpcRequest("unconfirmed_txs"),
-			);
-			this.mempool = mempoolResult.result;
+			this.mempool = await this.chainOperator.queryMempool();
 
 			if (+this.mempool.total_bytes < this.totalBytes) {
 				break;
@@ -143,29 +132,15 @@ export class MempoolLoop {
 			this.botConfig.flashloanRouterAddress,
 		);
 
-		await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
-
-		const signerData = {
-			accountNumber: this.chainOperator.client.accountNumber,
-			sequence: this.chainOperator.client.sequence,
-			chainId: this.chainid,
-		};
+		// await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
 
 		const TX_FEE =
 			this.botConfig.txFees.get(nrOfMessages) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
-		const txRaw = await this.chainOperator.client.signingCWClient.sign(
-			this.chainOperator.client.publicAddress,
-			msgs,
-			TX_FEE,
-			"memo",
-			signerData,
-		);
-		const txBytes = TxRaw.encode(txRaw).finish();
-		const sendResult = await this.chainOperator.client.tmClient.broadcastTxSync({ tx: txBytes });
+		const txResponse = await this.chainOperator.signAndBroadcast(msgs, TX_FEE);
 
-		await this.logger?.sendMessage(JSON.stringify(sendResult), LogType.Console);
+		await this.logger?.sendMessage(JSON.stringify(txResponse), LogType.Console);
 		this.chainOperator.client.sequence += 1;
 		await delay(5000);
 		// await this.fetchRequiredChainData();

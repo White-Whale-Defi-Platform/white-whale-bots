@@ -1,5 +1,6 @@
 import { JsonObject } from "@cosmjs/cosmwasm-stargate";
 import { EncodeObject } from "@cosmjs/proto-signing";
+import { StdFee } from "@cosmjs/stargate";
 import { Network } from "@injectivelabs/networks";
 
 import { BotConfig } from "../types/base/botConfig";
@@ -44,15 +45,28 @@ export class ChainOperator {
 	async queryContractSmart(address: string, queryMsg: Record<string, unknown>): Promise<JsonObject> {
 		return await this.client.queryContractSmart(address, queryMsg);
 	}
+
+	/**
+	 *
+	 */
+	async queryMempool() {
+		return await this.client.queryMempool();
+	}
 	/**
 	 *
 	 */
 	async signAndBroadcast(
-		senderAddress: string,
 		msgs: Array<EncodeObject>,
+		fee?: StdFee | "auto",
 		memo?: string | undefined,
 	): Promise<TxResponse> {
-		return await this.client.signAndBroadcast(senderAddress, msgs, memo);
+		return await this.client.signAndBroadcast(msgs, fee, memo);
+	}
+	/**
+	 *
+	 */
+	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string) {
+		return await this.client.signAndBroadcastSkipBundle(messages, fee, memo);
 	}
 
 	// /**

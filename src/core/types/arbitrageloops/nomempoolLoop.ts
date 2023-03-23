@@ -120,7 +120,7 @@ export class NoMempoolLoop {
 			this.botConfig.flashloanRouterAddress,
 		);
 
-		const txResponse = await this.chainOperator.signAndBroadcast(publicAddress, msgs, "test");
+		const txResponse = await this.chainOperator.signAndBroadcast(msgs);
 		console.log(txResponse);
 		await delay(10000);
 	}

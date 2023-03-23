@@ -13,7 +13,7 @@ import { setBotConfig } from "./core/types/base/botConfig";
 import { LogType } from "./core/types/base/logging";
 import { removedUnusedPools } from "./core/types/base/pool";
 // load env files
-dotenv.config({ path: ".env" });
+dotenv.config({ path: "injective.env" });
 const botConfig = setBotConfig(process.env);
 
 let startupMessage = "===".repeat(30);
@@ -140,7 +140,7 @@ Total Paths:** \t${paths.length}\n`;
 			const mins = (botConfig.signOfLife * timeIt) % 60;
 			const hours = ~~((botConfig.signOfLife * timeIt) / 60);
 			startupTime = Date.now();
-			const message = `**chain:** ${loop.chainid} **wallet:**  **status:** running for ${
+			const message = `**chain:** ${chainOperator.client.chainId} **wallet:**  **status:** running for ${
 				loop.iterations
 			} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
 			await logger.sendMessage(message);
