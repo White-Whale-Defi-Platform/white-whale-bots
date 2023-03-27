@@ -104,7 +104,7 @@ export class SkipLoop extends MempoolLoop {
 		}
 		this.chainOperator.client = <CosmjsAdapter>this.chainOperator.client;
 		const bidMsgEncoded = getSendMessage(
-			String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651)),
+			String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651) * (10 ^ 12)),
 			"inj",
 			this.chainOperator.client.publicAddress,
 			this.botConfig.skipConfig.skipBidWallet,
@@ -117,12 +117,19 @@ export class SkipLoop extends MempoolLoop {
 		msgs.push(bidMsgEncoded);
 
 		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
-		const TX_FEE =
-			this.botConfig.txFees.get(nrOfWasms) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
+		const gasAmount = 750000000000000;
+		const gasFee = {
+			denom:
+				this.botConfig.baseDenom === "peggy0xdAC17F958D2ee523a2206206994597C13D831ec7"
+					? "inj"
+					: this.botConfig.baseDenom,
+			amount: String(gasAmount),
+		};
+
+		const TX_FEE = { amount: [gasFee], gas: String(500000 * nrOfWasms) };
 
 		const res = <SkipResult>await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE);
-		console.log(res);
+
 		let logItem = "";
 		let logMessage = `**wallet:** ${this.chainOperator.client.publicAddress}\t **block:** ${res.result.desired_height}\t **profit:** ${arbTrade.profit}`;
 
