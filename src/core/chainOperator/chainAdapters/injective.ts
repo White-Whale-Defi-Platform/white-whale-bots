@@ -16,11 +16,16 @@ import {
 	IndexerGrpcSpotApi,
 	MsgBroadcasterWithPk,
 	MsgExecuteContract,
+	MsgSend,
 	PrivateKey,
 	PublicKey,
 } from "@injectivelabs/sdk-ts";
 import { ChainId } from "@injectivelabs/ts-types";
 import { SkipBundleClient } from "@skip-mev/skipjs";
+import { MsgSend as CosmJSMsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
+import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
+import { MsgExecuteContract as CosmJSMsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
+import { inspect } from "util";
 
 import { BotConfig } from "../../types/base/botConfig";
 import { Mempool } from "../../types/base/mempool";
@@ -43,6 +48,8 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	signer!: DirectSecp256k1HdWallet;
 	accountNumber = 0;
 	sequence = 0;
+	skipBundleClient?: SkipBundleClient;
+	skipSigningAddress!: string;
 
 	/**
 	 *
@@ -82,6 +89,11 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			prefix: botConfig.chainPrefix,
 			hdPaths: [hdPath],
 		});
+
+		if (botConfig.skipConfig) {
+			this.skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
+			this.skipSigningAddress = (await this.signer.getAccounts())[0].address;
+		}
 	}
 	/**
 	 *
@@ -155,7 +167,12 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string) {
+	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string, otherTx?: TxRaw) {
+		if (!this.skipBundleClient || !this.skipSigningAddress) {
+			console.log("skip bundle client not initialised");
+			process.exit(1);
+		}
+
 		const preppedMsgs = this.prepair(messages);
 		if (!preppedMsgs) {
 			return;
@@ -177,10 +194,15 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			bodyBytes: bodyBytes,
 			authInfoBytes: authInfoBytes,
 		};
-		const skipBundleClient = new SkipBundleClient("https://injective-1-api.skip.money");
-		const signingAddress = (await this.signer.getAccounts())[0].address;
-		const signed = await skipBundleClient.signBundle([cosmTxRaw], this.signer, signingAddress);
-		const res = await skipBundleClient.sendBundle(signed, 0, true);
+
+		let signed;
+		if (otherTx) {
+			signed = await this.skipBundleClient.signBundle([otherTx, cosmTxRaw], this.signer, this.skipSigningAddress);
+		} else {
+			signed = await this.skipBundleClient.signBundle([cosmTxRaw], this.signer, this.skipSigningAddress);
+		}
+		console.log(inspect(signed, { depth: null }));
+		const res = await this.skipBundleClient.sendBundle(signed, 0, true);
 		return res;
 	}
 	/**
@@ -188,32 +210,58 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 */
 	private prepair(messages: Array<EncodeObject>) {
 		try {
-			const encodedExecuteMsg = messages.map((msg, idx) => {
-				const { msgT, contract, funds } = msg?.value || {};
-				const msgString = Buffer.from(msg?.value?.msg).toString("utf8");
-				const jsonMessage = JSON.parse(msgString);
+			const encodedExecuteMsgs: Array<MsgExecuteContract | MsgSend> = [];
+			messages.map((msg, idx) => {
+				if (msg.typeUrl === "/cosmwasm.wasm.v1.MsgExecuteContract") {
+					const msgExecuteContract = <CosmJSMsgExecuteContract>msg.value;
+					const msgUtf8 = msgExecuteContract.msg;
+					const sender = msgExecuteContract.sender;
+					const contract = msgExecuteContract.contract;
+					const funds = msgExecuteContract.funds;
 
-				const [[action, msgs]] = Object.entries(jsonMessage);
+					const msgString = Buffer.from(msgUtf8).toString("utf8");
+					const jsonMessage = JSON.parse(msgString);
 
-				const isLPMessage = action?.includes("provide");
+					const [[action, msgs]] = Object.entries(jsonMessage);
 
-				const executeMessageJson = {
-					action,
-					msg: msgs as object,
-				};
-				// Provide LP: Funds isint being handled proper, before we were sending 1 coin, now we are sending it all but getting invalid coins
-				const params = {
-					funds: isLPMessage ? funds : funds?.[0],
-					sender: this.publicAddress,
+					const isLPMessage = action?.includes("provide");
 
-					contractAddress: contract,
-					exec: executeMessageJson,
-				};
+					const executeMessageJson = {
+						action,
+						msg: msgs as object,
+					};
+					// Provide LP: Funds isint being handled proper, before we were sending 1 coin, now we are sending it all but getting invalid coins
+					const params = {
+						funds: isLPMessage ? funds : funds?.[0],
+						sender: this.publicAddress,
 
-				const MessageExecuteContract = MsgExecuteContract.fromJSON(params);
-				return MessageExecuteContract;
+						contractAddress: contract,
+						exec: executeMessageJson,
+					};
+
+					const MessageExecuteContract = MsgExecuteContract.fromJSON(params);
+
+					encodedExecuteMsgs.push(MessageExecuteContract);
+				}
+				if (msg.typeUrl === "/cosmos.bank.v1beta1.MsgSend") {
+					const msgSend = <CosmJSMsgSend>msg.value;
+					const sender = msgSend.fromAddress;
+					const receiver = msgSend.toAddress;
+					const amount = msgSend.amount;
+
+					const msgSendInjective = MsgSend.fromJSON({
+						amount: {
+							denom: amount[0].denom,
+							amount: amount[0].amount,
+						},
+						srcInjectiveAddress: sender,
+						dstInjectiveAddress: receiver,
+					});
+
+					encodedExecuteMsgs.push(msgSendInjective);
+				}
 			});
-			return encodedExecuteMsg;
+			return encodedExecuteMsgs;
 		} catch (error) {
 			console.log(error);
 		}

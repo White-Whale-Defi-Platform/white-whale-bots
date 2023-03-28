@@ -13,7 +13,7 @@ import { setBotConfig } from "./core/types/base/botConfig";
 import { LogType } from "./core/types/base/logging";
 import { removedUnusedPools } from "./core/types/base/pool";
 // load env files
-dotenv.config({ path: "injective.env" });
+dotenv.config({ path: "juno.env" });
 const botConfig = setBotConfig(process.env);
 
 let startupMessage = "===".repeat(30);

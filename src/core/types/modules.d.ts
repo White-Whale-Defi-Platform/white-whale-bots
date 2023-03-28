@@ -6,7 +6,7 @@ declare namespace NodeJS {
 		WALLET_MNEMONIC: string;
 
 		/**
-		 * The base denom to pay gas in.
+		 * The base denom to start the arb from.
 		 *
 		 * E.g., "uluna".
 		 */
@@ -16,8 +16,15 @@ declare namespace NodeJS {
 		 */
 		CHAIN_PREFIX: string;
 		/**
+		 * The denom to pay gas in. Also used for skip bidding.
+		 *
+		 * E.g., "uluna".
+		 */
+		GAS_DENOM: string;
+		/**
 		 * The http endpoint to the RPC.
 		 */
+
 		RPC_URL: string;
 		/**
 		 * A list of all the factories to map, separated by ", \n".
