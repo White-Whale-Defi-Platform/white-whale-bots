@@ -1,4 +1,5 @@
 import { StdFee } from "@cosmjs/stargate";
+import { getStdFee } from "@injectivelabs/utils";
 import { assert } from "console";
 
 import { NativeAssetInfo } from "./asset";
@@ -31,6 +32,7 @@ export interface BotConfig {
 	mnemonic: string;
 	useMempool: boolean;
 	baseDenom: string;
+	gasDenom: string;
 	signOfLife: number;
 
 	gasPrice: string;
@@ -101,9 +103,14 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 	const TX_FEES = new Map<number, StdFee>();
 	const PROFIT_THRESHOLDS = new Map<number, number>();
 	for (let hops = 2; hops <= (MAX_PATH_HOPS - 1) * 2 + 1; hops++) {
-		const gasFee = { denom: envs.BASE_DENOM, amount: String(GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE) };
-		TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) });
-		const profitThreshold: number = PROFIT_THRESHOLD + +gasFee.amount;
+		if (envs.GAS_DENOM === "inj") {
+			TX_FEES.set(hops, getStdFee(String(GAS_USAGE_PER_HOP * hops))); //in 18 decimals
+		} else {
+			const gasFee = { denom: envs.GAS_DENOM, amount: String(GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE) };
+			TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) }); //in 6 decimals
+		}
+
+		const profitThreshold: number = PROFIT_THRESHOLD + GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE; //in 6 decimal default
 		PROFIT_THRESHOLDS.set(hops, profitThreshold);
 	}
 	const botConfig: BotConfig = {
@@ -118,6 +125,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		mnemonic: envs.WALLET_MNEMONIC,
 		useMempool: envs.USE_MEMPOOL == "1" ? true : false,
 		baseDenom: envs.BASE_DENOM,
+		gasDenom: envs.GAS_DENOM,
 		gasPrice: envs.GAS_UNIT_PRICE,
 		profitThresholds: PROFIT_THRESHOLDS,
 		txFees: TX_FEES,

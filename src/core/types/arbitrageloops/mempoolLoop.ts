@@ -1,7 +1,6 @@
 import { EncodeObject } from "@cosmjs/proto-signing";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
-import CosmjsAdapter from "../../chainOperator/chainAdapters/cosmjs";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
 import { BotConfig } from "../base/botConfig";
@@ -125,7 +124,6 @@ export class MempoolLoop {
 	 *
 	 */
 	private async trade(arbTrade: OptimalTrade) {
-		this.chainOperator.client = <CosmjsAdapter>this.chainOperator.client;
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
 			this.chainOperator.client.publicAddress,

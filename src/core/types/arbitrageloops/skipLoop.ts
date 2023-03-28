@@ -1,12 +1,12 @@
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { EncodeObject } from "@cosmjs/proto-signing";
-import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { SkipBundleClient } from "@skip-mev/skipjs";
 import { WebClient } from "@slack/web-api";
+import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
+import { inspect } from "util";
 
 import { getSendMessage } from "../../../chains/defaults/messages/getSendMessage";
 import { OptimalTrade } from "../../arbitrage/arbitrage";
-import CosmjsAdapter from "../../chainOperator/chainAdapters/cosmjs";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { SkipResult } from "../../chainOperator/skipclients";
 import { Logger } from "../../logging";
@@ -16,7 +16,6 @@ import { MempoolTrade, processMempool } from "../base/mempool";
 import { Path } from "../base/path";
 import { applyMempoolTradesOnPools, Pool } from "../base/pool";
 import { MempoolLoop } from "./mempoolLoop";
-
 /**
  *
  */
@@ -57,11 +56,16 @@ export class SkipLoop extends MempoolLoop {
 	public async step(): Promise<void> {
 		this.iterations++;
 		this.updateStateFunction(this.chainOperator, this.pools);
+		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+
+		if (arbTrade) {
+			await this.skipTrade(arbTrade);
+			this.cdPaths(arbTrade.path);
+			return;
+		}
+
 		while (true) {
-			const mempoolResult = await this.chainOperator.client.httpClient.execute(
-				createJsonRpcRequest("unconfirmed_txs"),
-			);
-			this.mempool = mempoolResult.result;
+			this.mempool = await this.chainOperator.queryMempool();
 
 			if (+this.mempool.total_bytes < this.totalBytes) {
 				break;
@@ -77,9 +81,15 @@ export class SkipLoop extends MempoolLoop {
 			} else {
 				for (const trade of mempoolTrades) {
 					applyMempoolTradesOnPools(this.pools, [trade]);
+
 					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+
 					if (arbTrade) {
 						await this.skipTrade(arbTrade, trade);
+
+						this.cdPaths(arbTrade.path);
+
+						break;
 					}
 				}
 			}
@@ -89,7 +99,7 @@ export class SkipLoop extends MempoolLoop {
 	/**
 	 *
 	 */
-	private async skipTrade(arbTrade: OptimalTrade, toArbTrade: MempoolTrade) {
+	private async skipTrade(arbTrade: OptimalTrade, toArbTrade?: MempoolTrade) {
 		if (
 			!this.botConfig.skipConfig?.useSkip ||
 			this.botConfig.skipConfig?.skipRpcUrl === undefined ||
@@ -102,10 +112,9 @@ export class SkipLoop extends MempoolLoop {
 			);
 			return;
 		}
-		this.chainOperator.client = <CosmjsAdapter>this.chainOperator.client;
 		const bidMsgEncoded = getSendMessage(
 			String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651)),
-			"inj",
+			this.botConfig.gasDenom,
 			this.chainOperator.client.publicAddress,
 			this.botConfig.skipConfig.skipBidWallet,
 		);
@@ -120,9 +129,17 @@ export class SkipLoop extends MempoolLoop {
 		const TX_FEE =
 			this.botConfig.txFees.get(nrOfWasms) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
+		console.log(inspect(TX_FEE, { depth: null }));
 
-		const res = <SkipResult>await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE);
-		console.log(res);
+		let res: SkipResult;
+		if (toArbTrade) {
+			const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
+			res = <SkipResult>await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE, undefined, txToArbRaw);
+		} else {
+			res = <SkipResult>await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE, undefined, undefined);
+		}
+		console.log(inspect(res, { depth: null }));
+
 		let logItem = "";
 		let logMessage = `**wallet:** ${this.chainOperator.client.publicAddress}\t **block:** ${res.result.desired_height}\t **profit:** ${arbTrade.profit}`;
 

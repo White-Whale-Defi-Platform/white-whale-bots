@@ -1,5 +1,4 @@
 import { JsonObject, setupWasmExtension, SigningCosmWasmClient, WasmExtension } from "@cosmjs/cosmwasm-stargate";
-import { fromUtf8 } from "@cosmjs/encoding";
 import { DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing";
 import { AccountData } from "@cosmjs/proto-signing/build/signer";
 import { GasPrice, QueryClient, setupAuthExtension, StdFee } from "@cosmjs/stargate";
@@ -27,12 +26,16 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	sequence = 0;
 	chainId!: string;
 	signer!: DirectSecp256k1HdWallet;
+	skipBundleClient?: SkipBundleClient;
 
 	/**
 	 *
 	 */
 	constructor(botConfig: BotConfig) {
 		this.httpClient = new HttpBatchClient(botConfig.rpcUrl);
+		if (botConfig.skipConfig) {
+			this.skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
+		}
 	}
 	/**
 	 *
@@ -84,10 +87,11 @@ class CosmjsAdapter implements ChainOperatorInterface {
 			const txRaw = await this.signingCWClient.sign(this.publicAddress, msgs, fee, "memo", signerData);
 			const txBytes = TxRaw.encode(txRaw).finish();
 			const res = await this.tmClient.broadcastTxSync({ tx: txBytes });
+			console.log(res);
 			return {
 				height: 0,
 				code: res.code,
-				transactionHash: fromUtf8(res.hash),
+				transactionHash: res.hash.toString(),
 				rawLog: res.log,
 			};
 		}
@@ -95,17 +99,26 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string) {
+	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string, otherTx?: TxRaw) {
+		if (!this.skipBundleClient) {
+			console.log("skip bundle client not initialised");
+			process.exit(1);
+		}
+
 		const signerData = {
 			accountNumber: this.accountNumber,
 			sequence: this.sequence,
 			chainId: this.chainId,
 		};
 		const txRaw: TxRaw = await this.signingCWClient.sign(this.publicAddress, messages, fee, "", signerData);
-		const skipBundleClient = new SkipBundleClient("https://injective-1-api.skip.money");
 
-		const signed = await skipBundleClient.signBundle([txRaw], this.signer, this.publicAddress);
-		const res = await skipBundleClient.sendBundle(signed, 0, true);
+		let signed;
+		if (otherTx) {
+			signed = await this.skipBundleClient.signBundle([otherTx, txRaw], this.signer, this.publicAddress);
+		} else {
+			signed = await this.skipBundleClient.signBundle([txRaw], this.signer, this.publicAddress);
+		}
+		const res = await this.skipBundleClient.sendBundle(signed, 0, true);
 		return res;
 	}
 
