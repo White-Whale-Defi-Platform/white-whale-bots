@@ -66,7 +66,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	 *
 	 */
 	async queryContractSmart(address: string, queryMsg: Record<string, unknown>): Promise<JsonObject> {
-		return await this.signingCWClient.queryContractSmart(address, queryMsg);
+		return await this.wasmQueryClient.wasm.queryContractSmart(address, queryMsg);
 	}
 	/**
 	 *
