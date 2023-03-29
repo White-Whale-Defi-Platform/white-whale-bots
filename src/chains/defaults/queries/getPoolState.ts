@@ -1,7 +1,8 @@
-import { BotClients } from "../../../core/node/chainoperator";
+import { ChainOperator } from "../../../core/chainOperator/chainoperator";
 import {
 	Asset,
 	isJunoSwapNativeAssetInfo,
+	isNativeAsset,
 	isWyndDaoNativeAsset,
 	isWyndDaoTokenAsset,
 	JunoSwapAssetInfo,
@@ -29,19 +30,17 @@ interface PoolState {
  * @param client The cosmwasm client to send requests from, including wasmextension.
  * @param pools An array of Pool objects to obtain the chain states for.
  */
-export async function getPoolStates(botClients: BotClients, pools: Array<Pool>) {
+export async function getPoolStates(chainOperator: ChainOperator, pools: Array<Pool>) {
 	await Promise.all(
 		pools.map(async (pool) => {
 			if (pool.dexname === AmmDexName.junoswap) {
-				const poolState: JunoSwapPoolState = await botClients.WasmQueryClient.wasm.queryContractSmart(
-					pool.address,
-					{ info: {} },
-				);
+				const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(pool.address, { info: {} });
+
 				pool.assets[0].amount = poolState.token1_reserve;
 				pool.assets[1].amount = poolState.token2_reserve;
 				return;
 			} else {
-				const poolState: PoolState = await botClients.WasmQueryClient.wasm.queryContractSmart(pool.address, {
+				const poolState = <PoolState>await chainOperator.queryContractSmart(pool.address, {
 					pool: {},
 				});
 				const [assets] = processPoolStateAssets(poolState);
@@ -59,25 +58,21 @@ export async function getPoolStates(botClients: BotClients, pools: Array<Pool>) 
  * @returns An array of instantiated Pool objects.
  */
 export async function initPools(
-	botClients: BotClients,
+	chainOperator: ChainOperator,
 	poolAddresses: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>,
 	factoryMapping: Array<{ factory: string; router: string }>,
 ): Promise<Array<Pool>> {
 	const pools: Array<Pool> = [];
-	const factoryPools = await getPoolsFromFactory(botClients, factoryMapping);
+	const factoryPools = await getPoolsFromFactory(chainOperator, factoryMapping);
 	for (const poolAddress of poolAddresses) {
 		let assets: Array<Asset> = [];
 		let dexname: AmmDexName;
 		let totalShare: string;
 		try {
-			const poolState = <PoolState>(
-				await botClients.WasmQueryClient.wasm.queryContractSmart(poolAddress.pool, { pool: {} })
-			);
+			const poolState = <PoolState>await chainOperator.queryContractSmart(poolAddress.pool, { pool: {} });
 			[assets, dexname, totalShare] = processPoolStateAssets(poolState);
 		} catch (error) {
-			const poolState = <JunoSwapPoolState>(
-				await botClients.WasmQueryClient.wasm.queryContractSmart(poolAddress.pool, { info: {} })
-			);
+			const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(poolAddress.pool, { info: {} });
 			[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
 		}
 		const factory = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.factory ?? "";
@@ -119,7 +114,18 @@ function processPoolStateAssets(poolState: PoolState): [Array<Asset>, AmmDexName
 			});
 			type = AmmDexName.wyndex;
 		} else {
-			assets.push(assetState);
+			if (isNativeAsset(assetState.info)) {
+				if (assetState.info.native_token.denom === "inj") {
+					assets.push({
+						amount: String(+assetState.amount / 1e12),
+						info: assetState.info,
+					});
+				} else {
+					assets.push(assetState);
+				}
+			} else {
+				assets.push(assetState);
+			}
 		}
 	}
 	return [assets, type, poolState.total_share];

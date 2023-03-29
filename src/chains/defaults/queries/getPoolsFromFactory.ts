@@ -1,7 +1,5 @@
-
-import { BotClients } from "../../../core/node/chainoperator";
+import { ChainOperator } from "../../../core/chainOperator/chainoperator";
 import { AssetInfo } from "../../../core/types/base/asset";
-
 
 interface FactoryStatePair {
 	asset_infos: Array<AssetInfo>;
@@ -16,13 +14,13 @@ interface FactoryState {
  *
  */
 export async function getPoolsFromFactory(
-	botClients: BotClients,
+	chainOperator: ChainOperator,
 	factoryMapping: Array<{ factory: string; router: string }>,
 ): Promise<Array<{ pool: string; factory: string; router: string }>> {
 	const factorypairs: Array<{ pool: string; factory: string; router: string }> = [];
 	await Promise.all(
 		factoryMapping.map(async (factorymap) => {
-			let res: FactoryState = await botClients.WasmQueryClient.wasm.queryContractSmart(factorymap.factory, {
+			let res: FactoryState = await chainOperator.queryContractSmart(factorymap.factory, {
 				pairs: { limit: 30 },
 			});
 
@@ -36,7 +34,7 @@ export async function getPoolsFromFactory(
 
 			while (res.pairs.length == 30) {
 				const start_after = res.pairs[res.pairs.length - 1].asset_infos;
-				res = await botClients.WasmQueryClient.wasm.queryContractSmart(factorymap.factory, {
+				res = await chainOperator.queryContractSmart(factorymap.factory, {
 					pairs: { limit: 30, start_after: start_after },
 				});
 

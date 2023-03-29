@@ -1,13 +1,13 @@
-import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import dotenv from "dotenv";
 
 import * as chains from "./chains";
 import { trySomeArb } from "./core/arbitrage/arbitrage";
 import { getPaths, newGraph } from "./core/arbitrage/graph";
+import { ChainOperator } from "./core/chainOperator/chainoperator";
+import { getSkipClient } from "./core/chainOperator/skipclients";
 import { Logger } from "./core/logging";
-import { getChainOperator } from "./core/node/chainoperator";
-import { getSkipClient } from "./core/node/skipclients";
 import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
+import { NoMempoolLoop } from "./core/types/arbitrageloops/nomempoolLoop";
 import { SkipLoop } from "./core/types/arbitrageloops/skipLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
 import { LogType } from "./core/types/base/logging";
@@ -35,6 +35,11 @@ startupMessage += "---".repeat(30);
 /**
  * Runs the main program.
  */
+
+// let getPoolStates: (chainOperator: ChainOperator, pools: Array<Pool>) => void;
+/**
+ *
+ */
 async function main() {
 	const logger = new Logger(botConfig);
 	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
@@ -52,21 +57,10 @@ async function main() {
 		initPools = chainSetups.initPools;
 		return;
 	});
+	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
+	let setupMessage = "---".repeat(30);
 
-	const [account, botClients] = await getChainOperator(botConfig);
-	const { accountNumber, sequence } = await botClients.SigningCWClient.getSequence(account.address);
-	const chainId = await (
-		await botClients.HttpClient.execute(createJsonRpcRequest("block"))
-	).result.block.header.chain_id;
-
-	let setupMessage = `
-Connections Details:\n
-**Account Number:** ${accountNumber}
-**Sequence:** \t${sequence}
-**Chain Id:** \t${chainId}\n`;
-	setupMessage += "---".repeat(30);
-
-	const allPools = await initPools(botClients, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+	const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
 	const graph = newGraph(allPools);
 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 
@@ -98,14 +92,12 @@ Total Paths:** \t${paths.length}\n`;
 			trySomeArb,
 			getPoolStates,
 			getFlashArbMessages,
-			botClients,
-			account,
+			chainOperator,
 			botConfig,
 			skipClient,
 			skipSigner,
 			logger,
 			[...paths],
-
 		);
 	} else if (botConfig.useMempool === true) {
 		await logger.sendMessage("Initializing mempool loop...", LogType.Console);
@@ -116,19 +108,28 @@ Total Paths:** \t${paths.length}\n`;
 			trySomeArb,
 			getPoolStates,
 			getFlashArbMessages,
-			botClients,
-			account,
+			chainOperator,
 			botConfig,
 			logger,
 			[...paths],
-
 		);
 	} else {
-		await logger.sendMessage("**Info:** loop without mempool or skip not implemented yet");
-		return;
+		await logger.sendMessage("Initializing non-mempool loop...", LogType.Console);
+		loop = new NoMempoolLoop(
+			filteredPools,
+			paths,
+			trySomeArb,
+			getPoolStates,
+			getFlashArbMessages,
+			chainOperator,
+			botConfig,
+			logger,
+			[...paths],
+		);
 	}
+
 	// main loop of the bot
-	await loop.fetchRequiredChainData();
+	// await loop.fetchRequiredChainData();
 
 	await logger.sendMessage("Starting loop...", LogType.All);
 	while (true) {
@@ -139,7 +140,7 @@ Total Paths:** \t${paths.length}\n`;
 			const mins = (botConfig.signOfLife * timeIt) % 60;
 			const hours = ~~((botConfig.signOfLife * timeIt) / 60);
 			startupTime = Date.now();
-			const message = `**chain:** ${loop.chainid} **wallet:** ${account.address} **status:** running for ${
+			const message = `**chain:** ${chainOperator.client.chainId} **wallet:**  **status:** running for ${
 				loop.iterations
 			} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
 			await logger.sendMessage(message);

@@ -1,22 +1,26 @@
 import { EncodeObject } from "@cosmjs/proto-signing";
+import { inspect } from "util";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
 import { BotConfig } from "../base/botConfig";
-import { LogType } from "../base/logging";
-import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../base/mempool";
+import { flushTxMemory, Mempool } from "../base/mempool";
 import { Path } from "../base/path";
-import { applyMempoolTradesOnPools, Pool } from "../base/pool";
+import { Pool } from "../base/pool";
+
 /**
  *
  */
-export class MempoolLoop {
+export class NoMempoolLoop {
 	pools: Array<Pool>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
+	accountNumber = 0;
+	sequence = 0;
+	chainid = "";
 	botConfig: BotConfig;
 	logger: Logger | undefined;
 	// CACHE VALUES
@@ -28,7 +32,7 @@ export class MempoolLoop {
 	 *
 	 */
 	arbitrageFunction: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined;
-	updateStateFunction: (chainOperator: ChainOperator, pools: Array<Pool>) => void;
+	updateStateFunction: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>;
 	messageFunction: (
 		arbTrade: OptimalTrade,
 		walletAddress: string,
@@ -42,7 +46,7 @@ export class MempoolLoop {
 		pools: Array<Pool>,
 		paths: Array<Path>,
 		arbitrage: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined,
-		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => void,
+		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
 		messageFunction: (
 			arbTrade: OptimalTrade,
 			walletAddress: string,
@@ -69,45 +73,30 @@ export class MempoolLoop {
 	/**
 	 *
 	 */
+	public async fetchRequiredChainData() {
+		// const { accountNumber, sequence } = await this.botClients.SigningCWClient.getSequence(this.account.address);
+		// this.sequence = sequence;
+		// this.accountNumber = accountNumber;
+		// const chainId = await this.botClients.SigningCWClient.getChainId();
+		// this.chainid = chainId;
+	}
+
+	/**
+	 *
+	 */
 	public async step() {
 		this.iterations++;
-		this.updateStateFunction(this.chainOperator, this.pools);
+		await this.updateStateFunction(this.chainOperator, this.pools);
 
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
 		if (arbTrade) {
+			console.log(inspect(arbTrade.path.pools, { showHidden: true, depth: 4, colors: true }));
+			console.log(inspect(arbTrade.offerAsset, { showHidden: true, depth: 3, colors: true }));
+			console.log("expected profit: ", arbTrade.profit);
 			await this.trade(arbTrade);
 			this.cdPaths(arbTrade.path);
 			return;
-		}
-
-		while (true) {
-			this.mempool = await this.chainOperator.queryMempool();
-
-			if (+this.mempool.total_bytes < this.totalBytes) {
-				break;
-			} else if (+this.mempool.total_bytes === this.totalBytes) {
-				continue;
-			} else {
-				this.totalBytes = +this.mempool.total_bytes;
-			}
-
-			const mempoolTrades: Array<MempoolTrade> = processMempool(this.mempool);
-			if (mempoolTrades.length === 0) {
-				continue;
-			} else {
-				applyMempoolTradesOnPools(this.pools, mempoolTrades);
-			}
-
-			const arbTrade = this.arbitrageFunction(this.paths, this.botConfig);
-
-			if (arbTrade) {
-				await this.trade(arbTrade);
-
-				this.cdPaths(arbTrade.path);
-
-				break;
-			}
 		}
 	}
 
@@ -124,26 +113,17 @@ export class MempoolLoop {
 	 *
 	 */
 	private async trade(arbTrade: OptimalTrade) {
+		const publicAddress = this.chainOperator.client.publicAddress;
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
-			this.chainOperator.client.publicAddress,
+			publicAddress,
 			this.botConfig.flashloanRouterAddress,
 		);
 
-		// await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
-
-		const TX_FEE =
-			this.botConfig.txFees.get(nrOfMessages) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
-
-		const txResponse = await this.chainOperator.signAndBroadcast(msgs, TX_FEE);
-
-		await this.logger?.sendMessage(JSON.stringify(txResponse), LogType.Console);
-		this.chainOperator.client.sequence += 1;
-		await delay(5000);
-		// await this.fetchRequiredChainData();
+		const txResponse = await this.chainOperator.signAndBroadcast(msgs);
+		console.log(txResponse);
+		await delay(10000);
 	}
-
 	/**
 	 * Put path on Cooldown, add to CDPaths with iteration number as block.
 	 * Updates the iteration count of elements in CDpaths if its in equalpath of param: path
@@ -168,13 +148,8 @@ export class MempoolLoop {
 		this.paths = out;
 	}
 
-	/**.
-	 *
-	 * Removes the CD Paths if CD iteration number of path + Cooldownblocks <= this.iterations
+	/** Removes the CD Paths if CD iteration number of path + Cooldownblocks <= this.iterations
 	 * ADDS the path from pathlibary to this.paths.
-	 */
-	/**
-	 *
 	 */
 	public unCDPaths() {
 		this.CDpaths.forEach((value, key) => {

@@ -121,13 +121,11 @@ export function getOptimalTrade(paths: Array<Path>, offerAssetInfo: AssetInfo): 
 	let maxPath;
 
 	paths.map((path: Path) => {
-
 		const [tradesize, profit] = getOptimalTradeForPath(path, offerAssetInfo);
 		if (profit > maxProfit && tradesize > 0) {
 			maxProfit = profit;
 			maxTradesize = tradesize;
 			maxPath = path;
-
 		}
 	});
 	if (maxPath) {
@@ -171,7 +169,7 @@ export function getOptimalTradeForPath(path: Path, offerAssetInfo: AssetInfo): [
 		aprime_out = (r1 * r2 * aprime_out * a_out) / (a_in + r1 * r2 * aprime_out);
 	}
 	// # Calculate the delta_a
-	const delta_a = Math.floor((Math.sqrt(r1_first * r2_first * aprime_in * aprime_out) - aprime_in) / r1_first);
+	const delta_a = (Math.sqrt(r1_first * r2_first * aprime_in * aprime_out) - aprime_in) / r1_first;
 
 	let currentOfferAsset = { amount: String(delta_a), info: offerAssetInfo };
 	for (let i = 0; i < path.pools.length; i++) {

@@ -37,7 +37,8 @@ export function getFlashArbMessages(
  */
 function getFlashArbMessage(path: Path, offerAsset0: Asset): FlashLoanMessage {
 	const wasmMsgs = [];
-	let offerAsset = offerAsset0;
+	const loanOfferAsset = { amount: String(Math.floor(+offerAsset0.amount)), info: offerAsset0.info };
+	let offerAsset = { amount: String(Math.floor(+offerAsset0.amount)), info: offerAsset0.info };
 	for (const pool of path.pools) {
 		const [wasmMsgsPool, offerAssetNext] = getWasmMessages(pool, offerAsset);
 		wasmMsgs.push(...wasmMsgsPool);
@@ -45,7 +46,7 @@ function getFlashArbMessage(path: Path, offerAsset0: Asset): FlashLoanMessage {
 	}
 	const flashLoanMessage: FlashLoanMessage = {
 		flash_loan: {
-			assets: [offerAsset0],
+			assets: [loanOfferAsset],
 			msgs: wasmMsgs,
 		},
 	};
@@ -56,24 +57,31 @@ function getFlashArbMessage(path: Path, offerAsset0: Asset): FlashLoanMessage {
  */
 function getWasmMessages(pool: Pool, offerAsset: Asset) {
 	const [outGivenInTrade, returnAssetInfo] = outGivenIn(pool, offerAsset);
-	const beliefPrice = Math.round((+offerAsset.amount / outGivenInTrade) * 1e6) / 1e6; //gives price per token bought
+	// const beliefPrice = Math.round((+offerAsset.amount / outGivenInTrade) * 1e6) / 1e6; //gives price per token bought
 	const nextOfferAsset: Asset = { amount: String(outGivenInTrade), info: returnAssetInfo };
 	let msg: DefaultSwapMessage | JunoSwapMessage | SendMessage;
 	if (pool.dexname === AmmDexName.default || pool.dexname === AmmDexName.wyndex) {
 		if (isNativeAsset(offerAsset.info)) {
+			const amount =
+				offerAsset.info.native_token.denom === "inj"
+					? String(Math.floor(+offerAsset.amount * 1e12))
+					: String(Math.floor(+offerAsset.amount));
 			msg = <DefaultSwapMessage>{
 				swap: {
-					max_spread: "0.01",
+					max_spread: "0.1",
 					offer_asset:
 						pool.dexname === AmmDexName.default
-							? offerAsset
-							: { amount: offerAsset.amount, info: { native: offerAsset.info.native_token.denom } },
-					belief_price: String(beliefPrice),
+							? { amount: amount, info: offerAsset.info }
+							: { amount: amount, info: { native: offerAsset.info.native_token.denom } },
+					// belief_price: String(beliefPrice),
 				},
 			};
 		} else {
 			const innerSwapMsg: InnerSwapMessage = {
-				swap: { belief_price: String(beliefPrice), max_spread: "0.01" },
+				swap: {
+					belief_price: String(Math.round((+offerAsset.amount / outGivenInTrade) * 1e6) / 1e6),
+					max_spread: "0.1",
+				},
 			};
 			const objJsonStr = JSON.stringify(innerSwapMsg);
 			const objJsonB64 = Buffer.from(objJsonStr).toString("base64");
@@ -105,7 +113,10 @@ function getWasmMessages(pool: Pool, offerAsset: Asset) {
 				funds: isNativeAsset(offerAsset.info)
 					? [
 							{
-								amount: offerAsset.amount,
+								amount:
+									offerAsset.info.native_token.denom === "inj"
+										? String(Math.floor(+offerAsset.amount * 1e12))
+										: String(Math.floor(+offerAsset.amount)),
 								denom: offerAsset.info.native_token.denom,
 							},
 					  ]

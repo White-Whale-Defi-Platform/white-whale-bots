@@ -43,25 +43,29 @@
     "all": true,
     "parallel": true,
     "include": [
-        "src/**/!(*.spec.*).[tj]s?(x)"
+      "src/**/!(*.spec.*).[tj]s?(x)"
     ],
     "exclude": [
       "src/tests/**/*.*"
     ],
     "reporter": [
-        "lcov",
-        "text",
-        "text-summary"
+      "lcov",
+      "text",
+      "text-summary"
     ],
     "report-dir": "coverage"
-},
+  },
   "dependencies": {
     "@cosmjs/cosmwasm-stargate": "^0.29.4",
     "@cosmjs/stargate": "^0.29.4",
     "@cosmjs/tendermint-rpc": "^0.29.4",
+    "@injectivelabs/networks": "^1.0.105",
+    "@injectivelabs/sdk-ts": "^1.0.487",
+    "@injectivelabs/ts-types": "^1.0.39",
     "@skip-mev/skipjs": "^1.1.0",
     "@slack/web-api": "^6.8.0",
     "axios": "^1.3.3",
+    "cosmjs-utils": "^0.1.0",
     "discord.js": "^14.7.1",
     "dotenv": "^16.0.1"
   }
