@@ -174,7 +174,8 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		}
 
 		const preppedMsgs = this.prepair(messages);
-		if (!preppedMsgs) {
+		// console.log(inspect(preppedMsgs, { depth: null }));
+		if (!preppedMsgs || preppedMsgs.length === 0) {
 			return;
 		}
 		const { signBytes, txRaw, bodyBytes, authInfoBytes } = createTransaction({
