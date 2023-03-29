@@ -57,7 +57,6 @@ function getFlashArbMessage(path: Path, offerAsset0: Asset): FlashLoanMessage {
  */
 function getWasmMessages(pool: Pool, offerAsset: Asset) {
 	const [outGivenInTrade, returnAssetInfo] = outGivenIn(pool, offerAsset);
-	console.log(offerAsset.amount, outGivenInTrade);
 	// const beliefPrice = Math.round((+offerAsset.amount / outGivenInTrade) * 1e6) / 1e6; //gives price per token bought
 	const nextOfferAsset: Asset = { amount: String(outGivenInTrade), info: returnAssetInfo };
 	let msg: DefaultSwapMessage | JunoSwapMessage | SendMessage;
