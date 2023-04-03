@@ -1,5 +1,6 @@
 import { StdFee } from "@cosmjs/stargate";
 import { getStdFee } from "@injectivelabs/utils";
+import axios from "axios";
 import { assert } from "console";
 
 import { NativeAssetInfo } from "./asset";
@@ -22,7 +23,8 @@ interface LoggerConfig {
 
 export interface BotConfig {
 	chainPrefix: string;
-	rpcUrl: string;
+	rpcUrls: Array<string>;
+	ignoreAddresses: Set<string>;
 	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
 	maxPathPools: number;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
@@ -33,6 +35,7 @@ export interface BotConfig {
 	useMempool: boolean;
 	baseDenom: string;
 	gasDenom: string;
+	apiUrl: string | undefined;
 	signOfLife: number;
 
 	gasPrice: string;
@@ -49,9 +52,9 @@ export interface BotConfig {
 /**
  *
  */
-export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
+export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> {
 	validateEnvs(envs);
-
+	const apiurl = envs.API_URL;
 	let pools = envs.POOLS.trim()
 		.replace(/\n|\r|\t/g, "")
 		.replace(/,\s*$/, "");
@@ -71,6 +74,13 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
 	const MAX_PATH_HOPS = +envs.MAX_PATH_HOPS; //required gas units per trade (hop)
 
+	let IGNORE_ADDRS = new Set<string>();
+	// set ignored Addresses
+	if (envs.IGNORE_ADDRESSES) {
+		const addrs = JSON.parse(envs.IGNORE_ADDRESSES);
+		addrs.forEach((element: string) => IGNORE_ADDRS.add(element));
+	}
+	IGNORE_ADDRS = await getIgnoAddresses(envs.CHAIN_PREFIX + "-1", apiurl, IGNORE_ADDRS);
 	// setup skipconfig if present
 	let skipConfig;
 	if (envs.USE_SKIP == "1") {
@@ -113,9 +123,16 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		const profitThreshold: number = PROFIT_THRESHOLD + GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE; //in 6 decimal default
 		PROFIT_THRESHOLDS.set(hops, profitThreshold);
 	}
+	let RPCURLS;
+	if (envs.RPC_URL) {
+		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, JSON.parse(envs.RPC_URL));
+	} else {
+		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, "");
+	}
 	const botConfig: BotConfig = {
 		chainPrefix: envs.CHAIN_PREFIX,
-		rpcUrl: envs.RPC_URL,
+		rpcUrls: RPCURLS,
+		apiUrl: envs.API_URL,
 		poolEnvs: POOLS_ENVS,
 		maxPathPools: MAX_PATH_HOPS,
 		mappingFactoryRouter: FACTORIES_TO_ROUTERS_MAPPING,
@@ -132,6 +149,7 @@ export function setBotConfig(envs: NodeJS.ProcessEnv): BotConfig {
 		skipConfig: skipConfig,
 		loggerConfig: loggerConfig,
 		signOfLife: SIGN_OF_LIFE,
+		ignoreAddresses: IGNORE_ADDRS,
 	};
 	return botConfig;
 }
@@ -148,6 +166,7 @@ function validateEnvs(envs: NodeJS.ProcessEnv) {
 	assert(envs.FACTORIES_TO_ROUTERS_MAPPING, `Please set "FACTORIES_TO_ROUTERS_MAPPING" in env or ".env" file`);
 	assert(envs.POOLS, `Please set "POOLS" in env or ".env" file`);
 	assert(envs.FLASHLOAN_ROUTER_ADDRESS, `Please set "FLASHLOAN_ROUTER_ADDRESS" in env, or ".env" file`);
+	assert(envs.GAS_DENOM, `Please set "GAS_DENOM" in env or ".env" file`);
 }
 
 /**
@@ -157,4 +176,64 @@ function validateSkipEnvs(envs: NodeJS.ProcessEnv) {
 	assert(envs.SKIP_URL, `Please set SKIP_URL in env or ".env" file`);
 	assert(envs.SKIP_BID_WALLET, `Please set SKIP_BID_WALLET in env or ".env" file`);
 	assert(envs.SKIP_BID_RATE, `Please set SKIP_BID_RATE in env or ".env" file`);
+}
+/**
+ *
+ */
+async function getIgnoAddresses(chain_id: string, apiurl: string | undefined, ignoreAddresses: any) {
+	if (!apiurl || apiurl.trim() == "") {
+		if (ignoreAddresses) {
+			return ignoreAddresses;
+		} else {
+			return new Set<string>();
+		}
+	}
+	let start = 0;
+	let out: Set<string>;
+	if (ignoreAddresses) {
+		out = ignoreAddresses;
+	} else {
+		out = new Set<string>();
+	}
+	if (apiurl) {
+		const urls: string = apiurl + "addresses?chain_id=" + chain_id;
+		const res1: any = (await axios.get(urls + "&page=1")).data;
+		if (res1.data[0]) {
+			start = Math.ceil(Number(res1.meta.all) / Number(res1.meta.per_page));
+			res1.data.forEach((Element: any) => out.add(Element.address));
+			for (let i = 2; i <= start; i++) {
+				const res = (await axios.get(urls + "?page=" + String(i))).data;
+				res.data.forEach((Element: any) => out.add(Element.address));
+			}
+		}
+	}
+	return out;
+}
+
+/**
+ *
+ */
+async function getRPCfromRegistry(prefix: string, inputurls: any | undefined) {
+	const registry = await axios.get(`https://api.github.com/repos/cosmos/chain-registry/contents/`);
+	let path = "";
+	registry.data.forEach((elem: any) => {
+		if (elem.name.includes(prefix)) {
+			path = elem.path;
+		}
+	});
+	const chaindata = await axios.get(
+		`https://raw.githubusercontent.com/cosmos/chain-registry/master/${path}/chain.json`,
+	);
+	const rpcs = chaindata.data.apis.rpc;
+	if (inputurls) {
+		const out = inputurls;
+		rpcs.forEach((element: any) => {
+			if (!out.includes(element.address)) {
+				out.push(element.address);
+			}
+		});
+		return out;
+	} else {
+		return rpcs;
+	}
 }

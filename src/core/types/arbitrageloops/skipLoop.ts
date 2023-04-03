@@ -45,8 +45,9 @@ export class SkipLoop extends MempoolLoop {
 		logger: Logger | undefined,
 
 		pathlib: Array<Path>,
+		ignoreAddresses: Set<string>,
 	) {
-		super(pools, paths, arbitrage, updateState, messageFunction, chainOperator, botConfig, logger, pathlib);
+		super(pools, paths, arbitrage, updateState, messageFunction, chainOperator, botConfig, logger, pathlib, ignoreAddresses);
 		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.logger = logger);
 	}
 
@@ -75,27 +76,34 @@ export class SkipLoop extends MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempoolTrades: Array<MempoolTrade> = processMempool(this.mempool);
+			const mempooltxs: [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] = processMempool(
+				this.mempool,
+				this.ignoreAddresses,
+			);
+			const mempoolTrades = mempooltxs[0];
+			mempooltxs[1].forEach((Element) => {
+				if (this.ignoreAddresses.has(Element.sender)) {
+					this.ignoreAddresses.add(Element.reciever);
+				}
+			});
+
 			if (mempoolTrades.length === 0) {
 				continue;
 			} else {
 				for (const trade of mempoolTrades) {
-					applyMempoolTradesOnPools(this.pools, [trade]);
-
-					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
-
-					if (arbTrade) {
-						await this.skipTrade(arbTrade, trade);
-
-						this.cdPaths(arbTrade.path);
-
-						break;
-					}
+					if (trade.sender && !this.ignoreAddresses.has(trade.sender)) {
+						applyMempoolTradesOnPools(this.pools, [trade]);
+						const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+						if (arbTrade) {
+							await this.skipTrade(arbTrade, trade);
+							this.cdPaths(arbTrade.path);
+							break;
+						}
+					}	
 				}
 			}
 		}
 	}
-
 	/**
 	 *
 	 */
@@ -164,6 +172,15 @@ export class SkipLoop extends MempoolLoop {
 
 					const logMessageDeliverTx = `**DeliverTx Error:** index: ${idx}\t ${String(item.log)}\n`;
 					logMessage = logMessage.concat(logMessageDeliverTx);
+					if (idx == 0 && (item["code"] == 10 || item["code"] == 5)) {
+						const log: string = item["log"];
+						if (
+							toArbTrade?.sender && !(item["code"] == 5) &&
+							!log.includes("type wyndex::factory::ConfigResponse: unknown variant")
+						) {
+							this.ignoreAddresses.add(toArbTrade.sender);
+						}
+					}
 				}
 			});
 		}

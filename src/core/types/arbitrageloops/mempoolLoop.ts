@@ -17,6 +17,7 @@ export class MempoolLoop {
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
+	ignoreAddresses: Set<string>;
 	botConfig: BotConfig;
 	logger: Logger | undefined;
 	// CACHE VALUES
@@ -52,6 +53,7 @@ export class MempoolLoop {
 		botConfig: BotConfig,
 		logger: Logger | undefined,
 		pathlib: Array<Path>,
+		ignoreAddresses: Set<string>,
 	) {
 		this.pools = pools;
 		this.CDpaths = new Map<string, [number, number, number]>();
@@ -64,6 +66,7 @@ export class MempoolLoop {
 		this.botConfig = botConfig;
 		this.logger = logger;
 		this.pathlib = pathlib;
+		this.ignoreAddresses = ignoreAddresses;
 	}
 
 	/**
@@ -92,11 +95,25 @@ export class MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempoolTrades: Array<MempoolTrade> = processMempool(this.mempool);
+			const mempooltxs: [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] = processMempool(
+				this.mempool,
+				this.ignoreAddresses,
+			);
+			// Checks if there is a SendMsg from a blacklisted Address, if so add the reciever to the timeouted addresses
+			mempooltxs[1].forEach((Element) => {
+				if (this.ignoreAddresses.has(Element.sender)) {
+					this.ignoreAddresses.add(Element.reciever);
+				}
+			});
+			const mempoolTrades: Array<MempoolTrade> = mempooltxs[0];
 			if (mempoolTrades.length === 0) {
 				continue;
 			} else {
-				applyMempoolTradesOnPools(this.pools, mempoolTrades);
+				for (const trade of mempoolTrades) {
+					if (trade.sender && !this.ignoreAddresses.has(trade.sender)) {
+						applyMempoolTradesOnPools(this.pools, [trade]);
+					}
+				}
 			}
 
 			const arbTrade = this.arbitrageFunction(this.paths, this.botConfig);

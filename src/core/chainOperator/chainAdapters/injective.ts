@@ -64,7 +64,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		});
 		this.spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
 		this.wasmQueryClient = new ChainGrpcWasmApi(endpoints.grpc);
-		this.httpClient = new HttpBatchClient(botConfig.rpcUrl);
+		this.httpClient = new HttpBatchClient(botConfig.rpcUrls[0]);
 		this.chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
 		this.network = network;
 		this.publicKey = privateKey.toPublicKey();
@@ -266,6 +266,13 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		} catch (error) {
 			console.log(error);
 		}
+	}
+	/**
+	 * Sets new Clients for Mempoolloop.
+	 * TODO!!!
+	 */
+	public async getNewClients() {
+		throw new Error("Change Clients not implemented for Injective yet")
 	}
 }
 

@@ -27,12 +27,18 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	chainId!: string;
 	signer!: DirectSecp256k1HdWallet;
 	skipBundleClient?: SkipBundleClient;
+	rpcUrls!: Array<string>;
+	timeoutRPCs!: Map<string, number>;
+	chainPrefix!: string;
+	denom!: string;
+	gasPrice!: string;
 
 	/**
 	 *
 	 */
 	constructor(botConfig: BotConfig) {
-		this.httpClient = new HttpBatchClient(botConfig.rpcUrl);
+		this.timeoutRPCs = new Map<string, number>
+		this.httpClient = new HttpBatchClient(botConfig.rpcUrls[0]);
 		if (botConfig.skipConfig) {
 			this.skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
 		}
@@ -46,21 +52,32 @@ class CosmjsAdapter implements ChainOperatorInterface {
 			prefix: botConfig.chainPrefix,
 		});
 		this.signer = signer;
+		this.rpcUrls = botConfig.rpcUrls;
+		this.chainPrefix = botConfig.chainPrefix;
+		this.denom = botConfig.baseDenom;
+		this.gasPrice = botConfig.gasPrice;
 
 		// connect to client and querier
-		this.signingCWClient = await SigningCosmWasmClient.connectWithSigner(botConfig.rpcUrl, signer, {
-			prefix: botConfig.chainPrefix,
-			gasPrice: GasPrice.fromString(botConfig.gasPrice + botConfig.baseDenom),
-		});
-		this.httpClient = new HttpBatchClient(botConfig.rpcUrl);
-		this.tmClient = await Tendermint34Client.create(this.httpClient);
-		this.wasmQueryClient = QueryClient.withExtensions(this.tmClient, setupWasmExtension, setupAuthExtension);
+		await this.getClients(botConfig.rpcUrls[0]);
 		this.account = (await signer.getAccounts())[0];
 		const { accountNumber, sequence } = await this.signingCWClient.getSequence(this.account.address);
 		this.chainId = await this.signingCWClient.getChainId();
 		this.accountNumber = accountNumber;
 		this.sequence = sequence;
 		this.publicAddress = this.account.address;
+	}
+
+	/**
+	 *
+	 */
+	async getClients(rpcUrl: string) {
+		this.httpClient = new HttpBatchClient(rpcUrl);
+		this.tmClient = await Tendermint34Client.create(this.httpClient);
+		this.wasmQueryClient = QueryClient.withExtensions(this.tmClient, setupWasmExtension, setupAuthExtension);
+		this.signingCWClient = await SigningCosmWasmClient.connectWithSigner(rpcUrl, this.signer, {
+			prefix: this.chainPrefix,
+			gasPrice: GasPrice.fromString(this.gasPrice + this.denom),
+		});
 	}
 	/**
 	 *
@@ -129,6 +146,59 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		const mempoolResult = await this.httpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
 		return mempoolResult.result;
 	}
+
+	/**
+	 * Sets new Clients for Mempoolloop.
+	 *
+	 */
+	public async getNewClients(): Promise<string | void> {
+		//await this.logger?.sendMessage("Error: \n" + String(errmsg), LogType.All);
+		let out: string
+		const TIMEOUTDUR = 60000; // 10 Min timeout if error
+		let n = 0;
+		let urlString: string | undefined;
+		this.timeoutRPCs.set(this.httpClient.url, Date.now());
+		while (!urlString && n < this.rpcUrls.length) {
+			const currTime: number = Date.now();
+
+			if (!this.timeoutRPCs.has(this.rpcUrls[n])) {
+				urlString = this.rpcUrls[n];
+			} else {
+				const errTime = this.timeoutRPCs.get(this.rpcUrls[n]);
+				if (errTime && errTime + TIMEOUTDUR <= currTime) {
+					this.timeoutRPCs.delete(this.rpcUrls[n]);
+					urlString = this.rpcUrls[n];
+				}
+			}
+			n++;
+		}
+		if (!urlString) {
+			//await this.logger?.sendMessage("All RPC's Timeouted", LogType.Console);
+			let n: number = Date.now();
+			let nextUrl: string = this.httpClient.url;
+			for (const [url, timeouted] of this.timeoutRPCs.entries()) {
+				if (timeouted < n) {
+					n = timeouted;
+					nextUrl = url;
+				}
+			}
+			await delay(TIMEOUTDUR + n - Date.now());
+			await this.getClients(nextUrl);
+			out = nextUrl
+		} else {
+			//await this.logger?.sendMessage("Updating Clients to: " + urlString, LogType.All);
+			await this.getClients(urlString);
+			out = urlString
+		}
+		//await this.logger?.sendMessage("Continue...", LogType.Console);
+		return out;
+	}
+}
+/**
+ *
+ */
+function delay(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export default CosmjsAdapter;

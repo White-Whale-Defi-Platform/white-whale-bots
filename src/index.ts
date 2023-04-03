@@ -14,23 +14,6 @@ import { LogType } from "./core/types/base/logging";
 import { removedUnusedPools } from "./core/types/base/pool";
 // load env files
 dotenv.config();
-const botConfig = setBotConfig(process.env);
-
-let startupMessage = "===".repeat(30);
-startupMessage += "\n**White Whale Bot**\n";
-startupMessage += "===".repeat(30);
-startupMessage += `\nEnvironment Variables:\n
-**RPC ENPDOINT:** \t${botConfig.rpcUrl}
-**OFFER DENOM:** \t${JSON.stringify(botConfig.offerAssetInfo)}
-**FACTORIES_TO_ROUTERS_MAPPING:** \t${JSON.stringify(botConfig.mappingFactoryRouter)}
-**USE MEMPOOL:** \t${botConfig.useMempool}
-**USE SKIP:** \t${botConfig.skipConfig?.useSkip}
-`;
-if (botConfig.skipConfig) {
-	startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
-	startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
-}
-startupMessage += "---".repeat(30);
 
 /**
  * Runs the main program.
@@ -41,6 +24,23 @@ startupMessage += "---".repeat(30);
  *
  */
 async function main() {
+	const botConfig = await setBotConfig(process.env);
+
+	let startupMessage = "===".repeat(30);
+	startupMessage += "\n**White Whale Bot**\n";
+	startupMessage += "===".repeat(30);
+	startupMessage += `\nEnvironment Variables:\n
+**RPC ENPDOINT:** \t${botConfig.rpcUrls}
+**OFFER DENOM:** \t${JSON.stringify(botConfig.offerAssetInfo)}
+**FACTORIES_TO_ROUTERS_MAPPING:** \t${JSON.stringify(botConfig.mappingFactoryRouter)}
+**USE MEMPOOL:** \t${botConfig.useMempool}
+**USE SKIP:** \t${botConfig.skipConfig?.useSkip}
+`;
+	if (botConfig.skipConfig) {
+		startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
+		startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
+	}
+	startupMessage += "---".repeat(30);
 	const logger = new Logger(botConfig);
 	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
 	let getPoolStates = chains.defaults.getPoolStates;
@@ -59,7 +59,6 @@ async function main() {
 	});
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 	let setupMessage = "---".repeat(30);
-
 	const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
 	const graph = newGraph(allPools);
 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
@@ -98,6 +97,7 @@ Total Paths:** \t${paths.length}\n`;
 			skipSigner,
 			logger,
 			[...paths],
+			botConfig.ignoreAddresses,
 		);
 	} else if (botConfig.useMempool === true) {
 		await logger.sendMessage("Initializing mempool loop...", LogType.Console);
@@ -112,6 +112,7 @@ Total Paths:** \t${paths.length}\n`;
 			botConfig,
 			logger,
 			[...paths],
+			botConfig.ignoreAddresses,
 		);
 	} else {
 		await logger.sendMessage("Initializing non-mempool loop...", LogType.Console);
