@@ -74,24 +74,20 @@ export class NoMempoolLoop {
 	 *
 	 */
 	public async step() {
-		while (true) {
-			this.iterations++;
-			await this.updateStateFunction(this.chainOperator, this.pools);
+		this.iterations++;
+		await this.updateStateFunction(this.chainOperator, this.pools);
 
-			const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
-			if (arbTrade) {
-				console.log(inspect(arbTrade.path.pools, { showHidden: true, depth: 4, colors: true }));
-				console.log(inspect(arbTrade.offerAsset, { showHidden: true, depth: 3, colors: true }));
-				console.log("expected profit: ", arbTrade.profit);
-				await this.trade(arbTrade);
-				this.cdPaths(arbTrade.path);
-				break;
-			}
-
-			await delay(1500);
+		if (arbTrade) {
+			console.log(inspect(arbTrade.path.pools, { showHidden: true, depth: 4, colors: true }));
+			console.log(inspect(arbTrade.offerAsset, { showHidden: true, depth: 3, colors: true }));
+			console.log("expected profit: ", arbTrade.profit);
+			await this.trade(arbTrade);
+			this.cdPaths(arbTrade.path);
 		}
-		return;
+
+		await delay(1500);
 	}
 
 	/**
