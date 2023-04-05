@@ -12,7 +12,6 @@ import {
 	ChainGrpcWasmApi,
 	ChainRestAuthApi,
 	createTransaction,
-	getDefaultSubaccountId,
 	IndexerGrpcSpotApi,
 	MsgBroadcasterWithPk,
 	MsgExecuteContract,
@@ -34,22 +33,22 @@ import { ChainOperatorInterface, TxResponse } from "../chainOperatorInterface";
  *
  */
 class InjectiveAdapter implements ChainOperatorInterface {
-	privateKey: PrivateKey;
-	signAndBroadcastClient: MsgBroadcasterWithPk;
-	spotQueryClient: IndexerGrpcSpotApi;
-	wasmQueryClient: ChainGrpcWasmApi;
-	httpClient: HttpBatchClient;
-	chainId: ChainId;
-	network: Network;
-	publicKey: PublicKey;
-	publicAddress: string;
-	ethereumAddress: string;
-	subAccountId: string;
-	signer!: DirectSecp256k1HdWallet;
-	accountNumber = 0;
-	sequence = 0;
-	skipBundleClient?: SkipBundleClient;
-	skipSigningAddress!: string;
+	private _privateKey: PrivateKey;
+	private _signAndBroadcastClient: MsgBroadcasterWithPk;
+	private _spotQueryClient: IndexerGrpcSpotApi;
+	private _wasmQueryClient: ChainGrpcWasmApi;
+	private _httpClient: HttpBatchClient;
+	private _chainId: ChainId;
+
+	private _network: Network;
+	private _publicKey: PublicKey;
+	private _publicAddress: string;
+
+	private _signer!: DirectSecp256k1HdWallet;
+	private _accountNumber = 0;
+	private _sequence = 0;
+	private _skipBundleClient?: SkipBundleClient;
+	private _skipSigningAddress!: string;
 
 	/**
 	 *
@@ -57,49 +56,72 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	constructor(botConfig: BotConfig, network: Network = Network.MainnetK8s) {
 		const endpoints = getNetworkEndpoints(network);
 		const privateKey = PrivateKey.fromMnemonic(botConfig.mnemonic, "m/44'/60'/0'/0/0");
-		this.privateKey = privateKey;
-		this.signAndBroadcastClient = new MsgBroadcasterWithPk({
+		this._privateKey = privateKey;
+		this._signAndBroadcastClient = new MsgBroadcasterWithPk({
 			network: network,
 			privateKey: privateKey,
 		});
-		this.spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
-		this.wasmQueryClient = new ChainGrpcWasmApi(endpoints.grpc);
-		this.httpClient = new HttpBatchClient(botConfig.rpcUrls[0]);
-		this.chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
-		this.network = network;
-		this.publicKey = privateKey.toPublicKey();
-		this.publicAddress = privateKey.toPublicKey().toAddress().address;
-		this.subAccountId = getDefaultSubaccountId(this.publicAddress);
-		this.ethereumAddress = privateKey.toPublicKey().toAddress().getEthereumAddress();
+		this._spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
+		this._wasmQueryClient = new ChainGrpcWasmApi(endpoints.grpc);
+		this._httpClient = new HttpBatchClient(botConfig.rpcUrls[0]);
+		this._chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
+		this._network = network;
+		this._publicKey = privateKey.toPublicKey();
+		this._publicAddress = privateKey.toPublicKey().toAddress().address;
 	}
 	/**
 	 *
 	 */
+	public get sequence() {
+		return this._sequence;
+	}
+	/**
+	 *
+	 */
+	public set sequence(value) {
+		this._sequence = value;
+	}
+	/**
+	 *
+	 */
+	public get publicAddress(): string {
+		return this._publicAddress;
+	}
+	/**
+	 *
+	 */
+	public get chainId(): ChainId {
+		return this._chainId;
+	}
+
+	/**
+	 *
+	 */
 	async init(botConfig: BotConfig): Promise<void> {
-		const restEndpoint = getNetworkEndpoints(this.network).rest;
+		const restEndpoint = getNetworkEndpoints(this._network).rest;
 		const chainRestAuthApi = new ChainRestAuthApi(restEndpoint);
-		const accountDetailsResponse = await chainRestAuthApi.fetchAccount(this.publicAddress);
+		const accountDetailsResponse = await chainRestAuthApi.fetchAccount(this._publicAddress);
 		const baseAccount = BaseAccount.fromRestApi(accountDetailsResponse);
 		const accountDetails = baseAccount.toAccountDetails();
-		this.accountNumber = accountDetails.accountNumber;
-		this.sequence = accountDetails.sequence;
+		this._accountNumber = accountDetails.accountNumber;
+		this._sequence = accountDetails.sequence;
 
 		const hdPath = stringToPath("m/44'/60'/0'/0/0");
-		this.signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
+		this._signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
 			prefix: botConfig.chainPrefix,
 			hdPaths: [hdPath],
 		});
 
 		if (botConfig.skipConfig) {
-			this.skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
-			this.skipSigningAddress = (await this.signer.getAccounts())[0].address;
+			this._skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
+			this._skipSigningAddress = (await this._signer.getAccounts())[0].address;
 		}
 	}
 	/**
 	 *
 	 */
 	async queryContractSmart(address: string, queryMsg: Record<string, unknown>): Promise<JsonObject> {
-		const queryResult = await this.wasmQueryClient.fetchSmartContractState(
+		const queryResult = await this._wasmQueryClient.fetchSmartContractState(
 			address,
 			Buffer.from(JSON.stringify(queryMsg)).toString("base64"),
 		);
@@ -110,8 +132,21 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 *
 	 */
 	async queryMempool(): Promise<Mempool> {
-		const mempoolResult = await this.httpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
+		const mempoolResult = await this._httpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
 		return mempoolResult.result;
+	}
+
+	/**
+	 *
+	 */
+	async reset(): Promise<void> {
+		const restEndpoint = getNetworkEndpoints(this._network).rest;
+		const chainRestAuthApi = new ChainRestAuthApi(restEndpoint);
+		const accountDetailsResponse = await chainRestAuthApi.fetchAccount(this._publicAddress);
+		const baseAccount = BaseAccount.fromRestApi(accountDetailsResponse);
+		const accountDetails = baseAccount.toAccountDetails();
+		this._accountNumber = accountDetails.accountNumber;
+		this._sequence = accountDetails.sequence;
 	}
 	/**
 	 *
@@ -126,11 +161,11 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			if (!fee || fee === "auto") {
 				const broadcasterOptions = {
 					msgs: preppedMsgs,
-					injectiveAddress: this.publicAddress,
+					injectiveAddress: this._publicAddress,
 				};
-				const simRes = await this.signAndBroadcastClient.simulate(broadcasterOptions);
+				const simRes = await this._signAndBroadcastClient.simulate(broadcasterOptions);
 				console.log("simulation succesful: \n", simRes);
-				const res = await this.signAndBroadcastClient.broadcast(broadcasterOptions);
+				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
 				return {
 					height: res.height,
 					code: res.code,
@@ -140,10 +175,10 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			} else {
 				const broadcasterOptions = {
 					msgs: preppedMsgs,
-					injectiveAddress: this.publicAddress,
+					injectiveAddress: this._publicAddress,
 					gasLimit: +fee.gas,
 				};
-				const res = await this.signAndBroadcastClient.broadcast(broadcasterOptions);
+				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
 				return {
 					height: res.height,
 					code: res.code,
@@ -168,7 +203,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 *
 	 */
 	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string, otherTx?: TxRaw) {
-		if (!this.skipBundleClient || !this.skipSigningAddress) {
+		if (!this._skipBundleClient || !this._skipSigningAddress) {
 			console.log("skip bundle client not initialised");
 			process.exit(1);
 		}
@@ -181,13 +216,13 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		const { signBytes, txRaw, bodyBytes, authInfoBytes } = createTransaction({
 			fee: fee,
 			memo: memo,
-			chainId: this.chainId,
+			chainId: this._chainId,
 			message: preppedMsgs.map((msg) => msg.toDirectSign()),
-			pubKey: this.publicKey.toBase64(),
-			sequence: this.sequence,
-			accountNumber: this.accountNumber,
+			pubKey: this._publicKey.toBase64(),
+			sequence: this._sequence,
+			accountNumber: this._accountNumber,
 		});
-		const signature = await this.privateKey.sign(Buffer.from(signBytes));
+		const signature = await this._privateKey.sign(Buffer.from(signBytes));
 
 		txRaw.setSignaturesList([signature]);
 		const cosmTxRaw = {
@@ -198,12 +233,16 @@ class InjectiveAdapter implements ChainOperatorInterface {
 
 		let signed;
 		if (otherTx) {
-			signed = await this.skipBundleClient.signBundle([otherTx, cosmTxRaw], this.signer, this.skipSigningAddress);
+			signed = await this._skipBundleClient.signBundle(
+				[otherTx, cosmTxRaw],
+				this._signer,
+				this._skipSigningAddress,
+			);
 		} else {
-			signed = await this.skipBundleClient.signBundle([cosmTxRaw], this.signer, this.skipSigningAddress);
+			signed = await this._skipBundleClient.signBundle([cosmTxRaw], this._signer, this._skipSigningAddress);
 		}
 		console.log(inspect(signed, { depth: null }));
-		const res = await this.skipBundleClient.sendBundle(signed, 0, true);
+		const res = await this._skipBundleClient.sendBundle(signed, 0, true);
 		return res;
 	}
 	/**
@@ -234,7 +273,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 					// Provide LP: Funds isint being handled proper, before we were sending 1 coin, now we are sending it all but getting invalid coins
 					const params = {
 						funds: isLPMessage ? funds : funds?.[0],
-						sender: this.publicAddress,
+						sender: this._publicAddress,
 
 						contractAddress: contract,
 						exec: executeMessageJson,

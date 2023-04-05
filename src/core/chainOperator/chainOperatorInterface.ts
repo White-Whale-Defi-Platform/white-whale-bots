@@ -24,6 +24,7 @@ export interface ChainOperatorInterface {
 	// getNetwork: () => Promise<string>;
 	// getBalance: (address: string, searchDenom: string) => Promise<Coin>;
 	queryMempool: () => Promise<Mempool>;
+	reset: () => Promise<void>;
 }
 
 export interface TxResponse {

@@ -126,15 +126,17 @@ export class MempoolLoop {
 				break;
 			}
 		}
+		return;
 	}
 
 	/**
 	 *
 	 */
-	public reset() {
+	async reset() {
 		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();
+		await this.chainOperator.reset();
 	}
 
 	/**
@@ -156,9 +158,11 @@ export class MempoolLoop {
 		const txResponse = await this.chainOperator.signAndBroadcast(msgs, TX_FEE);
 
 		await this.logger?.sendMessage(JSON.stringify(txResponse), LogType.Console);
-		this.chainOperator.client.sequence += 1;
+
+		if (txResponse.code === 0) {
+			this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
+		}
 		await delay(5000);
-		// await this.fetchRequiredChainData();
 	}
 
 	/**

@@ -75,6 +75,13 @@ export class ChainOperator {
 			return await this.client.signAndBroadcast(msgs, fee, memo);
 		}
 	}
+
+	/**
+	 *
+	 */
+	async reset() {
+		return await this.client.reset();
+	}
 	/**
 	 *
 	 */
