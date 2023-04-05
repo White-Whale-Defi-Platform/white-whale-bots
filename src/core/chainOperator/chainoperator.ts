@@ -63,6 +63,13 @@ export class ChainOperator {
 	): Promise<TxResponse> {
 		return await this.client.signAndBroadcast(msgs, fee, memo);
 	}
+
+	/**
+	 *
+	 */
+	async reset() {
+		return await this.client.reset();
+	}
 	/**
 	 *
 	 */

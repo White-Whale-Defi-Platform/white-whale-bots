@@ -179,7 +179,7 @@ export class SkipLoop extends MempoolLoop {
 		}
 
 		if (res.result.code === 0) {
-			this.chainOperator.client.sequence += 1;
+			this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
 		}
 		await delay(5000);
 	}

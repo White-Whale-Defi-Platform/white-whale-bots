@@ -134,7 +134,7 @@ Total Paths:** \t${paths.length}\n`;
 	await logger.sendMessage("Starting loop...", LogType.All);
 	while (true) {
 		await loop.step();
-		loop.reset();
+		await loop.reset();
 		if (startupTime - Date.now() + botConfig.signOfLife * 60000 <= 0) {
 			timeIt++;
 			const mins = (botConfig.signOfLife * timeIt) % 60;

@@ -5,7 +5,7 @@ import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
 import { BotConfig } from "../base/botConfig";
-import { flushTxMemory, Mempool } from "../base/mempool";
+import { Mempool } from "../base/mempool";
 import { Path } from "../base/path";
 import { Pool } from "../base/pool";
 
@@ -73,40 +73,33 @@ export class NoMempoolLoop {
 	/**
 	 *
 	 */
-	public async fetchRequiredChainData() {
-		// const { accountNumber, sequence } = await this.botClients.SigningCWClient.getSequence(this.account.address);
-		// this.sequence = sequence;
-		// this.accountNumber = accountNumber;
-		// const chainId = await this.botClients.SigningCWClient.getChainId();
-		// this.chainid = chainId;
-	}
-
-	/**
-	 *
-	 */
 	public async step() {
-		this.iterations++;
-		await this.updateStateFunction(this.chainOperator, this.pools);
+		while (true) {
+			this.iterations++;
+			await this.updateStateFunction(this.chainOperator, this.pools);
 
-		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+			const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
-		if (arbTrade) {
-			console.log(inspect(arbTrade.path.pools, { showHidden: true, depth: 4, colors: true }));
-			console.log(inspect(arbTrade.offerAsset, { showHidden: true, depth: 3, colors: true }));
-			console.log("expected profit: ", arbTrade.profit);
-			await this.trade(arbTrade);
-			this.cdPaths(arbTrade.path);
-			return;
+			if (arbTrade) {
+				console.log(inspect(arbTrade.path.pools, { showHidden: true, depth: 4, colors: true }));
+				console.log(inspect(arbTrade.offerAsset, { showHidden: true, depth: 3, colors: true }));
+				console.log("expected profit: ", arbTrade.profit);
+				await this.trade(arbTrade);
+				this.cdPaths(arbTrade.path);
+				break;
+			}
+
+			await delay(1500);
 		}
+		return;
 	}
 
 	/**
 	 *
 	 */
-	public reset() {
+	async reset() {
 		this.unCDPaths();
-		this.totalBytes = 0;
-		flushTxMemory();
+		await this.chainOperator.reset();
 	}
 
 	/**
