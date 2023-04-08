@@ -17,6 +17,7 @@ export class MempoolLoop {
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
+	// TODO: Change ignore Addresses to opject
 	ignoreAddresses: Set<string>;
 	botConfig: BotConfig;
 	logger: Logger | undefined;

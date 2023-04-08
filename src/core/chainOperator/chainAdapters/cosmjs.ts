@@ -24,14 +24,13 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	private _publicAddress!: string;
 	private _accountNumber = 0;
 	private _sequence = 0;
-
+	private _chainPrefix: string;
 	private _chainId!: string;
-
 	private _signer!: DirectSecp256k1HdWallet;
 	private _skipBundleClient?: SkipBundleClient;
-	timeoutRPCs: Map<string, number>;
-	private _rpcUrls!: string[];
-	private _chainPrefix!: string;
+	private _timeoutRPCs: Map<string, number>;
+
+	private _rpcUrls!: Array<string>;
 	private _denom!: string;
 	private _gasPrice!: string;
 
@@ -39,7 +38,8 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	 *
 	 */
 	constructor(botConfig: BotConfig) {
-		this.timeoutRPCs = new Map<string, number>
+		this._chainPrefix = botConfig.chainPrefix;
+		this._timeoutRPCs = new Map<string, number>();
 		this._httpClient = new HttpBatchClient(botConfig.rpcUrls[0]);
 		if (botConfig.skipConfig) {
 			this._skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
@@ -79,7 +79,6 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		});
 		this._signer = signer;
 		this._rpcUrls = botConfig.rpcUrls;
-		this._chainPrefix = botConfig.chainPrefix;
 		this._denom = botConfig.baseDenom;
 		this._gasPrice = botConfig.gasPrice;
 
@@ -179,20 +178,20 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	 */
 	public async getNewClients(): Promise<string | void> {
 		//await this.logger?.sendMessage("Error: \n" + String(errmsg), LogType.All);
-		let out: string
+		let out: string;
 		const TIMEOUTDUR = 60000; // 10 Min timeout if error
 		let n = 0;
 		let urlString: string | undefined;
-		this.timeoutRPCs.set(this._httpClient.url, Date.now());
+		this._timeoutRPCs.set(this._httpClient.url, Date.now());
 		while (!urlString && n < this._rpcUrls.length) {
 			const currTime: number = Date.now();
 
-			if (!this.timeoutRPCs.has(this._rpcUrls[n])) {
+			if (!this._timeoutRPCs.has(this._rpcUrls[n])) {
 				urlString = this._rpcUrls[n];
 			} else {
-				const errTime = this.timeoutRPCs.get(this._rpcUrls[n]);
+				const errTime = this._timeoutRPCs.get(this._rpcUrls[n]);
 				if (errTime && errTime + TIMEOUTDUR <= currTime) {
-					this.timeoutRPCs.delete(this._rpcUrls[n]);
+					this._timeoutRPCs.delete(this._rpcUrls[n]);
 					urlString = this._rpcUrls[n];
 				}
 			}
@@ -202,7 +201,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 			//await this.logger?.sendMessage("All RPC's Timeouted", LogType.Console);
 			let n: number = Date.now();
 			let nextUrl: string = this._httpClient.url;
-			for (const [url, timeouted] of this.timeoutRPCs.entries()) {
+			for (const [url, timeouted] of this._timeoutRPCs.entries()) {
 				if (timeouted < n) {
 					n = timeouted;
 					nextUrl = url;
@@ -210,16 +209,19 @@ class CosmjsAdapter implements ChainOperatorInterface {
 			}
 			await delay(TIMEOUTDUR + n - Date.now());
 			await this.getClients(nextUrl);
-			out = nextUrl
+			out = nextUrl;
 		} else {
 			//await this.logger?.sendMessage("Updating Clients to: " + urlString, LogType.All);
 			await this.getClients(urlString);
-			out = urlString
+			out = urlString;
 		}
 		//await this.logger?.sendMessage("Continue...", LogType.Console);
 		return out;
 	}
-	
+
+	/**
+	 *
+	 */
 	async reset(): Promise<void> {
 		const { accountNumber, sequence } = await this._signingCWClient.getSequence(this._account.address);
 		this._accountNumber = accountNumber;
@@ -230,7 +232,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
  *
  */
 function delay(ms: number) {
-	return new Promise((resolve) => setTimeout(resolve, ms))
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export default CosmjsAdapter;

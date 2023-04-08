@@ -311,7 +311,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 * TODO!!!
 	 */
 	public async getNewClients() {
-		throw new Error("Change Clients not implemented for Injective yet")
+		throw new Error("Change Clients not implemented for Injective yet");
 	}
 }
 

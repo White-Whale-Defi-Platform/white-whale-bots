@@ -41,9 +41,10 @@ export class ChainOperator {
 		});
 	}
 	/**
-	 * Error handled in getPoolState.
+	 *
 	 */
 	async queryContractSmart(address: string, queryMsg: Record<string, unknown>): Promise<JsonObject> {
+		//Error handled in getPoolState.
 		return await this.client.queryContractSmart(address, queryMsg);
 	}
 

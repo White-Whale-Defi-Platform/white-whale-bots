@@ -61,7 +61,10 @@ export function showTxMemory() {
  *@param mempool The mempool(state) to process.
  *@return An array of swap, send and swap-operation messages that exist in the `mempool`.
  */
-export function processMempool(mempool: Mempool, ignoreAddresses:Set<string>):  [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] {
+export function processMempool(
+	mempool: Mempool,
+	ignoreAddresses: Set<string>,
+): [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] {
 	const mempoolTrades: [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] = [[], []];
 	for (const tx of mempool.txs) {
 		if (txMemory[tx] == true) {
@@ -164,7 +167,7 @@ export function processMempool(mempool: Mempool, ignoreAddresses:Set<string>):  
 						message: containedMsg,
 						offer_asset: offerAsset,
 						txBytes: txBytes,
-						sender:sender,
+						sender: sender,
 					});
 				} else if (isJunoSwapOperationsMessage(containedMsg)) {
 					mempoolTrades[0].push({
@@ -172,7 +175,7 @@ export function processMempool(mempool: Mempool, ignoreAddresses:Set<string>):  
 						message: containedMsg,
 						offer_asset: undefined,
 						txBytes: txBytes,
-						sender:sender,
+						sender: sender,
 					});
 				}
 				// check if the message is a swap-operations router message we want to add to the relevant trades
@@ -182,9 +185,8 @@ export function processMempool(mempool: Mempool, ignoreAddresses:Set<string>):  
 						mempoolTrades[0].push(mempoolTrade);
 					}
 				} else if (ignoreAddresses.has(msgExecuteContract.contract)) {
-					const gets = fromAscii(fromBase64(containedMsg.delegate.msg))
+					const gets = fromAscii(fromBase64(containedMsg.delegate.msg));
 					mempoolTrades[1].push({ sender: msgExecuteContract.contract, reciever: gets });
-					// todo add to ignored addresses
 				} else {
 					continue;
 				}
@@ -206,7 +208,6 @@ function processSwapOperations(
 	msgExecuteContract?: MsgExecuteContract,
 	amount?: string,
 	contractAddress?: string,
-	
 ) {
 	const operationsMessage = containedMsg.execute_swap_operations.operations;
 	let offerAmount;
@@ -228,7 +229,7 @@ function processSwapOperations(
 			message: containedMsg,
 			offer_asset: offerAsset,
 			txBytes: txBytes,
-			sender:msgExecuteContract?.sender
+			sender: msgExecuteContract?.sender,
 		};
 	}
 	if (isAstroSwapOperationsMessages(operationsMessage)) {
@@ -238,7 +239,7 @@ function processSwapOperations(
 			message: containedMsg,
 			offer_asset: offerAsset,
 			txBytes: txBytes,
-			sender:msgExecuteContract?.sender
+			sender: msgExecuteContract?.sender,
 		};
 	}
 	if (isWyndDaoSwapOperationsMessages(operationsMessage)) {
@@ -262,7 +263,7 @@ function processSwapOperations(
 			message: containedMsg,
 			offer_asset: offerAsset,
 			txBytes: txBytes,
-			sender:msgExecuteContract?.sender
+			sender: msgExecuteContract?.sender,
 		};
 	}
 }

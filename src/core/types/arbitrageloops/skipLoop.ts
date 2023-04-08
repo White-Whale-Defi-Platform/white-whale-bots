@@ -47,7 +47,18 @@ export class SkipLoop extends MempoolLoop {
 		pathlib: Array<Path>,
 		ignoreAddresses: Set<string>,
 	) {
-		super(pools, paths, arbitrage, updateState, messageFunction, chainOperator, botConfig, logger, pathlib, ignoreAddresses);
+		super(
+			pools,
+			paths,
+			arbitrage,
+			updateState,
+			messageFunction,
+			chainOperator,
+			botConfig,
+			logger,
+			pathlib,
+			ignoreAddresses,
+		);
 		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.logger = logger);
 	}
 
@@ -96,10 +107,10 @@ export class SkipLoop extends MempoolLoop {
 						const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 						if (arbTrade) {
 							await this.skipTrade(arbTrade, trade);
-							this.cdPaths(arbTrade.path);
+							//this.cdPaths(arbTrade.path);
 							break;
 						}
-					}	
+					}
 				}
 			}
 		}
@@ -173,12 +184,12 @@ export class SkipLoop extends MempoolLoop {
 					const logMessageDeliverTx = `**DeliverTx Error:** index: ${idx}\t ${String(item.log)}\n`;
 					logMessage = logMessage.concat(logMessageDeliverTx);
 					if (idx == 0 && (item["code"] == 10 || item["code"] == 5)) {
-						const log: string = item["log"];
-						if (
-							toArbTrade?.sender && !(item["code"] == 5) &&
-							!log.includes("type wyndex::factory::ConfigResponse: unknown variant")
-						) {
+						if (toArbTrade?.sender) {
 							this.ignoreAddresses.add(toArbTrade.sender);
+							await this.logger?.sendMessage(
+								"Error on Trade from Address: " + toArbTrade.sender,
+								LogType.Console,
+							);
 						}
 					}
 				}

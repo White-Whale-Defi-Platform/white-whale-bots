@@ -54,6 +54,12 @@ export interface BotConfig {
  */
 export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> {
 	validateEnvs(envs);
+	let RPCURLS;
+	if (envs.RPC_URL) {
+		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, JSON.parse(envs.RPC_URL));
+	} else {
+		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, "");
+	}
 	const apiurl = envs.API_URL;
 	let pools = envs.POOLS.trim()
 		.replace(/\n|\r|\t/g, "")
@@ -122,12 +128,6 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 
 		const profitThreshold: number = PROFIT_THRESHOLD + GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE; //in 6 decimal default
 		PROFIT_THRESHOLDS.set(hops, profitThreshold);
-	}
-	let RPCURLS;
-	if (envs.RPC_URL) {
-		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, JSON.parse(envs.RPC_URL));
-	} else {
-		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, "");
 	}
 	const botConfig: BotConfig = {
 		chainPrefix: envs.CHAIN_PREFIX,
@@ -225,15 +225,17 @@ async function getRPCfromRegistry(prefix: string, inputurls: any | undefined) {
 		`https://raw.githubusercontent.com/cosmos/chain-registry/master/${path}/chain.json`,
 	);
 	const rpcs = chaindata.data.apis.rpc;
-	if (inputurls) {
-		const out = inputurls;
-		rpcs.forEach((element: any) => {
-			if (!out.includes(element.address)) {
-				out.push(element.address);
-			}
-		});
-		return out;
+	let out: Array<string>;
+	if (!inputurls) {
+		out = new Array<string>();
 	} else {
-		return rpcs;
+		out = inputurls;
 	}
+
+	rpcs.forEach((element: any) => {
+		if (!out.includes(element.address)) {
+			out.push(element.address);
+		}
+	});
+	return out;
 }
