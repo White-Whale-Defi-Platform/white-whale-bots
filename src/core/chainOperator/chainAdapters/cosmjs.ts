@@ -33,6 +33,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	private _rpcUrls!: Array<string>;
 	private _denom!: string;
 	private _gasPrice!: string;
+	private _currRpcUrl: string;
 
 	/**
 	 *
@@ -41,6 +42,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		this._chainPrefix = botConfig.chainPrefix;
 		this._timeoutRPCs = new Map<string, number>();
 		this._httpClient = new HttpBatchClient(botConfig.rpcUrls[0]);
+		this._currRpcUrl = botConfig.rpcUrls[0];
 		if (botConfig.skipConfig) {
 			this._skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
 		}
@@ -182,7 +184,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		const TIMEOUTDUR = 60000; // 10 Min timeout if error
 		let n = 0;
 		let urlString: string | undefined;
-		this._timeoutRPCs.set(this._httpClient.url, Date.now());
+		this._timeoutRPCs.set(this._currRpcUrl, Date.now());
 		while (!urlString && n < this._rpcUrls.length) {
 			const currTime: number = Date.now();
 
@@ -200,7 +202,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		if (!urlString) {
 			//await this.logger?.sendMessage("All RPC's Timeouted", LogType.Console);
 			let n: number = Date.now();
-			let nextUrl: string = this._httpClient.url;
+			let nextUrl: string = this._currRpcUrl;
 			for (const [url, timeouted] of this._timeoutRPCs.entries()) {
 				if (timeouted < n) {
 					n = timeouted;
@@ -216,7 +218,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 			out = urlString;
 		}
 		//await this.logger?.sendMessage("Continue...", LogType.Console);
-		return out;
+		this._currRpcUrl = out;
 	}
 
 	/**
