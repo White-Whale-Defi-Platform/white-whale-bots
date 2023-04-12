@@ -173,7 +173,7 @@ export class SkipLoop extends MempoolLoop {
 
 					const logMessageCheckTx = `**CheckTx Error:** index: ${idx}\t ${String(item.log)}\n`;
 					logMessage = logMessage.concat(logMessageCheckTx);
-					if (toArbTrade?.sender && idx == 0 && item["code"] == "5"){
+					if (toArbTrade?.sender && idx == 0 && item["code"] == "5") {
 						this.ignoreAddresses.add(toArbTrade.sender);
 					}
 				}

@@ -78,6 +78,7 @@ Total Paths:** \t${paths.length}\n`;
 	await logger.sendMessage(startupMessage, LogType.Console);
 
 	let loop;
+
 	if (botConfig.skipConfig) {
 		await logger.sendMessage("Initializing skip loop...", LogType.Console);
 		const [skipClient, skipSigner] = await getSkipClient(

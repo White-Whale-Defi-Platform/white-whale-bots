@@ -18,7 +18,7 @@ import { ChainOperatorInterface, TxResponse } from "../chainOperatorInterface";
 class CosmjsAdapter implements ChainOperatorInterface {
 	private _signingCWClient!: SigningCosmWasmClient; //used to sign transactions
 	private _tmClient!: Tendermint34Client; //used to broadcast transactions
-	private _httpClient: HttpBatchClient | HttpClient; //used to query rpc methods (unconfirmed_txs, account)
+	private _httpClient!: HttpBatchClient | HttpClient; //used to query rpc methods (unconfirmed_txs, account)
 	private _wasmQueryClient!: QueryClient & WasmExtension; //used to query wasm methods (contract states)
 	private _account!: AccountData;
 	private _publicAddress!: string;
@@ -41,11 +41,13 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	constructor(botConfig: BotConfig) {
 		this._chainPrefix = botConfig.chainPrefix;
 		this._timeoutRPCs = new Map<string, number>();
-		this._httpClient = new HttpBatchClient(botConfig.rpcUrls[0]);
 		this._currRpcUrl = botConfig.rpcUrls[0];
 		if (botConfig.skipConfig) {
 			this._skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
 		}
+		this._rpcUrls = botConfig.rpcUrls;
+		this._denom = botConfig.baseDenom;
+		this._gasPrice = botConfig.gasPrice;
 	}
 	/**
 	 *
@@ -82,17 +84,12 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	 */
 	async init(botConfig: BotConfig) {
 		// derive signing wallet
-		const signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
+		this._signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
 			prefix: botConfig.chainPrefix,
 		});
-		this._signer = signer;
-		this._rpcUrls = botConfig.rpcUrls;
-		this._denom = botConfig.baseDenom;
-		this._gasPrice = botConfig.gasPrice;
-
 		// connect to client and querier
-		await this.getClients(botConfig.rpcUrls[0]);
-		this._account = (await signer.getAccounts())[0];
+		await this.setClients(botConfig.rpcUrls[0]);
+		this._account = (await this._signer.getAccounts())[0];
 		const { accountNumber, sequence } = await this._signingCWClient.getSequence(this._account.address);
 		this._chainId = await this._signingCWClient.getChainId();
 		this._accountNumber = accountNumber;
@@ -103,7 +100,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	async getClients(rpcUrl: string) {
+	async setClients(rpcUrl: string) {
 		this._httpClient = new HttpBatchClient(rpcUrl);
 		this._tmClient = await Tendermint34Client.create(this._httpClient);
 		this._wasmQueryClient = QueryClient.withExtensions(this._tmClient, setupWasmExtension, setupAuthExtension);
@@ -216,11 +213,11 @@ class CosmjsAdapter implements ChainOperatorInterface {
 				}
 			}
 			await delay(TIMEOUTDUR + n - Date.now());
-			await this.getClients(nextUrl);
+			await this.setClients(nextUrl);
 			out = nextUrl;
 		} else {
 			//await this.logger?.sendMessage("Updating Clients to: " + urlString, LogType.All);
-			await this.getClients(urlString);
+			await this.setClients(urlString);
 			out = urlString;
 		}
 		//await this.logger?.sendMessage("Continue...", LogType.Console);
