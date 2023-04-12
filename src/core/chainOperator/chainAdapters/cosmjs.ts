@@ -68,6 +68,12 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
+	public set publicAddress(value) {
+		this._publicAddress = value;
+	}
+	/**
+	 *
+	 */
 	public get chainId(): string {
 		return this._chainId;
 	}
@@ -91,7 +97,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		this._chainId = await this._signingCWClient.getChainId();
 		this._accountNumber = accountNumber;
 		this.sequence = sequence;
-		this._publicAddress = this._account.address;
+		this.publicAddress = this._account.address;
 	}
 
 	/**
