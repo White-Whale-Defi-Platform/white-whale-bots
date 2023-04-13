@@ -175,6 +175,10 @@ export class SkipLoop extends MempoolLoop {
 					logMessage = logMessage.concat(logMessageCheckTx);
 					if (toArbTrade?.sender && idx == 0 && item["code"] == "5") {
 						this.ignoreAddresses.add(toArbTrade.sender);
+						await this.logger?.sendMessage(
+							"Error on Trade from Address: " + toArbTrade.sender,
+							LogType.Console,
+						);
 					}
 				}
 			});

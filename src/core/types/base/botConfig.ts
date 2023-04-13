@@ -35,7 +35,6 @@ export interface BotConfig {
 	useMempool: boolean;
 	baseDenom: string;
 	gasDenom: string;
-	apiUrl: string | undefined;
 	signOfLife: number;
 
 	gasPrice: string;
@@ -58,9 +57,8 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	if (envs.RPC_URL) {
 		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, JSON.parse(envs.RPC_URL));
 	} else {
-		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, "");
+		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX);
 	}
-	const apiurl = envs.API_URL;
 	let pools = envs.POOLS.trim()
 		.replace(/\n|\r|\t/g, "")
 		.replace(/,\s*$/, "");
@@ -80,13 +78,12 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
 	const MAX_PATH_HOPS = +envs.MAX_PATH_HOPS; //required gas units per trade (hop)
 
-	let IGNORE_ADDRS = new Set<string>();
+	const IGNORE_ADDRS = new Set<string>();
 	// set ignored Addresses
 	if (envs.IGNORE_ADDRESSES) {
 		const addrs = JSON.parse(envs.IGNORE_ADDRESSES);
 		addrs.forEach((element: string) => IGNORE_ADDRS.add(element));
 	}
-	IGNORE_ADDRS = await getIgnoAddresses(envs.CHAIN_PREFIX + "-1", apiurl, IGNORE_ADDRS);
 	// setup skipconfig if present
 	let skipConfig;
 	if (envs.USE_SKIP == "1") {
@@ -132,7 +129,6 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	const botConfig: BotConfig = {
 		chainPrefix: envs.CHAIN_PREFIX,
 		rpcUrls: RPCURLS,
-		apiUrl: envs.API_URL,
 		poolEnvs: POOLS_ENVS,
 		maxPathPools: MAX_PATH_HOPS,
 		mappingFactoryRouter: FACTORIES_TO_ROUTERS_MAPPING,
@@ -162,7 +158,6 @@ function validateEnvs(envs: NodeJS.ProcessEnv) {
 	assert(envs.WALLET_MNEMONIC, `Please set "WALLET_MNEMONIC" in env, or ".env" file`);
 	assert(envs.BASE_DENOM, `Please set "BASE_DENOM" in env or ".env" file`);
 	assert(envs.CHAIN_PREFIX, `Please set "CHAIN_PREFIX" in env or ".env" file`);
-	assert(envs.RPC_URL && envs.RPC_URL.includes("http"), `Please set "RPC_URL" in env or ".env" file`);
 	assert(envs.FACTORIES_TO_ROUTERS_MAPPING, `Please set "FACTORIES_TO_ROUTERS_MAPPING" in env or ".env" file`);
 	assert(envs.POOLS, `Please set "POOLS" in env or ".env" file`);
 	assert(envs.FLASHLOAN_ROUTER_ADDRESS, `Please set "FLASHLOAN_ROUTER_ADDRESS" in env, or ".env" file`);
@@ -177,43 +172,11 @@ function validateSkipEnvs(envs: NodeJS.ProcessEnv) {
 	assert(envs.SKIP_BID_WALLET, `Please set SKIP_BID_WALLET in env or ".env" file`);
 	assert(envs.SKIP_BID_RATE, `Please set SKIP_BID_RATE in env or ".env" file`);
 }
-/**
- *
- */
-async function getIgnoAddresses(chain_id: string, apiurl: string | undefined, ignoreAddresses: any) {
-	if (!apiurl || apiurl.trim() == "") {
-		if (ignoreAddresses) {
-			return ignoreAddresses;
-		} else {
-			return new Set<string>();
-		}
-	}
-	let start = 0;
-	let out: Set<string>;
-	if (ignoreAddresses) {
-		out = ignoreAddresses;
-	} else {
-		out = new Set<string>();
-	}
-	if (apiurl) {
-		const urls: string = apiurl + "addresses?chain_id=" + chain_id;
-		const res1: any = (await axios.get(urls + "&page=1")).data;
-		if (res1.data[0]) {
-			start = Math.ceil(Number(res1.meta.all) / Number(res1.meta.per_page));
-			res1.data.forEach((Element: any) => out.add(Element.address));
-			for (let i = 2; i <= start; i++) {
-				const res = (await axios.get(urls + "?page=" + String(i))).data;
-				res.data.forEach((Element: any) => out.add(Element.address));
-			}
-		}
-	}
-	return out;
-}
 
 /**
  *
  */
-async function getRPCfromRegistry(prefix: string, inputurls: any | undefined) {
+async function getRPCfromRegistry(prefix: string, inputurls?: Array<string>) {
 	const registry = await axios.get(`https://api.github.com/repos/cosmos/chain-registry/contents/`);
 	let path = "";
 	registry.data.forEach((elem: any) => {

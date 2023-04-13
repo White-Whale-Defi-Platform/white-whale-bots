@@ -182,7 +182,6 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	 *
 	 */
 	public async getNewClients(): Promise<string | void> {
-		//await this.logger?.sendMessage("Error: \n" + String(errmsg), LogType.All);
 		let out: string;
 		const TIMEOUTDUR = 60000; // 10 Min timeout if error
 		let n = 0;
@@ -203,7 +202,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 			n++;
 		}
 		if (!urlString) {
-			//await this.logger?.sendMessage("All RPC's Timeouted", LogType.Console);
+			console.log("All RPC's Timeouted");
 			let n: number = Date.now();
 			let nextUrl: string = this._currRpcUrl;
 			for (const [url, timeouted] of this._timeoutRPCs.entries()) {
@@ -216,11 +215,11 @@ class CosmjsAdapter implements ChainOperatorInterface {
 			await this.setClients(nextUrl);
 			out = nextUrl;
 		} else {
-			//await this.logger?.sendMessage("Updating Clients to: " + urlString, LogType.All);
+			console.log("Updating Clients to: " + urlString);
 			await this.setClients(urlString);
 			out = urlString;
 		}
-		//await this.logger?.sendMessage("Continue...", LogType.Console);
+		console.log("Continue...");
 		this._currRpcUrl = out;
 	}
 

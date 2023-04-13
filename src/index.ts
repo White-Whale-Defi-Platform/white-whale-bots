@@ -30,7 +30,7 @@ async function main() {
 	startupMessage += "\n**White Whale Bot**\n";
 	startupMessage += "===".repeat(30);
 	startupMessage += `\nEnvironment Variables:\n
-**RPC ENPDOINT:** \t${botConfig.rpcUrls}
+**RPC ENPDOINTS:** \t${botConfig.rpcUrls}
 **OFFER DENOM:** \t${JSON.stringify(botConfig.offerAssetInfo)}
 **FACTORIES_TO_ROUTERS_MAPPING:** \t${JSON.stringify(botConfig.mappingFactoryRouter)}
 **USE MEMPOOL:** \t${botConfig.useMempool}
