@@ -1,5 +1,6 @@
 import { fromAscii, fromBase64, fromUtf8 } from "@cosmjs/encoding";
 import { decodeTxRaw } from "@cosmjs/proto-signing";
+import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
 import { isSendMessage, SendMessage } from "../messages/sendmessages";
@@ -191,8 +192,8 @@ export function processMempool(
 					continue;
 				}
 			} else if (message.typeUrl == "/cosmos.bank.v1beta1.MsgSend") {
-				const msg: MsgExecuteContract = MsgExecuteContract.decode(message.value);
-				mempoolTrades[1].push({ sender: msg.sender, reciever: msg.contract });
+				const msgSend: MsgSend = MsgSend.decode(message.value);
+				mempoolTrades[1].push({ sender: msgSend.fromAddress, reciever: msgSend.toAddress });
 			}
 		}
 	}
