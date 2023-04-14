@@ -24,7 +24,6 @@ import { SkipBundleClient } from "@skip-mev/skipjs";
 import { MsgSend as CosmJSMsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { MsgExecuteContract as CosmJSMsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
-import { inspect } from "util";
 
 import { BotConfig } from "../../types/base/botConfig";
 import { Mempool } from "../../types/base/mempool";
@@ -42,7 +41,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 
 	private _network: Network;
 	private _publicKey: PublicKey;
-	private _publicAddress: string;
+	private _publicAddress!: string;
 
 	private _signer!: DirectSecp256k1HdWallet;
 	private _accountNumber = 0;
@@ -63,16 +62,16 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		});
 		this._spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
 		this._wasmQueryClient = new ChainGrpcWasmApi(endpoints.grpc);
-		this._httpClient = new HttpBatchClient(botConfig.rpcUrl);
+		this._httpClient = new HttpBatchClient(botConfig.rpcUrls[0]);
 		this._chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
 		this._network = network;
 		this._publicKey = privateKey.toPublicKey();
-		this._publicAddress = privateKey.toPublicKey().toAddress().address;
+		this.publicAddress = privateKey.toPublicKey().toAddress().address;
 	}
 	/**
 	 *
 	 */
-	public get sequence() {
+	public get sequence(): number {
 		return this._sequence;
 	}
 	/**
@@ -86,6 +85,12 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 */
 	public get publicAddress(): string {
 		return this._publicAddress;
+	}
+	/**
+	 *
+	 */
+	public set publicAddress(value) {
+		this._publicAddress = value;
 	}
 	/**
 	 *
@@ -104,7 +109,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		const baseAccount = BaseAccount.fromRestApi(accountDetailsResponse);
 		const accountDetails = baseAccount.toAccountDetails();
 		this._accountNumber = accountDetails.accountNumber;
-		this._sequence = accountDetails.sequence;
+		this.sequence = accountDetails.sequence;
 
 		const hdPath = stringToPath("m/44'/60'/0'/0/0");
 		this._signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
@@ -241,7 +246,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		} else {
 			signed = await this._skipBundleClient.signBundle([cosmTxRaw], this._signer, this._skipSigningAddress);
 		}
-		console.log(inspect(signed, { depth: null }));
 		const res = await this._skipBundleClient.sendBundle(signed, 0, true);
 		return res;
 	}
@@ -305,6 +309,13 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		} catch (error) {
 			console.log(error);
 		}
+	}
+	/**
+	 * Sets new Clients for Mempoolloop.
+	 * TODO!!!
+	 */
+	public async getNewClients() {
+		throw new Error("Change Clients not implemented for Injective yet");
 	}
 }
 

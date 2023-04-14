@@ -1,5 +1,6 @@
 import { fromAscii, fromBase64, fromUtf8 } from "@cosmjs/encoding";
 import { decodeTxRaw } from "@cosmjs/proto-signing";
+import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
 import { isSendMessage, SendMessage } from "../messages/sendmessages";
@@ -38,6 +39,7 @@ export interface MempoolTrade {
 		| JunoSwapOperationsMessage;
 	offer_asset: Asset | undefined;
 	txBytes: Uint8Array;
+	sender: string | undefined;
 }
 
 let txMemory: { [key: string]: boolean } = {};
@@ -60,8 +62,11 @@ export function showTxMemory() {
  *@param mempool The mempool(state) to process.
  *@return An array of swap, send and swap-operation messages that exist in the `mempool`.
  */
-export function processMempool(mempool: Mempool): Array<MempoolTrade> {
-	const mempoolTrades = [];
+export function processMempool(
+	mempool: Mempool,
+	ignoreAddresses: Set<string>,
+): [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] {
+	const mempoolTrades: [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] = [[], []];
 	for (const tx of mempool.txs) {
 		if (txMemory[tx] == true) {
 			// the transaction is already processed and stored in the txMemory
@@ -80,6 +85,7 @@ export function processMempool(mempool: Mempool): Array<MempoolTrade> {
 			) {
 				const msgExecuteContract: MsgExecuteContract = MsgExecuteContract.decode(message.value);
 				const containedMsg = JSON.parse(fromUtf8(msgExecuteContract.msg));
+				const sender = msgExecuteContract.sender;
 
 				// check if the message is a swap message we want to add to the relevant trades
 				if (isDefaultSwapMessage(containedMsg)) {
@@ -90,22 +96,24 @@ export function processMempool(mempool: Mempool): Array<MempoolTrade> {
 					if (isWyndDaoTokenAsset(offerAsset.info)) {
 						offerAsset.info = { token: { contract_addr: offerAsset.info.token } };
 					}
-					mempoolTrades.push({
+					mempoolTrades[0].push({
 						contract: msgExecuteContract.contract,
 						message: containedMsg,
 						offer_asset: offerAsset,
 						txBytes: txBytes,
+						sender: sender,
 					});
 					continue;
 				}
 
 				// check if the message is a junoswap message we want to add to the relevant trades
 				else if (isJunoSwapMessage(containedMsg)) {
-					mempoolTrades.push({
+					mempoolTrades[0].push({
 						contract: msgExecuteContract.contract,
 						message: containedMsg,
 						offer_asset: undefined,
 						txBytes: txBytes,
+						sender: sender,
 					});
 					continue;
 				}
@@ -123,7 +131,8 @@ export function processMempool(mempool: Mempool): Array<MempoolTrade> {
 								containedMsg.send.contract,
 							);
 							if (mempoolTrade) {
-								mempoolTrades.push(mempoolTrade);
+								mempoolTrade.sender = sender;
+								mempoolTrades[0].push(mempoolTrade);
 							}
 							continue;
 						} else if (isSwapMessage(msgJson)) {
@@ -134,11 +143,12 @@ export function processMempool(mempool: Mempool): Array<MempoolTrade> {
 								amount: containedMsg.send.amount,
 								info: { token: { contract_addr: token_addr } },
 							};
-							mempoolTrades.push({
+							mempoolTrades[0].push({
 								contract: contract,
 								message: containedMsg,
 								offer_asset: offer_asset,
 								txBytes: txBytes,
+								sender: sender,
 							});
 							continue;
 						} else {
@@ -153,29 +163,37 @@ export function processMempool(mempool: Mempool): Array<MempoolTrade> {
 						amount: containedMsg.execute_swap_operations.routes[0].offer_amount,
 						info: containedMsg.execute_swap_operations.routes[0].operations[0].t_f_m_swap.offer_asset_info,
 					};
-					mempoolTrades.push({
+					mempoolTrades[0].push({
 						contract: containedMsg.execute_swap_operations.routes[0].operations[0].t_f_m_swap.pair_contract,
 						message: containedMsg,
 						offer_asset: offerAsset,
 						txBytes: txBytes,
+						sender: sender,
 					});
 				} else if (isJunoSwapOperationsMessage(containedMsg)) {
-					mempoolTrades.push({
+					mempoolTrades[0].push({
 						contract: msgExecuteContract.contract,
 						message: containedMsg,
 						offer_asset: undefined,
 						txBytes: txBytes,
+						sender: sender,
 					});
 				}
 				// check if the message is a swap-operations router message we want to add to the relevant trades
 				else if (isSwapOperationsMessage(containedMsg)) {
 					const mempoolTrade = processSwapOperations(containedMsg, txBytes, msgExecuteContract);
 					if (mempoolTrade) {
-						mempoolTrades.push(mempoolTrade);
+						mempoolTrades[0].push(mempoolTrade);
 					}
+				} else if (ignoreAddresses.has(msgExecuteContract.contract)) {
+					const gets = fromAscii(fromBase64(containedMsg.delegate.msg));
+					mempoolTrades[1].push({ sender: msgExecuteContract.contract, reciever: gets });
 				} else {
 					continue;
 				}
+			} else if (message.typeUrl == "/cosmos.bank.v1beta1.MsgSend") {
+				const msgSend: MsgSend = MsgSend.decode(message.value);
+				mempoolTrades[1].push({ sender: msgSend.fromAddress, reciever: msgSend.toAddress });
 			}
 		}
 	}
@@ -212,6 +230,7 @@ function processSwapOperations(
 			message: containedMsg,
 			offer_asset: offerAsset,
 			txBytes: txBytes,
+			sender: msgExecuteContract?.sender,
 		};
 	}
 	if (isAstroSwapOperationsMessages(operationsMessage)) {
@@ -221,6 +240,7 @@ function processSwapOperations(
 			message: containedMsg,
 			offer_asset: offerAsset,
 			txBytes: txBytes,
+			sender: msgExecuteContract?.sender,
 		};
 	}
 	if (isWyndDaoSwapOperationsMessages(operationsMessage)) {
@@ -244,6 +264,7 @@ function processSwapOperations(
 			message: containedMsg,
 			offer_asset: offerAsset,
 			txBytes: txBytes,
+			sender: msgExecuteContract?.sender,
 		};
 	}
 }

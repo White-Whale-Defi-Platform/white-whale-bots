@@ -20,9 +20,17 @@ export async function getPoolsFromFactory(
 	const factorypairs: Array<{ pool: string; factory: string; router: string }> = [];
 	await Promise.all(
 		factoryMapping.map(async (factorymap) => {
-			let res: FactoryState = await chainOperator.queryContractSmart(factorymap.factory, {
-				pairs: { limit: 30 },
-			});
+			let res: FactoryState = { pairs: [] };
+			try {
+				res = await chainOperator.queryContractSmart(factorymap.factory, {
+					pairs: { limit: 30 },
+				});
+			} catch {
+				console.log("RPC err on getPoolsfromFactory ... switching RPC");
+				await chainOperator.client.getNewClients();
+				await getPoolsFromFactory(chainOperator, factoryMapping);
+				return;
+			}
 
 			res.pairs.map((factorypair) => {
 				factorypairs.push({

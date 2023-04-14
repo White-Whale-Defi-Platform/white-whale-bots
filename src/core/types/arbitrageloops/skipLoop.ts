@@ -45,8 +45,20 @@ export class SkipLoop extends MempoolLoop {
 		logger: Logger | undefined,
 
 		pathlib: Array<Path>,
+		ignoreAddresses: Set<string>,
 	) {
-		super(pools, paths, arbitrage, updateState, messageFunction, chainOperator, botConfig, logger, pathlib);
+		super(
+			pools,
+			paths,
+			arbitrage,
+			updateState,
+			messageFunction,
+			chainOperator,
+			botConfig,
+			logger,
+			pathlib,
+			ignoreAddresses,
+		);
 		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.logger = logger);
 	}
 
@@ -75,27 +87,34 @@ export class SkipLoop extends MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempoolTrades: Array<MempoolTrade> = processMempool(this.mempool);
+			const mempooltxs: [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] = processMempool(
+				this.mempool,
+				this.ignoreAddresses,
+			);
+			const mempoolTrades = mempooltxs[0];
+			mempooltxs[1].forEach((Element) => {
+				if (this.ignoreAddresses.has(Element.sender)) {
+					this.ignoreAddresses.add(Element.reciever);
+				}
+			});
+
 			if (mempoolTrades.length === 0) {
 				continue;
 			} else {
 				for (const trade of mempoolTrades) {
-					applyMempoolTradesOnPools(this.pools, [trade]);
-
-					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
-
-					if (arbTrade) {
-						await this.skipTrade(arbTrade, trade);
-
-						this.cdPaths(arbTrade.path);
-
-						break;
+					if (trade.sender && !this.ignoreAddresses.has(trade.sender)) {
+						applyMempoolTradesOnPools(this.pools, [trade]);
+						const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+						if (arbTrade) {
+							await this.skipTrade(arbTrade, trade);
+							//this.cdPaths(arbTrade.path);
+							break;
+						}
 					}
 				}
 			}
 		}
 	}
-
 	/**
 	 *
 	 */
@@ -154,6 +173,13 @@ export class SkipLoop extends MempoolLoop {
 
 					const logMessageCheckTx = `**CheckTx Error:** index: ${idx}\t ${String(item.log)}\n`;
 					logMessage = logMessage.concat(logMessageCheckTx);
+					if (toArbTrade?.sender && idx == 0 && item["code"] == "5") {
+						this.ignoreAddresses.add(toArbTrade.sender);
+						await this.logger?.sendMessage(
+							"Error on Trade from Address: " + toArbTrade.sender,
+							LogType.Console,
+						);
+					}
 				}
 			});
 		}
@@ -164,6 +190,15 @@ export class SkipLoop extends MempoolLoop {
 
 					const logMessageDeliverTx = `**DeliverTx Error:** index: ${idx}\t ${String(item.log)}\n`;
 					logMessage = logMessage.concat(logMessageDeliverTx);
+					if (idx == 0 && (item["code"] == 10 || item["code"] == 5)) {
+						if (toArbTrade?.sender) {
+							this.ignoreAddresses.add(toArbTrade.sender);
+							await this.logger?.sendMessage(
+								"Error on Trade from Address: " + toArbTrade.sender,
+								LogType.Console,
+							);
+						}
+					}
 				}
 			});
 		}

@@ -18,26 +18,36 @@ import { ChainOperatorInterface, TxResponse } from "../chainOperatorInterface";
 class CosmjsAdapter implements ChainOperatorInterface {
 	private _signingCWClient!: SigningCosmWasmClient; //used to sign transactions
 	private _tmClient!: Tendermint34Client; //used to broadcast transactions
-	private _httpClient: HttpBatchClient | HttpClient; //used to query rpc methods (unconfirmed_txs, account)
+	private _httpClient!: HttpBatchClient | HttpClient; //used to query rpc methods (unconfirmed_txs, account)
 	private _wasmQueryClient!: QueryClient & WasmExtension; //used to query wasm methods (contract states)
 	private _account!: AccountData;
 	private _publicAddress!: string;
 	private _accountNumber = 0;
 	private _sequence = 0;
-
+	private _chainPrefix: string;
 	private _chainId!: string;
-
 	private _signer!: DirectSecp256k1HdWallet;
 	private _skipBundleClient?: SkipBundleClient;
+	private _timeoutRPCs: Map<string, number>;
+
+	private _rpcUrls!: Array<string>;
+	private _denom!: string;
+	private _gasPrice!: string;
+	private _currRpcUrl: string;
 
 	/**
 	 *
 	 */
 	constructor(botConfig: BotConfig) {
-		this._httpClient = new HttpBatchClient(botConfig.rpcUrl);
+		this._chainPrefix = botConfig.chainPrefix;
+		this._timeoutRPCs = new Map<string, number>();
+		this._currRpcUrl = botConfig.rpcUrls[0];
 		if (botConfig.skipConfig) {
 			this._skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
 		}
+		this._rpcUrls = botConfig.rpcUrls;
+		this._denom = botConfig.baseDenom;
+		this._gasPrice = botConfig.gasPrice;
 	}
 	/**
 	 *
@@ -60,6 +70,12 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
+	public set publicAddress(value) {
+		this._publicAddress = value;
+	}
+	/**
+	 *
+	 */
 	public get chainId(): string {
 		return this._chainId;
 	}
@@ -68,24 +84,30 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	 */
 	async init(botConfig: BotConfig) {
 		// derive signing wallet
-		const signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
+		this._signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
 			prefix: botConfig.chainPrefix,
 		});
-		this._signer = signer;
-
 		// connect to client and querier
-		this._signingCWClient = await SigningCosmWasmClient.connectWithSigner(botConfig.rpcUrl, signer, {
-			prefix: botConfig.chainPrefix,
-			gasPrice: GasPrice.fromString(botConfig.gasPrice + botConfig.baseDenom),
-		});
-		this._tmClient = await Tendermint34Client.create(this._httpClient);
-		this._wasmQueryClient = QueryClient.withExtensions(this._tmClient, setupWasmExtension, setupAuthExtension);
-		this._account = (await signer.getAccounts())[0];
+		await this.setClients(botConfig.rpcUrls[0]);
+		this._account = (await this._signer.getAccounts())[0];
 		const { accountNumber, sequence } = await this._signingCWClient.getSequence(this._account.address);
 		this._chainId = await this._signingCWClient.getChainId();
 		this._accountNumber = accountNumber;
-		this._sequence = sequence;
-		this._publicAddress = this._account.address;
+		this.sequence = sequence;
+		this.publicAddress = this._account.address;
+	}
+
+	/**
+	 *
+	 */
+	async setClients(rpcUrl: string) {
+		this._httpClient = new HttpBatchClient(rpcUrl);
+		this._tmClient = await Tendermint34Client.create(this._httpClient);
+		this._wasmQueryClient = QueryClient.withExtensions(this._tmClient, setupWasmExtension, setupAuthExtension);
+		this._signingCWClient = await SigningCosmWasmClient.connectWithSigner(rpcUrl, this._signer, {
+			prefix: this._chainPrefix,
+			gasPrice: GasPrice.fromString(this._gasPrice + this._denom),
+		});
 	}
 	/**
 	 *
@@ -156,6 +178,52 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	}
 
 	/**
+	 * Sets new Clients for Mempoolloop.
+	 *
+	 */
+	public async getNewClients(): Promise<string | void> {
+		let out: string;
+		const TIMEOUTDUR = 60000; // 10 Min timeout if error
+		let n = 0;
+		let urlString: string | undefined;
+		this._timeoutRPCs.set(this._currRpcUrl, Date.now());
+		while (!urlString && n < this._rpcUrls.length) {
+			const currTime: number = Date.now();
+
+			if (!this._timeoutRPCs.has(this._rpcUrls[n])) {
+				urlString = this._rpcUrls[n];
+			} else {
+				const errTime = this._timeoutRPCs.get(this._rpcUrls[n]);
+				if (errTime && errTime + TIMEOUTDUR <= currTime) {
+					this._timeoutRPCs.delete(this._rpcUrls[n]);
+					urlString = this._rpcUrls[n];
+				}
+			}
+			n++;
+		}
+		if (!urlString) {
+			console.log("All RPC's Timeouted");
+			let n: number = Date.now();
+			let nextUrl: string = this._currRpcUrl;
+			for (const [url, timeouted] of this._timeoutRPCs.entries()) {
+				if (timeouted < n) {
+					n = timeouted;
+					nextUrl = url;
+				}
+			}
+			await delay(TIMEOUTDUR + n - Date.now());
+			await this.setClients(nextUrl);
+			out = nextUrl;
+		} else {
+			console.log("Updating Clients to: " + urlString);
+			await this.setClients(urlString);
+			out = urlString;
+		}
+		console.log("Continue...");
+		this._currRpcUrl = out;
+	}
+
+	/**
 	 *
 	 */
 	async reset(): Promise<void> {
@@ -163,6 +231,12 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		this._accountNumber = accountNumber;
 		this._sequence = sequence;
 	}
+}
+/**
+ *
+ */
+function delay(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export default CosmjsAdapter;

@@ -37,13 +37,14 @@ export class ChainOperator {
 		const cosmjsClient = new CosmjsAdapter(botConfig);
 		await cosmjsClient.init(botConfig);
 		return new Promise((resolve, reject) => {
-			resolve(new ChainOperator(cosmjsClient, botConfig.rpcUrl));
+			resolve(new ChainOperator(cosmjsClient, botConfig.rpcUrls[0]));
 		});
 	}
 	/**
 	 *
 	 */
 	async queryContractSmart(address: string, queryMsg: Record<string, unknown>): Promise<JsonObject> {
+		//Error handled in getPoolState.
 		return await this.client.queryContractSmart(address, queryMsg);
 	}
 
@@ -51,7 +52,13 @@ export class ChainOperator {
 	 *
 	 */
 	async queryMempool() {
-		return await this.client.queryMempool();
+		try {
+			return await this.client.queryMempool();
+		} catch (e) {
+			console.log(e);
+			await this.client.getNewClients();
+			return await this.client.queryMempool();
+		}
 	}
 	/**
 	 *
@@ -61,7 +68,13 @@ export class ChainOperator {
 		fee?: StdFee | "auto",
 		memo?: string | undefined,
 	): Promise<TxResponse> {
-		return await this.client.signAndBroadcast(msgs, fee, memo);
+		try {
+			return await this.client.signAndBroadcast(msgs, fee, memo);
+		} catch (e) {
+			console.log(e);
+			await this.client.getNewClients();
+			return await this.client.signAndBroadcast(msgs, fee, memo);
+		}
 	}
 
 	/**
@@ -74,6 +87,12 @@ export class ChainOperator {
 	 *
 	 */
 	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string, otherTx?: TxRaw) {
-		return await this.client.signAndBroadcastSkipBundle(messages, fee, memo, otherTx);
+		try {
+			return await this.client.signAndBroadcastSkipBundle(messages, fee, memo, otherTx);
+		} catch (e) {
+			console.log(e);
+			await this.client.getNewClients();
+			return await this.client.signAndBroadcastSkipBundle(messages, fee, memo, otherTx);
+		}
 	}
 }
