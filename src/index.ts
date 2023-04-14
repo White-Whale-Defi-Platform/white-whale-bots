@@ -25,11 +25,11 @@ dotenv.config();
  */
 async function main() {
 	const botConfig = await setBotConfig(process.env);
-
 	let startupMessage = "===".repeat(30);
 	startupMessage += "\n**White Whale Bot**\n";
 	startupMessage += "===".repeat(30);
 	startupMessage += `\nEnvironment Variables:\n
+**RPC ENDPOINT SCRAPER: ** \t${botConfig.useRpcUrlScraper}
 **RPC ENPDOINTS:** \t${botConfig.rpcUrls}
 **OFFER DENOM:** \t${JSON.stringify(botConfig.offerAssetInfo)}
 **FACTORIES_TO_ROUTERS_MAPPING:** \t${JSON.stringify(botConfig.mappingFactoryRouter)}

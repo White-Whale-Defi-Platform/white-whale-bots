@@ -24,6 +24,7 @@ interface LoggerConfig {
 export interface BotConfig {
 	chainPrefix: string;
 	rpcUrls: Array<string>;
+	useRpcUrlScraper: boolean;
 	ignoreAddresses: Set<string>;
 	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
 	maxPathPools: number;
@@ -53,11 +54,17 @@ export interface BotConfig {
  */
 export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> {
 	validateEnvs(envs);
-	let RPCURLS;
-	if (envs.RPC_URL) {
-		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, JSON.parse(envs.RPC_URL));
-	} else {
+	let RPCURLS: Array<string>;
+	if (envs.RPC_URL && envs.USE_RPC_URL_SCRAPER) {
+		const RPCURLS_PROVIDED = envs.RPC_URL.startsWith("[") ? JSON.parse(envs.RPC_URL) : [envs.RPC_URL];
+		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, RPCURLS_PROVIDED);
+	} else if (!envs.RPC_URL && envs.USE_RPC_URL_SCRAPER) {
 		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX);
+	} else if (envs.RPC_URL) {
+		RPCURLS = envs.RPC_URL.startsWith("[") ? JSON.parse(envs.RPC_URL) : [envs.RPC_URL];
+	} else {
+		console.log("no RPC URL provided or USE_RPC_URL_SCRAPER not set correctly");
+		process.exit(1);
 	}
 	let pools = envs.POOLS.trim()
 		.replace(/\n|\r|\t/g, "")
@@ -129,6 +136,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	const botConfig: BotConfig = {
 		chainPrefix: envs.CHAIN_PREFIX,
 		rpcUrls: RPCURLS,
+		useRpcUrlScraper: envs.USE_RPC_URL_SCRAPER == "1" ? true : false,
 		poolEnvs: POOLS_ENVS,
 		maxPathPools: MAX_PATH_HOPS,
 		mappingFactoryRouter: FACTORIES_TO_ROUTERS_MAPPING,

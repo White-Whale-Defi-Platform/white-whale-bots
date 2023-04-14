@@ -24,8 +24,12 @@ declare namespace NodeJS {
 		/**
 		 * The http endpoint to the RPC.
 		 */
-
 		RPC_URL: string;
+		/**
+		 * Whether or not to use cosmos chainregistry for finding public endpoints and using them
+		 * if necessary.
+		 */
+		USE_RPC_URL_SCRAPER: string;
 		/**
 		 * A list of all the factories to map, separated by ", \n".
 		 *
