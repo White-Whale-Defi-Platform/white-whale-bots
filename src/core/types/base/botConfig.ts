@@ -55,10 +55,10 @@ export interface BotConfig {
 export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> {
 	validateEnvs(envs);
 	let RPCURLS: Array<string>;
-	if (envs.RPC_URL && envs.USE_RPC_URL_SCRAPER) {
+	if (envs.RPC_URL && envs.USE_RPC_URL_SCRAPER == "1") {
 		const RPCURLS_PROVIDED = envs.RPC_URL.startsWith("[") ? JSON.parse(envs.RPC_URL) : [envs.RPC_URL];
 		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, RPCURLS_PROVIDED);
-	} else if (!envs.RPC_URL && envs.USE_RPC_URL_SCRAPER) {
+	} else if (!envs.RPC_URL && envs.USE_RPC_URL_SCRAPER == "1") {
 		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX);
 	} else if (envs.RPC_URL) {
 		RPCURLS = envs.RPC_URL.startsWith("[") ? JSON.parse(envs.RPC_URL) : [envs.RPC_URL];
