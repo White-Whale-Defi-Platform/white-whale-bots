@@ -20,7 +20,7 @@ import {
 	SwapOperationsMessage,
 	TFMSwapOperationsMessage,
 } from "../messages/swapmessages";
-import { Asset, isWyndDaoNativeAsset, isWyndDaoTokenAsset } from "./asset";
+import { Asset, fromChainAsset, isWyndDaoNativeAsset, isWyndDaoTokenAsset } from "./asset";
 
 export interface Mempool {
 	n_txs: string;
@@ -99,7 +99,7 @@ export function processMempool(
 					mempoolTrades[0].push({
 						contract: msgExecuteContract.contract,
 						message: containedMsg,
-						offer_asset: offerAsset,
+						offer_asset: fromChainAsset(offerAsset),
 						txBytes: txBytes,
 						sender: sender,
 					});
@@ -139,14 +139,14 @@ export function processMempool(
 							// swap message inside a send message
 							const contract = containedMsg.send.contract;
 							const token_addr = msgExecuteContract.contract;
-							const offer_asset: Asset = {
+							const offerAsset: Asset = {
 								amount: containedMsg.send.amount,
 								info: { token: { contract_addr: token_addr } },
 							};
 							mempoolTrades[0].push({
 								contract: contract,
 								message: containedMsg,
-								offer_asset: offer_asset,
+								offer_asset: fromChainAsset(offerAsset),
 								txBytes: txBytes,
 								sender: sender,
 							});
@@ -166,7 +166,7 @@ export function processMempool(
 					mempoolTrades[0].push({
 						contract: containedMsg.execute_swap_operations.routes[0].operations[0].t_f_m_swap.pair_contract,
 						message: containedMsg,
-						offer_asset: offerAsset,
+						offer_asset: fromChainAsset(offerAsset),
 						txBytes: txBytes,
 						sender: sender,
 					});
@@ -197,6 +197,7 @@ export function processMempool(
 			}
 		}
 	}
+
 	return mempoolTrades;
 }
 
@@ -228,7 +229,7 @@ function processSwapOperations(
 		return {
 			contract: swapContract,
 			message: containedMsg,
-			offer_asset: offerAsset,
+			offer_asset: fromChainAsset(offerAsset),
 			txBytes: txBytes,
 			sender: msgExecuteContract?.sender,
 		};
@@ -238,7 +239,7 @@ function processSwapOperations(
 		return {
 			contract: swapContract,
 			message: containedMsg,
-			offer_asset: offerAsset,
+			offer_asset: fromChainAsset(offerAsset),
 			txBytes: txBytes,
 			sender: msgExecuteContract?.sender,
 		};
@@ -262,7 +263,7 @@ function processSwapOperations(
 		return {
 			contract: swapContract,
 			message: containedMsg,
-			offer_asset: offerAsset,
+			offer_asset: fromChainAsset(offerAsset),
 			txBytes: txBytes,
 			sender: msgExecuteContract?.sender,
 		};

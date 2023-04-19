@@ -9,7 +9,7 @@ import {
 	isWWSwapOperationsMessages,
 	isWyndDaoSwapOperationsMessages,
 } from "../messages/swapmessages";
-import { Asset, AssetInfo, isMatchingAssetInfos, isWyndDaoNativeAsset } from "./asset";
+import { Asset, AssetInfo, fromChainAsset, isMatchingAssetInfos, isWyndDaoNativeAsset } from "./asset";
 import { MempoolTrade } from "./mempool";
 import { Path } from "./path";
 import { Uint128 } from "./uint128";
@@ -104,7 +104,6 @@ function applyTradeOnPool(pool: Pool, offer_asset: Asset) {
 
 		// Calculate return amount without deducting fees
 		const outGivenIn = Math.floor(a_out - k / (a_in + +offer_asset.amount));
-
 		// Update the assets of the pool
 		asset_in.amount = String(a_in + +offer_asset.amount);
 
@@ -136,24 +135,24 @@ export function applyMempoolTradesOnPools(pools: Array<Pool>, mempoolTrades: Arr
 					applyTradeOnPool(poolToUpdate, trade.offer_asset);
 				} else if (isJunoSwapMessage(msg) && trade.offer_asset === undefined) {
 					// For JunoSwap messages we dont have an offerAsset provided in the message
-					const offerAsset: Asset = {
+					const offerAsset: Asset = fromChainAsset({
 						amount: msg.swap.input_amount,
 						info:
 							msg.swap.input_token === "Token1"
 								? poolToUpdate.assets[0].info
 								: poolToUpdate.assets[1].info,
-					};
+					});
 					applyTradeOnPool(poolToUpdate, offerAsset);
 				} else if (isJunoSwapOperationsMessage(msg) && trade.offer_asset === undefined) {
 					// JunoSwap operations router message
 					// For JunoSwap messages we dont have an offerAsset provided in the message
-					const offerAsset: Asset = {
+					const offerAsset: Asset = fromChainAsset({
 						amount: msg.pass_through_swap.input_token_amount,
 						info:
 							msg.pass_through_swap.input_token === "Token1"
 								? poolToUpdate.assets[0].info
 								: poolToUpdate.assets[1].info,
-					};
+					});
 					applyTradeOnPool(poolToUpdate, offerAsset);
 
 					// Second swap
