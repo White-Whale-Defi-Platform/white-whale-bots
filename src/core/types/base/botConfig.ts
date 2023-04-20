@@ -184,6 +184,26 @@ function validateSkipEnvs(envs: NodeJS.ProcessEnv) {
 /**
  *
  */
+function randomize(values: Array<string>) {
+	let index = values.length,
+		randomIndex;
+
+	// While there remain elements to shuffle.
+	while (index != 0) {
+		// Pick a remaining element.
+		randomIndex = Math.floor(Math.random() * index);
+		index--;
+
+		// And swap it with the current element.
+		[values[index], values[randomIndex]] = [values[randomIndex], values[index]];
+	}
+
+	return values;
+}
+
+/**
+ *
+ */
 async function getRPCfromRegistry(prefix: string, inputurls?: Array<string>) {
 	const registry = await axios.get(`https://api.github.com/repos/cosmos/chain-registry/contents/`);
 	let path = "";
@@ -195,7 +215,7 @@ async function getRPCfromRegistry(prefix: string, inputurls?: Array<string>) {
 	const chaindata = await axios.get(
 		`https://raw.githubusercontent.com/cosmos/chain-registry/master/${path}/chain.json`,
 	);
-	const rpcs = chaindata.data.apis.rpc;
+	const rpcs = randomize(chaindata.data.apis.rpc);
 	let out: Array<string>;
 	if (!inputurls) {
 		out = new Array<string>();
