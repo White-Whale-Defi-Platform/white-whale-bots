@@ -58,7 +58,7 @@ function getFlashArbMessage(path: Path, offerAsset0: Asset): FlashLoanMessage {
 function getWasmMessages(pool: Pool, _offerAsset: Asset) {
 	const [outGivenInTrade, returnAssetInfo] = outGivenIn(pool, _offerAsset);
 	const offerAssetChain = toChainAsset(_offerAsset); //will be compensated for 18 decimals if needed
-	const beliefPriceChain = toChainPrice(offerAssetChain, { amount: String(outGivenInTrade), info: returnAssetInfo }); //will be compensated for 18 decimals if needed
+	const beliefPriceChain = toChainPrice(_offerAsset, { amount: String(outGivenInTrade), info: returnAssetInfo }); //will be compensated for 18 decimals if needed
 	let msg: DefaultSwapMessage | JunoSwapMessage | SendMessage;
 	if (pool.dexname === AmmDexName.default || pool.dexname === AmmDexName.wyndex) {
 		if (isNativeAsset(offerAssetChain.info)) {
