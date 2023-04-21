@@ -64,7 +64,7 @@ export function showTxMemory() {
  */
 export function processMempool(
 	mempool: Mempool,
-	ignoreAddresses: Set<string>,
+	ignoreAddresses: { [index: string]: boolean },
 ): [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] {
 	const mempoolTrades: [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] = [[], []];
 	for (const tx of mempool.txs) {
@@ -185,7 +185,7 @@ export function processMempool(
 					if (mempoolTrade) {
 						mempoolTrades[0].push(mempoolTrade);
 					}
-				} else if (ignoreAddresses.has(msgExecuteContract.contract)) {
+				} else if (ignoreAddresses[msgExecuteContract.contract]) {
 					const gets = fromAscii(fromBase64(containedMsg.delegate.msg));
 					mempoolTrades[1].push({ sender: msgExecuteContract.contract, reciever: gets });
 				} else {

@@ -45,7 +45,7 @@ export class SkipLoop extends MempoolLoop {
 		logger: Logger | undefined,
 
 		pathlib: Array<Path>,
-		ignoreAddresses: Set<string>,
+		ignoreAddresses: { [index: string]: boolean },
 	) {
 		super(
 			pools,
@@ -93,8 +93,8 @@ export class SkipLoop extends MempoolLoop {
 			);
 			const mempoolTrades = mempooltxs[0];
 			mempooltxs[1].forEach((Element) => {
-				if (this.ignoreAddresses.has(Element.sender)) {
-					this.ignoreAddresses.add(Element.reciever);
+				if (this.ignoreAddresses[Element.sender]) {
+					this.ignoreAddresses[Element.reciever] = true;
 				}
 			});
 
@@ -102,7 +102,7 @@ export class SkipLoop extends MempoolLoop {
 				continue;
 			} else {
 				for (const trade of mempoolTrades) {
-					if (trade.sender && !this.ignoreAddresses.has(trade.sender)) {
+					if (trade.sender && !this.ignoreAddresses[trade.sender]) {
 						applyMempoolTradesOnPools(this.pools, [trade]);
 						const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 						if (arbTrade) {
@@ -174,7 +174,7 @@ export class SkipLoop extends MempoolLoop {
 					const logMessageCheckTx = `**CheckTx Error:** index: ${idx}\t ${String(item.log)}\n`;
 					logMessage = logMessage.concat(logMessageCheckTx);
 					if (toArbTrade?.sender && idx == 0 && item["code"] == "5") {
-						this.ignoreAddresses.add(toArbTrade.sender);
+						this.ignoreAddresses[toArbTrade.sender] = true;
 						await this.logger?.sendMessage(
 							"Error on Trade from Address: " + toArbTrade.sender,
 							LogType.Console,
@@ -192,7 +192,7 @@ export class SkipLoop extends MempoolLoop {
 					logMessage = logMessage.concat(logMessageDeliverTx);
 					if (idx == 0 && (item["code"] == 10 || item["code"] == 5)) {
 						if (toArbTrade?.sender) {
-							this.ignoreAddresses.add(toArbTrade.sender);
+							this.ignoreAddresses[toArbTrade.sender] = true;
 							await this.logger?.sendMessage(
 								"Error on Trade from Address: " + toArbTrade.sender,
 								LogType.Console,
