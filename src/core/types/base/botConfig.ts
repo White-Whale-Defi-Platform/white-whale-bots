@@ -25,7 +25,7 @@ export interface BotConfig {
 	chainPrefix: string;
 	rpcUrls: Array<string>;
 	useRpcUrlScraper: boolean;
-	ignoreAddresses: Set<string>;
+	ignoreAddresses: { [index: string]: boolean };
 	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
 	maxPathPools: number;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
@@ -85,11 +85,11 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
 	const MAX_PATH_HOPS = +envs.MAX_PATH_HOPS; //required gas units per trade (hop)
 
-	const IGNORE_ADDRS = new Set<string>();
+	const IGNORE_ADDRS: { [index: string]: boolean } = {};
 	// set ignored Addresses
 	if (envs.IGNORE_ADDRESSES) {
 		const addrs = JSON.parse(envs.IGNORE_ADDRESSES);
-		addrs.forEach((element: string) => IGNORE_ADDRS.add(element));
+		addrs.forEach((element: string) => (IGNORE_ADDRS[element] = true));
 	}
 	// setup skipconfig if present
 	let skipConfig;
@@ -184,6 +184,26 @@ function validateSkipEnvs(envs: NodeJS.ProcessEnv) {
 /**
  *
  */
+function randomize(values: Array<string>) {
+	let index = values.length,
+		randomIndex;
+
+	// While there remain elements to shuffle.
+	while (index != 0) {
+		// Pick a remaining element.
+		randomIndex = Math.floor(Math.random() * index);
+		index--;
+
+		// And swap it with the current element.
+		[values[index], values[randomIndex]] = [values[randomIndex], values[index]];
+	}
+
+	return values;
+}
+
+/**
+ *
+ */
 async function getRPCfromRegistry(prefix: string, inputurls?: Array<string>) {
 	const registry = await axios.get(`https://api.github.com/repos/cosmos/chain-registry/contents/`);
 	let path = "";
@@ -195,7 +215,7 @@ async function getRPCfromRegistry(prefix: string, inputurls?: Array<string>) {
 	const chaindata = await axios.get(
 		`https://raw.githubusercontent.com/cosmos/chain-registry/master/${path}/chain.json`,
 	);
-	const rpcs = chaindata.data.apis.rpc;
+	const rpcs = randomize(chaindata.data.apis.rpc);
 	let out: Array<string>;
 	if (!inputurls) {
 		out = new Array<string>();
