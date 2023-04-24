@@ -1,10 +1,10 @@
 import { fromAscii, fromBase64, fromUtf8 } from "@cosmjs/encoding";
 import { decodeTxRaw } from "@cosmjs/proto-signing";
+import { parseCoins } from "@cosmjs/stargate";
 import { MsgExecuteContractCompat as MsgExecuteContractCompatBase } from "@injectivelabs/chain-api/injective/wasmx/v1/tx_pb";
 import { MsgExecuteContractCompat } from "@injectivelabs/sdk-ts";
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
-import { inspect } from "util";
 
 import { isSendMessage, SendMessage } from "../messages/sendmessages";
 import {
@@ -93,13 +93,12 @@ export function processMempool(
 				const msgExecuteContractCompatBase: MsgExecuteContractCompatBase =
 					MsgExecuteContractCompatBase.deserializeBinary(message.value);
 				const funds = msgExecuteContractCompatBase.getFunds();
-				const coinAmount = funds.replace(/(^\d+)(.+$)/i, "$1");
 				containedMsg = JSON.parse(msgExecuteContractCompatBase.getMsg());
 				msgExecuteContract = MsgExecuteContractCompat.fromJSON({
 					contractAddress: msgExecuteContractCompatBase.getContract(),
 					sender: msgExecuteContractCompatBase.getSender(),
 					msg: containedMsg,
-					funds: funds === "0" ? [] : { amount: coinAmount, denom: funds.split(coinAmount)[1] },
+					funds: funds === "0" ? [] : parseCoins(funds),
 				});
 			}
 			if (message.typeUrl === "/cosmwasm.wasm.v1.MsgExecuteContract") {
@@ -108,7 +107,6 @@ export function processMempool(
 			} else {
 				continue;
 			}
-			console.log(message.typeUrl, containedMsg, inspect(msgExecuteContract.funds, true, null, true));
 			// check if the message is a swap message we want to add to the relevant trades
 			if (isDefaultSwapMessage(containedMsg)) {
 				const offerAsset = containedMsg.swap.offer_asset;
