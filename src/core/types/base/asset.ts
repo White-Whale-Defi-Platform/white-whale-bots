@@ -85,7 +85,11 @@ export function toChainAsset(input: Asset): Asset {
 			amount: String(new BigNumber(+input.amount).multipliedBy(new BigNumber(10).pow(12))),
 			info: input.info,
 		};
-	} else return input;
+	} else
+		return {
+			amount: String(Math.floor(+input.amount)),
+			info: input.info,
+		};
 }
 
 /**

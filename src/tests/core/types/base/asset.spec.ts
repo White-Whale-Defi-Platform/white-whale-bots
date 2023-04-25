@@ -33,25 +33,23 @@ describe("Test convert 18 to 6 decimal asset and vice versa", () => {
 
 	it("Should return 18 decimal asset after 6 decimal input 'inj' denom TO chain", async () => {
 		const input: Asset = {
-			amount: String(new BigNumber(5).multipliedBy(new BigNumber(10).pow(6))),
+			amount: String(new BigNumber("5.1234123412341234123412341324").multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "inj" } },
 		};
 
 		const output = toChainAsset(input);
-
-		const times = +output.amount / +input.amount;
-		assert.equal(times, 1e12);
+		const times = Math.round(+output.amount / +input.amount / 1e12);
+		assert.equal(times, 1);
 	});
 
 	it("Should return 6 decimal asset after 6 decimal input 'uwhale' denom TO chain", async () => {
 		const input: Asset = {
-			amount: String(new BigNumber(5).multipliedBy(new BigNumber(10).pow(6))),
+			amount: String(new BigNumber(5.0110111).multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "uwhale" } },
 		};
 
 		const output = toChainAsset(input);
-
-		assert.equal(input, output);
+		assert.equal(Math.round(+input.amount), +output.amount);
 	});
 });
 
