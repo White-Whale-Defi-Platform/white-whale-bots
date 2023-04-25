@@ -1,3 +1,5 @@
+import { BigNumber } from "bignumber.js";
+
 import { isSendMessage } from "../messages/sendmessages";
 import {
 	isAstroSwapOperationsMessages,
@@ -13,6 +15,10 @@ import { Asset, AssetInfo, fromChainAsset, isMatchingAssetInfos, isWyndDaoNative
 import { MempoolTrade } from "./mempool";
 import { Path } from "./path";
 import { Uint128 } from "./uint128";
+BigNumber.config({
+	ROUNDING_MODE: BigNumber.ROUND_DOWN,
+	EXPONENTIAL_AT: [-10, 20],
+});
 
 export enum AmmDexName {
 	junoswap = "junoswap",
@@ -51,19 +57,22 @@ export interface Pool {
  * @return [number, assetInfo] of the received asset by the user.
  */
 export function outGivenIn(pool: Pool, offer_asset: Asset): [number, AssetInfo] {
-	const k = +pool.assets[0].amount * +pool.assets[1].amount;
 	const [asset_in, asset_out] = getAssetsOrder(pool, offer_asset.info) ?? [];
-	const a_in = +asset_in.amount;
-	const a_out = +asset_out.amount;
+	const a_in = BigNumber(asset_in.amount);
+	const a_out = BigNumber(asset_out.amount);
+	const k = a_in.multipliedBy(a_out);
 	if (pool.inputfee > 0) {
 		// pool uses inputfees
-		const r1 = 1 - pool.inputfee / 100;
-		const amount_in_after_fee = Math.floor(+offer_asset.amount * r1);
-		const outGivenIn = Math.floor(a_out - k / (a_in + amount_in_after_fee));
+		const r1 = BigNumber(BigNumber(1).minus(BigNumber(pool.inputfee).dividedBy(100)));
+		const amount_in_after_fee = BigNumber(offer_asset.amount).multipliedBy(r1);
+		const outGivenIn = a_out.minus(k.dividedBy(a_in.plus(amount_in_after_fee))).toNumber();
 		return [outGivenIn, asset_out.info];
 	} else {
-		const r2 = 1 - pool.outputfee / 100;
-		const outGivenIn = Math.floor(r2 * Math.floor(a_out - k / (a_in + +offer_asset.amount)));
+		const r2 = BigNumber(1).minus(BigNumber(pool.outputfee).dividedBy(100));
+		const outGivenIn = a_out
+			.minus(k.dividedBy(a_in.plus(offer_asset.amount)))
+			.multipliedBy(r2)
+			.toNumber();
 		return [outGivenIn, asset_out.info];
 	}
 }
