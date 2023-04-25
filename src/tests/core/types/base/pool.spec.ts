@@ -69,10 +69,10 @@ describe("Test outGivenIn for pool with 6 and 6 decimal assets", () => {
 			{
 				info: {
 					native_token: {
-						denom: "inj",
+						denom: "uwhale",
 					},
 				},
-				amount: "144264731967.836615185675",
+				amount: "1442647319670",
 			},
 			{
 				info: {
@@ -94,10 +94,10 @@ describe("Test outGivenIn for pool with 6 and 6 decimal assets", () => {
 	});
 	it("Should return positive number for given swap", async () => {
 		const input: Asset = {
-			amount: "27244227",
+			amount: "1000000",
 			info: {
 				native_token: {
-					denom: "peggy0xdAC17F958D2ee523a2206206994597C13D831ec7",
+					denom: "uwhale",
 				},
 			},
 		};
@@ -105,18 +105,20 @@ describe("Test outGivenIn for pool with 6 and 6 decimal assets", () => {
 		const output = outGivenIn(pool, input);
 		assert.isAbove(output[0], 0);
 	});
-	it("Should return 4138502584293659410 within 1000 margin for given input swap 27244227peggy0xdAC17F958D2ee523a2206206994597C13D831ec7", async () => {
+	it("Should return tokens nearly equal to the price of uwhale in the pool for swapping 1whale", async () => {
 		const input: Asset = {
-			amount: "27244227",
+			amount: "1000000",
 			info: {
 				native_token: {
-					denom: "peggy0xdAC17F958D2ee523a2206206994597C13D831ec7",
+					denom: "uwhale",
 				},
 			},
 		};
-
 		const output = outGivenIn(pool, input);
-		assert.closeTo(output[0] * 1e12, BigNumber("4138502584293659410").toNumber(), 1000);
+		const price = BigNumber(pool.assets[1].amount).dividedBy(BigNumber(pool.assets[0].amount));
+		console.log(`price ${price.toNumber() * 0.997 * +input.amount}, outgivenin: ${output[0]}`);
+
+		assert.closeTo(price.toNumber() * 0.997 * +input.amount, output[0], 100);
 	});
 });
 
