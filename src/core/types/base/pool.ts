@@ -1,3 +1,5 @@
+import { BigNumber } from "bignumber.js";
+
 import { isSendMessage } from "../messages/sendmessages";
 import {
 	isAstroSwapOperationsMessages,
@@ -9,10 +11,14 @@ import {
 	isWWSwapOperationsMessages,
 	isWyndDaoSwapOperationsMessages,
 } from "../messages/swapmessages";
-import { Asset, AssetInfo, isMatchingAssetInfos, isWyndDaoNativeAsset } from "./asset";
+import { Asset, AssetInfo, fromChainAsset, isMatchingAssetInfos, isWyndDaoNativeAsset } from "./asset";
 import { MempoolTrade } from "./mempool";
 import { Path } from "./path";
 import { Uint128 } from "./uint128";
+BigNumber.config({
+	ROUNDING_MODE: BigNumber.ROUND_DOWN,
+	EXPONENTIAL_AT: [-10, 20],
+});
 
 export enum AmmDexName {
 	junoswap = "junoswap",
@@ -51,19 +57,22 @@ export interface Pool {
  * @return [number, assetInfo] of the received asset by the user.
  */
 export function outGivenIn(pool: Pool, offer_asset: Asset): [number, AssetInfo] {
-	const k = +pool.assets[0].amount * +pool.assets[1].amount;
 	const [asset_in, asset_out] = getAssetsOrder(pool, offer_asset.info) ?? [];
-	const a_in = +asset_in.amount;
-	const a_out = +asset_out.amount;
+	const a_in = BigNumber(asset_in.amount);
+	const a_out = BigNumber(asset_out.amount);
+	const k = a_in.multipliedBy(a_out);
 	if (pool.inputfee > 0) {
 		// pool uses inputfees
-		const r1 = 1 - pool.inputfee / 100;
-		const amount_in_after_fee = Math.floor(+offer_asset.amount * r1);
-		const outGivenIn = Math.floor(a_out - k / (a_in + amount_in_after_fee));
+		const r1 = BigNumber(BigNumber(1).minus(BigNumber(pool.inputfee).dividedBy(100)));
+		const amount_in_after_fee = BigNumber(offer_asset.amount).multipliedBy(r1);
+		const outGivenIn = a_out.minus(k.dividedBy(a_in.plus(amount_in_after_fee))).toNumber();
 		return [outGivenIn, asset_out.info];
 	} else {
-		const r2 = 1 - pool.outputfee / 100;
-		const outGivenIn = Math.floor(r2 * Math.floor(a_out - k / (a_in + +offer_asset.amount)));
+		const r2 = BigNumber(1).minus(BigNumber(pool.outputfee).dividedBy(100));
+		const outGivenIn = a_out
+			.minus(k.dividedBy(a_in.plus(offer_asset.amount)))
+			.multipliedBy(r2)
+			.toNumber();
 		return [outGivenIn, asset_out.info];
 	}
 }
@@ -104,7 +113,6 @@ function applyTradeOnPool(pool: Pool, offer_asset: Asset) {
 
 		// Calculate return amount without deducting fees
 		const outGivenIn = Math.floor(a_out - k / (a_in + +offer_asset.amount));
-
 		// Update the assets of the pool
 		asset_in.amount = String(a_in + +offer_asset.amount);
 
@@ -136,24 +144,24 @@ export function applyMempoolTradesOnPools(pools: Array<Pool>, mempoolTrades: Arr
 					applyTradeOnPool(poolToUpdate, trade.offer_asset);
 				} else if (isJunoSwapMessage(msg) && trade.offer_asset === undefined) {
 					// For JunoSwap messages we dont have an offerAsset provided in the message
-					const offerAsset: Asset = {
+					const offerAsset: Asset = fromChainAsset({
 						amount: msg.swap.input_amount,
 						info:
 							msg.swap.input_token === "Token1"
 								? poolToUpdate.assets[0].info
 								: poolToUpdate.assets[1].info,
-					};
+					});
 					applyTradeOnPool(poolToUpdate, offerAsset);
 				} else if (isJunoSwapOperationsMessage(msg) && trade.offer_asset === undefined) {
 					// JunoSwap operations router message
 					// For JunoSwap messages we dont have an offerAsset provided in the message
-					const offerAsset: Asset = {
+					const offerAsset: Asset = fromChainAsset({
 						amount: msg.pass_through_swap.input_token_amount,
 						info:
 							msg.pass_through_swap.input_token === "Token1"
 								? poolToUpdate.assets[0].info
 								: poolToUpdate.assets[1].info,
-					};
+					});
 					applyTradeOnPool(poolToUpdate, offerAsset);
 
 					// Second swap

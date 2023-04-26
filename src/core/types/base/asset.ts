@@ -1,3 +1,5 @@
+import BigNumber from "bignumber.js";
+
 import { Uint128 } from "./uint128";
 
 export interface Asset {
@@ -71,5 +73,52 @@ export function isMatchingAssetInfos(a: AssetInfo, b: AssetInfo) {
 		return isNativeAsset(b) && a.native_token.denom === b.native_token.denom;
 	} else {
 		return !isNativeAsset(b) && a.token.contract_addr === b.token.contract_addr;
+	}
+}
+
+/**
+ *
+ */
+export function toChainAsset(input: Asset): Asset {
+	if (isNativeAsset(input.info) && input.info.native_token.denom === "inj") {
+		return {
+			amount: String(new BigNumber(+input.amount).multipliedBy(new BigNumber(10).pow(12))),
+			info: input.info,
+		};
+	} else
+		return {
+			amount: String(Math.floor(+input.amount)),
+			info: input.info,
+		};
+}
+
+/**
+ *
+ */
+export function fromChainAsset(input: Asset): Asset {
+	if (isNativeAsset(input.info) && input.info.native_token.denom === "inj") {
+		return {
+			amount: String(new BigNumber(+input.amount).dividedBy(new BigNumber(10).pow(12))),
+			info: input.info,
+		};
+	} else return input;
+}
+
+/**
+ *
+ */
+export function toChainPrice(input: Asset, output: Asset): string {
+	if (isNativeAsset(output.info) && output.info.native_token.denom === "inj") {
+		const price = Math.round(new BigNumber(+input.amount).dividedBy(+output.amount).toNumber() * 1e6) / 1e6;
+		return new BigNumber(price).dividedBy(new BigNumber(10).pow(12)).toFixed();
+	}
+	if (isNativeAsset(input.info) && input.info.native_token.denom === "inj") {
+		const price = Math.round(new BigNumber(+input.amount).dividedBy(+output.amount).toNumber() * 1e6) / 1e6;
+
+		return new BigNumber(price).multipliedBy(new BigNumber(10).pow(12)).toFixed();
+	} else {
+		return new BigNumber(
+			Math.round(new BigNumber(+input.amount).dividedBy(+output.amount).toNumber() * 1e6) / 1e6,
+		).toFixed();
 	}
 }
