@@ -67,7 +67,7 @@ export function showTxMemory() {
  */
 export function processMempool(
 	mempool: Mempool,
-	ignoreAddresses: { [index: string]: boolean },
+	ignoreAddresses: { [index: string]: { source: boolean; timeout_at: number; duration: number } },
 ): [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] {
 	const mempoolTrades: [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] = [[], []];
 	for (const tx of mempool.txs) {

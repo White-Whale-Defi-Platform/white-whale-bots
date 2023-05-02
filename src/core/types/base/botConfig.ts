@@ -25,7 +25,7 @@ export interface BotConfig {
 	chainPrefix: string;
 	rpcUrls: Array<string>;
 	useRpcUrlScraper: boolean;
-	ignoreAddresses: { [index: string]: boolean };
+	ignoreAddresses: { [index: string]: { source: boolean; timeout_at: number; duration: number } };
 	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
 	maxPathPools: number;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
@@ -85,11 +85,11 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
 	const MAX_PATH_HOPS = +envs.MAX_PATH_HOPS; //required gas units per trade (hop)
 
-	const IGNORE_ADDRS: { [index: string]: boolean } = {};
+	const IGNORE_ADDRS: { [index: string]: { source: boolean; timeout_at: number; duration: number } } = {};
 	// set ignored Addresses
 	if (envs.IGNORE_ADDRESSES) {
 		const addrs = JSON.parse(envs.IGNORE_ADDRESSES);
-		addrs.forEach((element: string) => (IGNORE_ADDRS[element] = true));
+		addrs.forEach((element: string) => (IGNORE_ADDRS[element] = { source: true, timeout_at: 0, duration: 1000 }));
 	}
 	// setup skipconfig if present
 	let skipConfig;

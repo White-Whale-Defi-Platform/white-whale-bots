@@ -17,7 +17,7 @@ export class MempoolLoop {
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
-	ignoreAddresses: { [index: string]: boolean };
+	ignoreAddresses: { [index: string]: { source: boolean; timeout_at: number; duration: number } };
 	botConfig: BotConfig;
 	logger: Logger | undefined;
 	// CACHE VALUES
@@ -53,11 +53,10 @@ export class MempoolLoop {
 		botConfig: BotConfig,
 		logger: Logger | undefined,
 		pathlib: Array<Path>,
-		ignoreAddresses: { [index: string]: boolean },
+		ignoreAddresses: { [index: string]: { source: boolean; timeout_at: number; duration: number } },
 	) {
 		this.pools = pools;
 		this.CDpaths = new Map<string, [number, number, number]>();
-
 		this.paths = paths;
 		this.arbitrageFunction = arbitrage;
 		this.updateStateFunction = updateState;
@@ -102,7 +101,25 @@ export class MempoolLoop {
 			// Checks if there is a SendMsg from a blacklisted Address, if so add the reciever to the timeouted addresses
 			mempooltxs[1].forEach((Element) => {
 				if (this.ignoreAddresses[Element.sender]) {
-					this.ignoreAddresses[Element.reciever] = true;
+					if (
+						this.ignoreAddresses[Element.sender].source ||
+						this.ignoreAddresses[Element.sender].timeout_at +
+							this.ignoreAddresses[Element.sender].duration <=
+							this.iterations
+					) {
+						this.ignoreAddresses[Element.reciever] = {
+							source: false,
+							timeout_at: this.iterations,
+							duration: 100,
+						};
+						this.ignoreAddresses[Element.sender].timeout_at = this.iterations;
+					} else if (
+						this.ignoreAddresses[Element.sender].timeout_at +
+							this.ignoreAddresses[Element.sender].duration >=
+						this.iterations
+					) {
+						delete this.ignoreAddresses[Element.sender];
+					}
 				}
 			});
 			const mempoolTrades: Array<MempoolTrade> = mempooltxs[0];
@@ -206,6 +223,20 @@ export class MempoolLoop {
 				this.paths.push(this.pathlib[value[2]]);
 			}
 		});
+	}
+
+	/**
+	 *
+	 */
+	public clear_ignoreAddresses() {
+		for (let i = 0; i < Object.keys(this.ignoreAddresses).length; i++) {
+			if (
+				!this.ignoreAddresses[i].source &&
+				this.ignoreAddresses[i].timeout_at + this.ignoreAddresses[i].duration <= this.iterations
+			) {
+				delete this.ignoreAddresses[i];
+			}
+		}
 	}
 }
 

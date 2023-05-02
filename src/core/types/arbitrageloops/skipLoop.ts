@@ -45,7 +45,7 @@ export class SkipLoop extends MempoolLoop {
 		logger: Logger | undefined,
 
 		pathlib: Array<Path>,
-		ignoreAddresses: { [index: string]: boolean },
+		ignoreAddresses: { [index: string]: { source: boolean; timeout_at: number; duration: number } },
 	) {
 		super(
 			pools,
@@ -94,7 +94,25 @@ export class SkipLoop extends MempoolLoop {
 			const mempoolTrades = mempooltxs[0];
 			mempooltxs[1].forEach((Element) => {
 				if (this.ignoreAddresses[Element.sender]) {
-					this.ignoreAddresses[Element.reciever] = true;
+					if (
+						this.ignoreAddresses[Element.sender].source ||
+						this.ignoreAddresses[Element.sender].timeout_at +
+							this.ignoreAddresses[Element.sender].duration <=
+							this.iterations
+					) {
+						this.ignoreAddresses[Element.reciever] = {
+							source: false,
+							timeout_at: this.iterations,
+							duration: 100,
+						};
+						this.ignoreAddresses[Element.sender].timeout_at = this.iterations;
+					} else if (
+						this.ignoreAddresses[Element.sender].timeout_at +
+							this.ignoreAddresses[Element.sender].duration >=
+						this.iterations
+					) {
+						delete this.ignoreAddresses[Element.sender];
+					}
 				}
 			});
 
@@ -174,7 +192,11 @@ export class SkipLoop extends MempoolLoop {
 					const logMessageCheckTx = `**CheckTx Error:** index: ${idx}\t ${String(item.log)}\n`;
 					logMessage = logMessage.concat(logMessageCheckTx);
 					if (toArbTrade?.sender && idx == 0 && item["code"] == "5") {
-						this.ignoreAddresses[toArbTrade.sender] = true;
+						this.ignoreAddresses[toArbTrade.sender] = {
+							source: false,
+							timeout_at: this.iterations,
+							duration: 100,
+						};
 						await this.logger?.sendMessage(
 							"Error on Trade from Address: " + toArbTrade.sender,
 							LogType.Console,
@@ -192,7 +214,11 @@ export class SkipLoop extends MempoolLoop {
 					logMessage = logMessage.concat(logMessageDeliverTx);
 					if (idx == 0 && (item["code"] == 10 || item["code"] == 5)) {
 						if (toArbTrade?.sender) {
-							this.ignoreAddresses[toArbTrade.sender] = true;
+							this.ignoreAddresses[toArbTrade.sender] = {
+								source: false,
+								timeout_at: this.iterations,
+								duration: 100,
+							};
 							await this.logger?.sendMessage(
 								"Error on Trade from Address: " + toArbTrade.sender,
 								LogType.Console,
