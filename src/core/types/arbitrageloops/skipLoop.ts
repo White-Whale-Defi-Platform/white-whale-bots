@@ -149,8 +149,10 @@ export class SkipLoop extends MempoolLoop {
 			);
 			return;
 		}
+
+		const skiprate = Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651);
 		const bidMsgEncoded = getSendMessage(
-			String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651)),
+			String(skiprate),
 			this.botConfig.gasDenom,
 			this.chainOperator.client.publicAddress,
 			this.botConfig.skipConfig.skipBidWallet,
@@ -178,7 +180,9 @@ export class SkipLoop extends MempoolLoop {
 		console.log(inspect(res, { depth: null }));
 
 		let logItem = "";
-		let logMessage = `**wallet:** ${this.chainOperator.client.publicAddress}\t **block:** ${res.result.desired_height}\t **profit:** ${arbTrade.profit}`;
+		let logMessage = `**wallet:** ${this.chainOperator.client.publicAddress}\t **block:** ${
+			res.result.desired_height
+		}\t **profit:** ${arbTrade.profit - skiprate}`;
 
 		if (res.result.code !== 0) {
 			logMessage += `\t **error code:** ${res.result.code}\n**error:** ${res.result.error}\n`;
