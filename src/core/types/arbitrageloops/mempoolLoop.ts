@@ -159,7 +159,7 @@ export class MempoolLoop {
 	/**
 	 *
 	 */
-	private async trade(arbTrade: OptimalTrade) {
+	public async trade(arbTrade: OptimalTrade) {
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
 			this.chainOperator.client.publicAddress,

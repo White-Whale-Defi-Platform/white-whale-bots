@@ -243,6 +243,10 @@ export class SkipLoop extends MempoolLoop {
 			this.cdPaths(arbTrade.path);
 		}
 
+		if (this.botConfig.skipConfig.trywithout && res.result.code === 4) {
+			await this.trade(arbTrade);
+		}
+
 		if (res.result.code === 0) {
 			this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
 		}

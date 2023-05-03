@@ -10,6 +10,7 @@ interface SkipConfig {
 	skipRpcUrl: string;
 	skipBidWallet: string;
 	skipBidRate: number;
+	trywithout: boolean;
 }
 
 interface LoggerConfig {
@@ -100,6 +101,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 			skipRpcUrl: envs.SKIP_URL ?? "",
 			skipBidWallet: envs.SKIP_BID_WALLET ?? "",
 			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
+			trywithout: envs.TRY_WO_SKIP === undefined || envs.TRY_WO_SKIP === "0" ? false : true,
 		};
 	}
 
