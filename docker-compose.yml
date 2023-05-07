@@ -7,7 +7,7 @@ services:
     container_name: white-whale-bot
     env_file:
       - .env
-    restart: always
+    restart: unless-stopped
     stdin_open: true
     tty: true
     
