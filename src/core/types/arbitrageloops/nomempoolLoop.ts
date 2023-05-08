@@ -75,7 +75,6 @@ export class NoMempoolLoop {
 	 */
 	public async step() {
 		this.iterations++;
-		await this.updateStateFunction(this.chainOperator, this.pools);
 
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
@@ -95,6 +94,7 @@ export class NoMempoolLoop {
 	 */
 	async reset() {
 		this.unCDPaths();
+		await this.updateStateFunction(this.chainOperator, this.pools);
 		await this.chainOperator.reset();
 	}
 

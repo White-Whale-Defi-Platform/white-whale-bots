@@ -67,7 +67,6 @@ export class SkipLoop extends MempoolLoop {
 	 */
 	public async step(): Promise<void> {
 		this.iterations++;
-		this.updateStateFunction(this.chainOperator, this.pools);
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
 		if (arbTrade) {
@@ -107,8 +106,8 @@ export class SkipLoop extends MempoolLoop {
 						const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 						if (arbTrade) {
 							await this.skipTrade(arbTrade, trade);
-							//this.cdPaths(arbTrade.path);
-							break;
+							this.cdPaths(arbTrade.path);
+							return;
 						}
 					}
 				}
