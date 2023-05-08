@@ -11,6 +11,7 @@ interface SkipConfig {
 	skipBidWallet: string;
 	skipBidRate: number;
 	trywithout: boolean;
+	timout_dur: number;
 }
 
 interface LoggerConfig {
@@ -102,6 +103,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 			skipBidWallet: envs.SKIP_BID_WALLET ?? "",
 			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
 			trywithout: envs.TRY_WO_SKIP === undefined || envs.TRY_WO_SKIP === "0" ? false : true,
+			timout_dur: envs.TIMEOUT_FOR_DUR === undefined ? 100 : Number(envs.TIMEOUT_FOR_DUR),
 		};
 	}
 

@@ -103,7 +103,7 @@ export class SkipLoop extends MempoolLoop {
 						this.ignoreAddresses[Element.reciever] = {
 							source: false,
 							timeout_at: this.iterations,
-							duration: 100,
+							duration: this.botConfig.skipConfig!.timout_dur,
 						};
 						this.ignoreAddresses[Element.sender].timeout_at = this.iterations;
 					} else if (
@@ -199,7 +199,7 @@ export class SkipLoop extends MempoolLoop {
 						this.ignoreAddresses[toArbTrade.sender] = {
 							source: false,
 							timeout_at: this.iterations,
-							duration: 100,
+							duration: this.botConfig.skipConfig!.timout_dur,
 						};
 						await this.logger?.sendMessage(
 							"Error on Trade from Address: " + toArbTrade.sender,
@@ -221,7 +221,7 @@ export class SkipLoop extends MempoolLoop {
 							this.ignoreAddresses[toArbTrade.sender] = {
 								source: false,
 								timeout_at: this.iterations,
-								duration: 100,
+								duration: this.botConfig.skipConfig!.timout_dur,
 							};
 							await this.logger?.sendMessage(
 								"Error on Trade from Address: " + toArbTrade.sender,
