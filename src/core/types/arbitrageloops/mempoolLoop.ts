@@ -119,7 +119,7 @@ export class MempoolLoop {
 			if (arbTrade) {
 				await this.trade(arbTrade);
 				this.cdPaths(arbTrade.path);
-
+				await this.chainOperator.reset();
 				break;
 			}
 		}
@@ -134,7 +134,6 @@ export class MempoolLoop {
 		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();
-		await this.chainOperator.reset();
 	}
 
 	/**
