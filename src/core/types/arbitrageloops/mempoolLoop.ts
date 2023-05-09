@@ -74,8 +74,6 @@ export class MempoolLoop {
 	 */
 	public async step() {
 		this.iterations++;
-		this.updateStateFunction(this.chainOperator, this.pools);
-
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
 		if (arbTrade) {
@@ -120,7 +118,6 @@ export class MempoolLoop {
 
 			if (arbTrade) {
 				await this.trade(arbTrade);
-
 				this.cdPaths(arbTrade.path);
 
 				break;
@@ -133,6 +130,7 @@ export class MempoolLoop {
 	 *
 	 */
 	async reset() {
+		this.updateStateFunction(this.chainOperator, this.pools);
 		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();

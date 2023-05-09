@@ -2,7 +2,6 @@ import { fromAscii, fromBase64, fromUtf8 } from "@cosmjs/encoding";
 import { decodeTxRaw } from "@cosmjs/proto-signing";
 import { parseCoins } from "@cosmjs/stargate";
 import { MsgExecuteContractCompat as MsgExecuteContractCompatBase } from "@injectivelabs/chain-api/injective/wasmx/v1/tx_pb";
-import { MsgExecuteContractCompat } from "@injectivelabs/sdk-ts";
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
@@ -82,31 +81,30 @@ export function processMempool(
 		const txBytes = fromBase64(tx);
 		const txRaw = decodeTxRaw(txBytes);
 		for (const message of txRaw.body.messages) {
-			let msgExecuteContract: MsgExecuteContract | MsgExecuteContractCompat;
+			let msgExecuteContract: MsgExecuteContract;
 			let containedMsg;
 			if (message.typeUrl == "/cosmos.bank.v1beta1.MsgSend") {
 				const msgSend: MsgSend = MsgSend.decode(message.value);
 				mempoolTrades[1].push({ sender: msgSend.fromAddress, reciever: msgSend.toAddress });
 				continue;
-			}
-			if (message.typeUrl === "/injective.wasmx.v1.MsgExecuteContractCompat") {
+			} else if (message.typeUrl === "/injective.wasmx.v1.MsgExecuteContractCompat") {
 				const msgExecuteContractCompatBase: MsgExecuteContractCompatBase =
 					MsgExecuteContractCompatBase.deserializeBinary(message.value);
 				const funds = msgExecuteContractCompatBase.getFunds();
 				containedMsg = JSON.parse(msgExecuteContractCompatBase.getMsg());
-				msgExecuteContract = MsgExecuteContractCompat.fromJSON({
-					contractAddress: msgExecuteContractCompatBase.getContract(),
+				msgExecuteContract = MsgExecuteContract.fromJSON({
+					contract: msgExecuteContractCompatBase.getContract(),
 					sender: msgExecuteContractCompatBase.getSender(),
-					msg: containedMsg,
+					msg: msgExecuteContractCompatBase.getMsg(),
 					funds: funds === "0" ? [] : parseCoins(funds),
 				});
-			}
-			if (message.typeUrl === "/cosmwasm.wasm.v1.MsgExecuteContract") {
+			} else if (message.typeUrl === "/cosmwasm.wasm.v1.MsgExecuteContract") {
 				msgExecuteContract = MsgExecuteContract.decode(message.value);
 				containedMsg = JSON.parse(fromUtf8(msgExecuteContract.msg));
 			} else {
 				continue;
 			}
+
 			// check if the message is a swap message we want to add to the relevant trades
 			if (isDefaultSwapMessage(containedMsg)) {
 				const offerAsset = containedMsg.swap.offer_asset;

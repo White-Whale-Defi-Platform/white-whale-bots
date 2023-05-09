@@ -52,7 +52,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	constructor(botConfig: BotConfig, network: Network = Network.MainnetK8s) {
+	constructor(botConfig: BotConfig, network: Network = Network.Mainnet) {
 		const endpoints = getNetworkEndpoints(network);
 		const privateKey = PrivateKey.fromMnemonic(botConfig.mnemonic, "m/44'/60'/0'/0/0");
 		this._privateKey = privateKey;
@@ -62,7 +62,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		});
 		this._spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
 		this._wasmQueryClient = new ChainGrpcWasmApi(endpoints.grpc);
-		this._httpClient = new HttpBatchClient(botConfig.rpcUrls[0]);
+		this._httpClient = new HttpBatchClient(endpoints.rpc ?? botConfig.rpcUrls[0]);
 		this._chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
 		this._network = network;
 		this._publicKey = privateKey.toPublicKey();
