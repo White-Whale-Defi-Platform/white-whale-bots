@@ -84,6 +84,7 @@ export class NoMempoolLoop {
 			console.log("expected profit: ", arbTrade.profit);
 			await this.trade(arbTrade);
 			this.cdPaths(arbTrade.path);
+			await this.chainOperator.reset();
 		}
 
 		await delay(1500);
@@ -95,7 +96,6 @@ export class NoMempoolLoop {
 	async reset() {
 		this.unCDPaths();
 		await this.updateStateFunction(this.chainOperator, this.pools);
-		await this.chainOperator.reset();
 	}
 
 	/**
