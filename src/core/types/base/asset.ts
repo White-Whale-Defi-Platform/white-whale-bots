@@ -2,6 +2,11 @@ import BigNumber from "bignumber.js";
 
 import { Uint128 } from "./uint128";
 
+BigNumber.config({
+	ROUNDING_MODE: BigNumber.ROUND_DOWN,
+	EXPONENTIAL_AT: [-10, 20],
+});
+
 export interface Asset {
 	amount: Uint128;
 	info: AssetInfo;
@@ -82,7 +87,7 @@ export function isMatchingAssetInfos(a: AssetInfo, b: AssetInfo) {
 export function toChainAsset(input: Asset): Asset {
 	if (isNativeAsset(input.info) && input.info.native_token.denom === "inj") {
 		return {
-			amount: String(new BigNumber(+input.amount).multipliedBy(new BigNumber(10).pow(12))),
+			amount: new BigNumber(+input.amount).multipliedBy(new BigNumber(10).pow(12)).toFixed(),
 			info: input.info,
 		};
 	} else
@@ -98,7 +103,7 @@ export function toChainAsset(input: Asset): Asset {
 export function fromChainAsset(input: Asset): Asset {
 	if (isNativeAsset(input.info) && input.info.native_token.denom === "inj") {
 		return {
-			amount: String(new BigNumber(+input.amount).dividedBy(new BigNumber(10).pow(12))),
+			amount: new BigNumber(+input.amount).dividedBy(new BigNumber(10).pow(12)).toFixed(6),
 			info: input.info,
 		};
 	} else return input;
