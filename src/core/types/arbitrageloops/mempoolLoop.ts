@@ -1,3 +1,5 @@
+import { sha256 } from "@cosmjs/crypto";
+import { toHex } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
@@ -118,6 +120,10 @@ export class MempoolLoop {
 
 			if (arbTrade) {
 				await this.trade(arbTrade);
+				console.log("mempool transactions to backrun:");
+				mempoolTrades.map((mpt) => {
+					console.log(toHex(sha256(mpt.txBytes)));
+				});
 				this.cdPaths(arbTrade.path);
 				await this.chainOperator.reset();
 				break;

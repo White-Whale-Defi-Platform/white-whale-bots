@@ -1,3 +1,5 @@
+import { sha256 } from "@cosmjs/crypto";
+import { toHex } from "@cosmjs/encoding";
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { EncodeObject } from "@cosmjs/proto-signing";
 import { SkipBundleClient } from "@skip-mev/skipjs";
@@ -105,6 +107,8 @@ export class SkipLoop extends MempoolLoop {
 						applyMempoolTradesOnPools(this.pools, [trade]);
 						const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 						if (arbTrade) {
+							console.log("mempool transaction to backrun: ");
+							console.log(toHex(sha256(trade.txBytes)));
 							await this.skipTrade(arbTrade, trade);
 							this.cdPaths(arbTrade.path);
 							return;
