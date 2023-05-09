@@ -10,14 +10,13 @@ dotenv.config();
 describe("Test convert 18 to 6 decimal asset and vice versa", () => {
 	it("Should return 6 decimal asset after 18 decimal input 'inj' denom converting FROM chain", async () => {
 		const input: Asset = {
-			amount: String(new BigNumber(5).multipliedBy(new BigNumber(10).pow(18))),
+			amount: String(new BigNumber("512.1234123445245667543").multipliedBy(new BigNumber(10).pow(18))),
 			info: { native_token: { denom: "inj" } },
 		};
 
 		const output = fromChainAsset(input);
-
 		const times = +input.amount / +output.amount;
-		assert.equal(times, 1e12);
+		assert.equal(Math.floor(times), 1e12);
 	});
 
 	it("Should return 6 decimal asset after 6 decimal input non 'inj' denom FROM chain", async () => {
@@ -33,7 +32,7 @@ describe("Test convert 18 to 6 decimal asset and vice versa", () => {
 
 	it("Should return 18 decimal asset after 6 decimal input 'inj' denom TO chain", async () => {
 		const input: Asset = {
-			amount: String(new BigNumber("5.1234123412341234123412341324").multipliedBy(new BigNumber(10).pow(6))),
+			amount: String(new BigNumber("512.34123412341234123412341324").multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "inj" } },
 		};
 
