@@ -132,26 +132,31 @@ export function applyMempoolMessagesOnPools(pools: Array<Pool>, mempoolMessages:
 	const swapsToProcess: Array<{ msg: MsgExecuteContract; pool: Pool }> = [];
 	const swapOperationsToProcess: Array<{ msg: MsgExecuteContract; poolsFromRouter: Array<Pool> }> = [];
 	mempoolMessages.map((msg) => {
-		const decodedMsg = JSON.parse(fromUtf8(msg.msg));
-		const poolToUpdate = pools.find(
-			(pool) =>
-				pool.address === msg.contract ||
-				(isSendMessage(decodedMsg) && decodedMsg.send.contract === pool.address),
-		);
-		if (poolToUpdate) {
-			swapsToProcess.push({ msg: msg, pool: poolToUpdate });
-		} else {
-			const poolsFromRouter = pools.filter(
+		try {
+			const decodedMsg = JSON.parse(fromUtf8(msg.msg));
+			const poolToUpdate = pools.find(
 				(pool) =>
-					pool.routerAddress === msg.contract ||
-					(isSendMessage(decodedMsg) && decodedMsg.send.contract === pool.routerAddress),
+					pool.address === msg.contract ||
+					(isSendMessage(decodedMsg) && decodedMsg.send.contract === pool.address),
 			);
-			if (poolsFromRouter.length > 0) {
-				swapOperationsToProcess.push({ msg: msg, poolsFromRouter: poolsFromRouter });
-			} else if (isTFMSwapOperationsMessage(decodedMsg)) {
-				//tfm swap uses all known pools
-				swapOperationsToProcess.push({ msg: msg, poolsFromRouter: pools });
+			if (poolToUpdate) {
+				swapsToProcess.push({ msg: msg, pool: poolToUpdate });
+			} else {
+				const poolsFromRouter = pools.filter(
+					(pool) =>
+						pool.routerAddress === msg.contract ||
+						(isSendMessage(decodedMsg) && decodedMsg.send.contract === pool.routerAddress),
+				);
+				if (poolsFromRouter.length > 0) {
+					swapOperationsToProcess.push({ msg: msg, poolsFromRouter: poolsFromRouter });
+				} else if (isTFMSwapOperationsMessage(decodedMsg)) {
+					//tfm swap uses all known pools
+					swapOperationsToProcess.push({ msg: msg, poolsFromRouter: pools });
+				}
 			}
+		} catch (e) {
+			console.log(e);
+			console.log("cannot apply mempool message on pool: \n", msg);
 		}
 	});
 
