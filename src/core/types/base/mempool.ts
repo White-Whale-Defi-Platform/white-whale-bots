@@ -5,16 +5,10 @@ import { MsgExecuteContractCompat as MsgExecuteContractCompatBase } from "@injec
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
-import { isSendMessage, SendMessage } from "../messages/sendmessages";
+import { SendMessage } from "../messages/sendmessages";
 import {
 	DefaultSwapMessage,
 	isAstroSwapOperationsMessages,
-	isDefaultSwapMessage,
-	isJunoSwapMessage,
-	isJunoSwapOperationsMessage,
-	isSwapMessage,
-	isSwapOperationsMessage,
-	isTFMSwapOperationsMessage,
 	isWWSwapOperationsMessages,
 	isWyndDaoSwapOperationsMessages,
 	JunoSwapMessage,
@@ -22,7 +16,7 @@ import {
 	SwapOperationsMessage,
 	TFMSwapOperationsMessage,
 } from "../messages/swapmessages";
-import { Asset, fromChainAsset, isWyndDaoNativeAsset, isWyndDaoTokenAsset } from "./asset";
+import { Asset, fromChainAsset, isWyndDaoNativeAsset } from "./asset";
 
 export interface Mempool {
 	n_txs: string;
@@ -30,6 +24,7 @@ export interface Mempool {
 	total_bytes: string;
 	txs: Array<string>;
 }
+
 export interface MempoolTrade {
 	contract: string;
 	message:
@@ -64,11 +59,11 @@ export function showTxMemory() {
  *@param mempool The mempool(state) to process.
  *@return An array of swap, send and swap-operation messages that exist in the `mempool`.
  */
-export function processMempool(
+export function decodeMempool(
 	mempool: Mempool,
-	ignoreAddresses: { [index: string]: boolean },
-): [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] {
-	const mempoolTrades: [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] = [[], []];
+	ignoreAddresses: Record<string, boolean>,
+): Array<{ msg: MsgExecuteContract; txBytes: Uint8Array }> {
+	const decodedMessages: Array<{ msg: MsgExecuteContract; txBytes: Uint8Array }> = [];
 	for (const tx of mempool.txs) {
 		if (txMemory[tx] == true) {
 			// the transaction is already processed and stored in the txMemory
@@ -82,59 +77,71 @@ export function processMempool(
 		const txRaw = decodeTxRaw(txBytes);
 		for (const message of txRaw.body.messages) {
 			let msgExecuteContract: MsgExecuteContract;
-			let containedMsg;
-			if (message.typeUrl == "/cosmos.bank.v1beta1.MsgSend") {
-				const msgSend: MsgSend = MsgSend.decode(message.value);
-				mempoolTrades[1].push({ sender: msgSend.fromAddress, reciever: msgSend.toAddress });
-				continue;
-			} else if (message.typeUrl === "/injective.wasmx.v1.MsgExecuteContractCompat") {
-				const msgExecuteContractCompatBase: MsgExecuteContractCompatBase =
-					MsgExecuteContractCompatBase.deserializeBinary(message.value);
-				const funds = msgExecuteContractCompatBase.getFunds();
-				containedMsg = JSON.parse(msgExecuteContractCompatBase.getMsg());
-				msgExecuteContract = MsgExecuteContract.fromJSON({
-					contract: msgExecuteContractCompatBase.getContract(),
-					sender: msgExecuteContractCompatBase.getSender(),
-					msg: msgExecuteContractCompatBase.getMsg(),
-					funds: funds === "0" ? [] : parseCoins(funds),
-				});
-			} else if (message.typeUrl === "/cosmwasm.wasm.v1.MsgExecuteContract") {
-				msgExecuteContract = MsgExecuteContract.decode(message.value);
-				containedMsg = JSON.parse(fromUtf8(msgExecuteContract.msg));
-			} else {
-				continue;
-			}
 
-			// check if the message is a swap message we want to add to the relevant trades
-			if (isDefaultSwapMessage(containedMsg)) {
-				const offerAsset = containedMsg.swap.offer_asset;
-				if (isWyndDaoNativeAsset(offerAsset.info)) {
-					offerAsset.info = { native_token: { denom: offerAsset.info.native } };
+			switch (message.typeUrl) {
+				case "/cosmos.bank.v1beta1.MsgSend": {
+					const msgSend: MsgSend = MsgSend.decode(message.value);
+					//if one of the spam wallets sends funds to a new wallet, add the new wallet to the ignore addresses
+					if (ignoreAddresses[msgSend.fromAddress]) {
+						ignoreAddresses[msgSend.toAddress] = true;
+					}
+					break;
 				}
-				if (isWyndDaoTokenAsset(offerAsset.info)) {
-					offerAsset.info = { token: { contract_addr: offerAsset.info.token } };
-				}
-				mempoolTrades[0].push({
-					contract: msgExecuteContract.contract,
-					message: containedMsg,
-					offer_asset: fromChainAsset(offerAsset),
-					txBytes: txBytes,
-					sender: msgExecuteContract.sender,
-				});
-				continue;
-			}
 
-			// check if the message is a junoswap message we want to add to the relevant trades
-			else if (isJunoSwapMessage(containedMsg)) {
-				mempoolTrades[0].push({
-					contract: msgExecuteContract.contract,
-					message: containedMsg,
-					offer_asset: undefined,
-					txBytes: txBytes,
-					sender: msgExecuteContract.sender,
-				});
-				continue;
+				case "/injective.wasmx.v1.MsgExecuteContractCompat": {
+					const msgExecuteContractCompatBase: MsgExecuteContractCompatBase =
+						MsgExecuteContractCompatBase.deserializeBinary(message.value);
+					const funds = msgExecuteContractCompatBase.getFunds();
+					msgExecuteContract = MsgExecuteContract.fromJSON({
+						contract: msgExecuteContractCompatBase.getContract(),
+						sender: msgExecuteContractCompatBase.getSender(),
+						msg: msgExecuteContractCompatBase.getMsg(),
+						funds: funds === "0" ? [] : parseCoins(funds),
+					});
+
+					//if the sender of the message is in our ignore list: skip this message
+					if (ignoreAddresses[msgExecuteContract.sender]) {
+						break;
+
+						// if they use a contract to fund new wallets
+					} else if (ignoreAddresses[msgExecuteContract.contract]) {
+						const containedMsg = JSON.parse(fromUtf8(msgExecuteContract.msg));
+						const gets = fromAscii(fromBase64(containedMsg.delegate.msg));
+						ignoreAddresses[gets] = true;
+						break;
+						// message we should process
+					} else {
+						decodedMessages.push({ msg: msgExecuteContract, txBytes: txBytes });
+					}
+					break;
+				}
+				case "/cosmwasm.wasm.v1.MsgExecuteContract": {
+					msgExecuteContract = MsgExecuteContract.decode(message.value);
+
+					//if the sender of the message is in our ignore list: skip this message
+					if (ignoreAddresses[msgExecuteContract.sender]) {
+						break;
+						// if they use a contract to fund new wallets
+					} else if (ignoreAddresses[msgExecuteContract.contract]) {
+						const containedMsg = JSON.parse(fromUtf8(msgExecuteContract.msg));
+						const gets = fromAscii(fromBase64(containedMsg.delegate.msg));
+						ignoreAddresses[gets] = true;
+						break;
+						// message we should process
+					} else {
+						decodedMessages.push({ msg: msgExecuteContract, txBytes: txBytes });
+					}
+					break;
+				}
+				default: {
+					break;
+				}
 			}
+		}
+	}
+	return decodedMessages;
+}
+/*
 
 			// check if the message is a cw20-send message we want to add to the relevant trades
 			else if (isSendMessage(containedMsg)) {
@@ -214,6 +221,7 @@ export function processMempool(
 
 	return mempoolTrades;
 }
+*/
 
 /**
  *

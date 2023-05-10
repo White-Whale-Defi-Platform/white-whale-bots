@@ -7,9 +7,9 @@ import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
 import { BotConfig } from "../base/botConfig";
 import { LogType } from "../base/logging";
-import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../base/mempool";
+import { decodeMempool, flushTxMemory, Mempool } from "../base/mempool";
 import { Path } from "../base/path";
-import { applyMempoolTradesOnPools, Pool } from "../base/pool";
+import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
 /**
  *
  */
@@ -95,25 +95,15 @@ export class MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempooltxs: [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] = processMempool(
-				this.mempool,
-				this.ignoreAddresses,
-			);
-			// Checks if there is a SendMsg from a blacklisted Address, if so add the reciever to the timeouted addresses
-			mempooltxs[1].forEach((Element) => {
-				if (this.ignoreAddresses[Element.sender]) {
-					this.ignoreAddresses[Element.reciever] = true;
-				}
-			});
-			const mempoolTrades: Array<MempoolTrade> = mempooltxs[0];
-			if (mempoolTrades.length === 0) {
+			const mempoolMessages = decodeMempool(this.mempool, this.ignoreAddresses);
+
+			if (mempoolMessages.length === 0) {
 				continue;
 			} else {
-				for (const trade of mempoolTrades) {
-					if (trade.sender && !this.ignoreAddresses[trade.sender]) {
-						applyMempoolTradesOnPools(this.pools, [trade]);
-					}
-				}
+				applyMempoolMessagesOnPools(
+					this.pools,
+					mempoolMessages.map((mpm) => mpm.msg),
+				);
 			}
 
 			const arbTrade = this.arbitrageFunction(this.paths, this.botConfig);
@@ -121,7 +111,7 @@ export class MempoolLoop {
 			if (arbTrade) {
 				await this.trade(arbTrade);
 				console.log("mempool transactions to backrun:");
-				mempoolTrades.map((mpt) => {
+				mempoolMessages.map((mpt) => {
 					console.log(toHex(sha256(mpt.txBytes)));
 				});
 				this.cdPaths(arbTrade.path);

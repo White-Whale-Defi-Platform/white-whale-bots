@@ -106,7 +106,19 @@ export function fromChainAsset(input: Asset): Asset {
 			amount: new BigNumber(+input.amount).dividedBy(new BigNumber(10).pow(12)).toFixed(6),
 			info: input.info,
 		};
-	} else return input;
+	} else if (isWyndDaoNativeAsset(input.info)) {
+		return {
+			amount: input.amount,
+			info: { native_token: { denom: input.info.native } },
+		};
+	} else if (isWyndDaoTokenAsset(input.info)) {
+		return {
+			amount: input.amount,
+			info: { token: { contract_addr: input.info.token } },
+		};
+	} else {
+		return input;
+	}
 }
 
 /**
