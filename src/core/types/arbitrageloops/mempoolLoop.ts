@@ -1,6 +1,7 @@
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
+import { inspect } from "util";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
@@ -130,6 +131,7 @@ export class MempoolLoop {
 		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();
+		console.log("reset: ", this.iterations);
 	}
 
 	/**
@@ -147,7 +149,7 @@ export class MempoolLoop {
 		const TX_FEE =
 			this.botConfig.txFees.get(nrOfMessages) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
-
+		console.log(inspect(TX_FEE));
 		const txResponse = await this.chainOperator.signAndBroadcast(msgs, TX_FEE);
 
 		await this.logger?.sendMessage(JSON.stringify(txResponse), LogType.Console);

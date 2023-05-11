@@ -182,6 +182,8 @@ class InjectiveAdapter implements ChainOperatorInterface {
 					msgs: preppedMsgs,
 					injectiveAddress: this._publicAddress,
 					gasLimit: +fee.gas,
+					feePrice: String(+fee.amount[0].amount / +fee.gas),
+					feeDenom: "inj",
 				};
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
 				return {

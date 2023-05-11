@@ -100,7 +100,7 @@ export class SkipLoop extends MempoolLoop {
 					if (arbTrade) {
 						console.log("mempool transaction to backrun: ");
 						console.log(toHex(sha256(mempoolMessage.txBytes)));
-						await this.skipTrade(arbTrade, mempoolMessage);
+						await this.skipTrade(arbTrade);
 						this.cdPaths(arbTrade.path);
 						return;
 					}
