@@ -229,12 +229,13 @@ export class MempoolLoop {
 	 *
 	 */
 	public clear_ignoreAddresses() {
-		for (let i = 0; i < Object.keys(this.ignoreAddresses).length; i++) {
+		const keys = Object.keys(this.ignoreAddresses);
+		for (let i = 0; i < keys.length; i++) {
 			if (
-				!this.ignoreAddresses[i].source &&
-				this.ignoreAddresses[i].timeout_at + this.ignoreAddresses[i].duration <= this.iterations
+				!this.ignoreAddresses[keys[i]].source &&
+				this.ignoreAddresses[keys[i]].timeout_at + this.ignoreAddresses[keys[i]].duration <= this.iterations
 			) {
-				delete this.ignoreAddresses[i];
+				delete this.ignoreAddresses[keys[i]];
 			}
 		}
 	}
