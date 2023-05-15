@@ -8,7 +8,7 @@ import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
 import { BotConfig } from "../base/botConfig";
 import { LogType } from "../base/logging";
-import { decodeMempool, flushTxMemory, Mempool } from "../base/mempool";
+import { decodeMempool, flushTxMemory, Mempool, MempoolTx } from "../base/mempool";
 import { Path } from "../base/path";
 import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
 /**
@@ -96,14 +96,14 @@ export class MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempoolMessages = decodeMempool(this.mempool, this.ignoreAddresses);
+			const mempoolMessages: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses);
 
 			if (mempoolMessages.length === 0) {
 				continue;
 			} else {
 				applyMempoolMessagesOnPools(
 					this.pools,
-					mempoolMessages.map((mpm) => mpm.msg),
+					mempoolMessages.map((mpm) => mpm.message),
 				);
 			}
 

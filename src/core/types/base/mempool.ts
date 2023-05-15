@@ -5,16 +5,10 @@ import { MsgExecuteContractCompat as MsgExecuteContractCompatBase } from "@injec
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
-import { SendMessage } from "../messages/sendmessages";
 import {
-	DefaultSwapMessage,
 	isAstroSwapOperationsMessages,
 	isWWSwapOperationsMessages,
 	isWyndDaoSwapOperationsMessages,
-	JunoSwapMessage,
-	JunoSwapOperationsMessage,
-	SwapOperationsMessage,
-	TFMSwapOperationsMessage,
 } from "../messages/swapmessages";
 import { Asset, fromChainAsset, isWyndDaoNativeAsset } from "./asset";
 
@@ -25,18 +19,9 @@ export interface Mempool {
 	txs: Array<string>;
 }
 
-export interface MempoolTrade {
-	contract: string;
-	message:
-		| DefaultSwapMessage
-		| SwapOperationsMessage
-		| SendMessage
-		| JunoSwapMessage
-		| TFMSwapOperationsMessage
-		| JunoSwapOperationsMessage;
-	offer_asset: Asset | undefined;
+export interface MempoolTx {
+	message: MsgExecuteContract;
 	txBytes: Uint8Array;
-	sender: string | undefined;
 }
 
 let txMemory: { [key: string]: boolean } = {};
@@ -59,11 +44,8 @@ export function showTxMemory() {
  *@param mempool The mempool(state) to process.
  *@return An array of swap, send and swap-operation messages that exist in the `mempool`.
  */
-export function decodeMempool(
-	mempool: Mempool,
-	ignoreAddresses: Record<string, boolean>,
-): Array<{ msg: MsgExecuteContract; txBytes: Uint8Array }> {
-	const decodedMessages: Array<{ msg: MsgExecuteContract; txBytes: Uint8Array }> = [];
+export function decodeMempool(mempool: Mempool, ignoreAddresses: Record<string, boolean>): Array<MempoolTx> {
+	const decodedMessages: Array<MempoolTx> = [];
 	for (const tx of mempool.txs) {
 		if (txMemory[tx] == true) {
 			// the transaction is already processed and stored in the txMemory
@@ -111,7 +93,7 @@ export function decodeMempool(
 						break;
 						// message we should process
 					} else {
-						decodedMessages.push({ msg: msgExecuteContract, txBytes: txBytes });
+						decodedMessages.push({ message: msgExecuteContract, txBytes: txBytes });
 					}
 					break;
 				}
@@ -129,7 +111,7 @@ export function decodeMempool(
 						break;
 						// message we should process
 					} else {
-						decodedMessages.push({ msg: msgExecuteContract, txBytes: txBytes });
+						decodedMessages.push({ message: msgExecuteContract, txBytes: txBytes });
 					}
 					break;
 				}
