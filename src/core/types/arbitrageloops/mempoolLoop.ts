@@ -96,15 +96,12 @@ export class MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempoolMessages: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses);
+			const mempoolTxs: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses);
 
-			if (mempoolMessages.length === 0) {
+			if (mempoolTxs.length === 0) {
 				continue;
 			} else {
-				applyMempoolMessagesOnPools(
-					this.pools,
-					mempoolMessages.map((mpm) => mpm.message),
-				);
+				applyMempoolMessagesOnPools(this.pools, mempoolTxs);
 			}
 
 			const arbTrade = this.arbitrageFunction(this.paths, this.botConfig);
@@ -112,7 +109,7 @@ export class MempoolLoop {
 			if (arbTrade) {
 				await this.trade(arbTrade);
 				console.log("mempool transactions to backrun:");
-				mempoolMessages.map((mpt) => {
+				mempoolTxs.map((mpt) => {
 					console.log(toHex(sha256(mpt.txBytes)));
 				});
 				this.cdPaths(arbTrade.path);

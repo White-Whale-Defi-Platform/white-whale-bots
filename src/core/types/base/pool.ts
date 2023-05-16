@@ -1,6 +1,7 @@
 import { fromAscii, fromBase64, fromUtf8 } from "@cosmjs/encoding";
 import { BigNumber } from "bignumber.js";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
+import { inspect } from "util";
 
 import { isSendMessage } from "../messages/sendmessages";
 import {
@@ -15,6 +16,7 @@ import {
 	isWyndDaoSwapOperationsMessages,
 } from "../messages/swapmessages";
 import { Asset, AssetInfo, fromChainAsset, isMatchingAssetInfos, isWyndDaoNativeAsset } from "./asset";
+import { MempoolTx } from "./mempool";
 import { Path } from "./path";
 import { Uint128 } from "./uint128";
 BigNumber.config({
@@ -125,47 +127,60 @@ function applyTradeOnPool(pool: Pool, offer_asset: Asset) {
 /**
  * Function to apply the mempoolTrades derived from the mempool on the list of tracked pools.
  * @param pools The pools the bot is tracking.
- * @param mempool An array of MempoolTrades with relevant mempool messages.
+ * @param mempoolMessages An array of `MempoolTx` with relevant mempool messages.
  */
-export function applyMempoolMessagesOnPools(pools: Array<Pool>, mempoolMessages: Array<MsgExecuteContract>) {
+export function applyMempoolMessagesOnPools(pools: Array<Pool>, mempoolTxs: Array<MempoolTx>) {
 	// Filter the trades in the mempool to only process the ones on pools we are tracking
 	const swapsToProcess: Array<{ msg: MsgExecuteContract; pool: Pool }> = [];
 	const swapOperationsToProcess: Array<{ msg: MsgExecuteContract; poolsFromRouter: Array<Pool> }> = [];
-	mempoolMessages.map((msg) => {
+	for (const mempoolTx of mempoolTxs) {
 		try {
-			const decodedMsg = JSON.parse(fromUtf8(msg.msg));
+			const decodedMsg = JSON.parse(fromUtf8(mempoolTx.message.msg));
 			const poolToUpdate = pools.find(
 				(pool) =>
-					pool.address === msg.contract ||
+					pool.address === mempoolTx.message.contract ||
 					(isSendMessage(decodedMsg) && decodedMsg.send.contract === pool.address),
 			);
 			if (poolToUpdate) {
-				swapsToProcess.push({ msg: msg, pool: poolToUpdate });
+				swapsToProcess.push({ msg: mempoolTx.message, pool: poolToUpdate });
 			} else {
 				const poolsFromRouter = pools.filter(
 					(pool) =>
-						pool.routerAddress === msg.contract ||
+						pool.routerAddress === mempoolTx.message.contract ||
 						(isSendMessage(decodedMsg) && decodedMsg.send.contract === pool.routerAddress),
 				);
 				if (poolsFromRouter.length > 0) {
-					swapOperationsToProcess.push({ msg: msg, poolsFromRouter: poolsFromRouter });
+					swapOperationsToProcess.push({ msg: mempoolTx.message, poolsFromRouter: poolsFromRouter });
 				} else if (isTFMSwapOperationsMessage(decodedMsg)) {
 					//tfm swap uses all known pools
-					swapOperationsToProcess.push({ msg: msg, poolsFromRouter: pools });
+					swapOperationsToProcess.push({ msg: mempoolTx.message, poolsFromRouter: pools });
 				}
 			}
 		} catch (e) {
 			console.log(e);
-			console.log("cannot apply mempool message on pool: \n", msg);
+			console.log("cannot apply mempool message on pool: \n", inspect(mempoolTx.message, true, null, true));
+			continue;
 		}
-	});
+	}
 
 	for (const swapMsg of swapsToProcess) {
-		applySwapMsg(swapMsg.pool, swapMsg.msg, pools);
+		try {
+			applySwapMsg(swapMsg.pool, swapMsg.msg, pools);
+		} catch (e) {
+			console.log("cannot apply swap message");
+			console.log(swapMsg.pool, inspect(JSON.parse(fromUtf8(swapMsg.msg.msg)), true, null, true));
+			continue;
+		}
 	}
 
 	for (const swapOperationsMsg of swapOperationsToProcess) {
-		applySwapOperationMsg(swapOperationsMsg.poolsFromRouter, swapOperationsMsg.msg);
+		try {
+			applySwapOperationMsg(swapOperationsMsg.poolsFromRouter, swapOperationsMsg.msg);
+		} catch (e) {
+			console.log("cannot apply swap operations message");
+			console.log(JSON.parse(fromUtf8(swapOperationsMsg.msg.msg)));
+			continue;
+		}
 	}
 }
 /**

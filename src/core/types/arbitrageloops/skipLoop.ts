@@ -88,13 +88,13 @@ export class SkipLoop extends MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempoolMessages: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses);
+			const mempoolTxs: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses);
 
-			if (mempoolMessages.length === 0) {
+			if (mempoolTxs.length === 0) {
 				continue;
 			} else {
-				for (const mempoolTx of mempoolMessages) {
-					applyMempoolMessagesOnPools(this.pools, [mempoolTx.message]);
+				for (const mempoolTx of mempoolTxs) {
+					applyMempoolMessagesOnPools(this.pools, [mempoolTx]);
 					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 					if (arbTrade) {
 						console.log("mempool transaction to backrun: ");
