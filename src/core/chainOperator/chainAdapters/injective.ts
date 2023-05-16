@@ -61,8 +61,8 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			privateKey: privateKey,
 		});
 		this._spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
-		this._wasmQueryClient = new ChainGrpcWasmApi("https://ww-injective-grpc-web.polkachu.com");
-		this._httpClient = new HttpBatchClient("https://ww-injective-rpc.polkachu.com");
+		this._wasmQueryClient = new ChainGrpcWasmApi(endpoints.grpc);
+		this._httpClient = new HttpBatchClient(endpoints.rpc ?? botConfig.rpcUrls[0]);
 		this._chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
 		this._network = network;
 		this._publicKey = privateKey.toPublicKey();
@@ -104,7 +104,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 */
 	async init(botConfig: BotConfig): Promise<void> {
 		const restEndpoint = getNetworkEndpoints(this._network).rest;
-		const chainRestAuthApi = new ChainRestAuthApi("https://ww-injective-rest.polkachu.com");
+		const chainRestAuthApi = new ChainRestAuthApi(restEndpoint);
 		const accountDetailsResponse = await chainRestAuthApi.fetchAccount(this._publicAddress);
 		const baseAccount = BaseAccount.fromRestApi(accountDetailsResponse);
 		const accountDetails = baseAccount.toAccountDetails();
