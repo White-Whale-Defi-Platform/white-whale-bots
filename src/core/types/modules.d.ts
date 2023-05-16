@@ -26,6 +26,14 @@ declare namespace NodeJS {
 		 */
 		RPC_URL: string;
 		/**
+		 * GRPC URL, used only for Injective chain. If not provided will use default from injective sdk.
+		 */
+		GRPC_URL: string;
+		/**
+		 * REST URL, used only for Injective chain. If not provided will use default from injective sdk.
+		 */
+		REST_URL: string;
+		/**
 		 * Whether or not to use cosmos chainregistry for finding public endpoints and using them
 		 * if necessary.
 		 */

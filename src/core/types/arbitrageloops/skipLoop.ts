@@ -97,10 +97,9 @@ export class SkipLoop extends MempoolLoop {
 					applyMempoolMessagesOnPools(this.pools, [mempoolTx]);
 					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 					if (arbTrade) {
-						console.log("mempool transaction to backrun: ");
-						console.log(toHex(sha256(mempoolTx.txBytes)));
 						await this.skipTrade(arbTrade, mempoolTx);
 						this.cdPaths(arbTrade.path);
+						await this.chainOperator.reset();
 						return;
 					}
 				}
@@ -146,6 +145,8 @@ export class SkipLoop extends MempoolLoop {
 		if (toArbTrade) {
 			const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
 			res = <SkipResult>await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE, undefined, txToArbRaw);
+			console.log("mempool transaction to backrun: ");
+			console.log(toHex(sha256(toArbTrade.txBytes)));
 		} else {
 			res = <SkipResult>await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE, undefined, undefined);
 		}
@@ -156,6 +157,10 @@ export class SkipLoop extends MempoolLoop {
 
 		if (res.result.code !== 0) {
 			logMessage += `\t **error code:** ${res.result.code}\n**error:** ${res.result.error}\n`;
+		}
+		if (res.result.code === 4) {
+			console.log("no skip validator up, trying default broadcast");
+			await this.trade(arbTrade);
 		}
 
 		if (res.result.result_check_txs != undefined) {

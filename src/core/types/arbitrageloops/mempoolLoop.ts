@@ -128,13 +128,12 @@ export class MempoolLoop {
 		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();
-		console.log("reset: ", this.iterations);
 	}
 
 	/**
 	 *
 	 */
-	private async trade(arbTrade: OptimalTrade) {
+	public async trade(arbTrade: OptimalTrade) {
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
 			this.chainOperator.client.publicAddress,
