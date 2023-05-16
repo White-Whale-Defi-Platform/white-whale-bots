@@ -146,7 +146,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 */
 	async reset(): Promise<void> {
 		const restEndpoint = getNetworkEndpoints(this._network).rest;
-		const chainRestAuthApi = new ChainRestAuthApi("https://ww-injective-rest.polkachu.com");
+		const chainRestAuthApi = new ChainRestAuthApi(restEndpoint);
 		const accountDetailsResponse = await chainRestAuthApi.fetchAccount(this._publicAddress);
 		const baseAccount = BaseAccount.fromRestApi(accountDetailsResponse);
 		const accountDetails = baseAccount.toAccountDetails();
