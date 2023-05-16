@@ -178,7 +178,7 @@ export function applyMempoolMessagesOnPools(pools: Array<Pool>, mempoolTxs: Arra
 			applySwapOperationMsg(swapOperationsMsg.poolsFromRouter, swapOperationsMsg.msg);
 		} catch (e) {
 			console.log("cannot apply swap operations message");
-			console.log(JSON.parse(fromUtf8(swapOperationsMsg.msg.msg)));
+			console.log(inspect(JSON.parse(fromUtf8(swapOperationsMsg.msg.msg)), true, null, true));
 			continue;
 		}
 	}
