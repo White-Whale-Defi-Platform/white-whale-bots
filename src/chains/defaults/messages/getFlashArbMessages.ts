@@ -73,7 +73,7 @@ function getWasmMessages(pool: Pool, _offerAsset: Asset) {
 								: { native: offerAssetChain.info.native_token.denom },
 					},
 
-					belief_price: beliefPriceChain,
+					// belief_price: beliefPriceChain,
 				},
 			};
 		} else {

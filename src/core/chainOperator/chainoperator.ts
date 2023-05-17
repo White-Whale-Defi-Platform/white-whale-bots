@@ -27,10 +27,10 @@ export class ChainOperator {
 	 */
 	static async connectWithSigner(botConfig: BotConfig): Promise<ChainOperator> {
 		if (botConfig.chainPrefix.includes("inj")) {
-			const injectiveClient = new InjectiveAdapter(botConfig, Network.MainnetK8s);
+			const injectiveClient = new InjectiveAdapter(botConfig, Network.Mainnet);
 			await injectiveClient.init(botConfig);
 			return new Promise((resolve, reject) => {
-				resolve(new ChainOperator(injectiveClient, Network.MainnetK8s));
+				resolve(new ChainOperator(injectiveClient, Network.Mainnet));
 			});
 		}
 

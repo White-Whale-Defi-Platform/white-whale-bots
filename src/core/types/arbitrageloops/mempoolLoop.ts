@@ -1,13 +1,16 @@
+import { sha256 } from "@cosmjs/crypto";
+import { toHex } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
+import { inspect } from "util";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
 import { BotConfig } from "../base/botConfig";
 import { LogType } from "../base/logging";
-import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../base/mempool";
+import { decodeMempool, flushTxMemory, Mempool, MempoolTx } from "../base/mempool";
 import { Path } from "../base/path";
-import { applyMempoolTradesOnPools, Pool } from "../base/pool";
+import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
 /**
  *
  */
@@ -73,8 +76,6 @@ export class MempoolLoop {
 	 */
 	public async step() {
 		this.iterations++;
-		this.updateStateFunction(this.chainOperator, this.pools);
-
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
 		if (arbTrade) {
@@ -94,7 +95,7 @@ export class MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempooltxs: [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] = processMempool(
+			const mempooltxs: [Array<MempoolTx>, Array<{ sender: string; reciever: string }>] = decodeMempool(
 				this.mempool,
 				this.ignoreAddresses,
 			);
@@ -122,24 +123,23 @@ export class MempoolLoop {
 					}
 				}
 			});
-			const mempoolTrades: Array<MempoolTrade> = mempooltxs[0];
-			if (mempoolTrades.length === 0) {
+			const mempoolTxs: Array<MempoolTx> = mempooltxs[0];
+			if (mempoolTxs.length === 0) {
 				continue;
 			} else {
-				for (const trade of mempoolTrades) {
-					if (trade.sender && !this.ignoreAddresses[trade.sender]) {
-						applyMempoolTradesOnPools(this.pools, [trade]);
-					}
-				}
+				applyMempoolMessagesOnPools(this.pools, mempoolTxs);
 			}
 
 			const arbTrade = this.arbitrageFunction(this.paths, this.botConfig);
 
 			if (arbTrade) {
 				await this.trade(arbTrade);
-
+				console.log("mempool transactions to backrun:");
+				mempoolTxs.map((mpt) => {
+					console.log(toHex(sha256(mpt.txBytes)));
+				});
 				this.cdPaths(arbTrade.path);
-
+				await this.chainOperator.reset();
 				break;
 			}
 		}
@@ -150,10 +150,10 @@ export class MempoolLoop {
 	 *
 	 */
 	async reset() {
+		this.updateStateFunction(this.chainOperator, this.pools);
 		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();
-		await this.chainOperator.reset();
 	}
 
 	/**
@@ -171,7 +171,7 @@ export class MempoolLoop {
 		const TX_FEE =
 			this.botConfig.txFees.get(nrOfMessages) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
-
+		console.log(inspect(TX_FEE));
 		const txResponse = await this.chainOperator.signAndBroadcast(msgs, TX_FEE);
 
 		await this.logger?.sendMessage(JSON.stringify(txResponse), LogType.Console);

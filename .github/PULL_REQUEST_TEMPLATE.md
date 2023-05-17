@@ -31,7 +31,7 @@
 
 -->
 
-- [ ] I have read [Migaloo's contribution guidelines](https://github.com/White-Whale-Defi-Platform/migaloo-bots/blob/main/CONTRIBUTING.md).
+- [ ] I have read [Migaloo's contribution guidelines](https://github.com/White-Whale-Defi-Platform/white-whale-bots/blob/main/docs/CONTRIBUTING.md).
 - [ ] My pull request has a sound title and description (not something vague like `Update index.md`)
 - [ ] All existing and new tests are passing (if any).
 - [ ] I updated/added relevant documentation.
