@@ -1,5 +1,4 @@
 import { StdFee } from "@cosmjs/stargate";
-import { getStdFee } from "@injectivelabs/utils";
 import axios from "axios";
 import { assert } from "console";
 
@@ -24,6 +23,8 @@ interface LoggerConfig {
 export interface BotConfig {
 	chainPrefix: string;
 	rpcUrls: Array<string>;
+	grpcUrl: string;
+	restUrl: string;
 	useRpcUrlScraper: boolean;
 	ignoreAddresses: { [index: string]: boolean };
 	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
@@ -66,6 +67,8 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 		console.log("no RPC URL provided or USE_RPC_URL_SCRAPER not set correctly");
 		process.exit(1);
 	}
+	const GRPCURL = envs.GRPC_URL;
+	const RESTURL = envs.REST_URL;
 	let pools = envs.POOLS.trim()
 		.replace(/\n|\r|\t/g, "")
 		.replace(/,\s*$/, "");
@@ -124,7 +127,11 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	const PROFIT_THRESHOLDS = new Map<number, number>();
 	for (let hops = 2; hops <= (MAX_PATH_HOPS - 1) * 2 + 1; hops++) {
 		if (envs.GAS_DENOM === "inj") {
-			TX_FEES.set(hops, getStdFee(String(GAS_USAGE_PER_HOP * hops))); //in 18 decimals
+			const gasFee = {
+				denom: envs.GAS_DENOM,
+				amount: (GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE * 1e12).toFixed(),
+			};
+			TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) }); //in 6 decimals
 		} else {
 			const gasFee = { denom: envs.GAS_DENOM, amount: String(GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE) };
 			TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) }); //in 6 decimals
@@ -136,6 +143,8 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	const botConfig: BotConfig = {
 		chainPrefix: envs.CHAIN_PREFIX,
 		rpcUrls: RPCURLS,
+		grpcUrl: GRPCURL,
+		restUrl: RESTURL,
 		useRpcUrlScraper: envs.USE_RPC_URL_SCRAPER == "1" ? true : false,
 		poolEnvs: POOLS_ENVS,
 		maxPathPools: MAX_PATH_HOPS,

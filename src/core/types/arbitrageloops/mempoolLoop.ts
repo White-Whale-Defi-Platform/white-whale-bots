@@ -1,15 +1,16 @@
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
+import { inspect } from "util";
 
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
 import { BotConfig } from "../base/botConfig";
 import { LogType } from "../base/logging";
-import { flushTxMemory, Mempool, MempoolTrade, processMempool } from "../base/mempool";
+import { decodeMempool, flushTxMemory, Mempool, MempoolTx } from "../base/mempool";
 import { Path } from "../base/path";
-import { applyMempoolTradesOnPools, Pool } from "../base/pool";
+import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
 /**
  *
  */
@@ -95,25 +96,12 @@ export class MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempooltxs: [Array<MempoolTrade>, Array<{ sender: string; reciever: string }>] = processMempool(
-				this.mempool,
-				this.ignoreAddresses,
-			);
-			// Checks if there is a SendMsg from a blacklisted Address, if so add the reciever to the timeouted addresses
-			mempooltxs[1].forEach((Element) => {
-				if (this.ignoreAddresses[Element.sender]) {
-					this.ignoreAddresses[Element.reciever] = true;
-				}
-			});
-			const mempoolTrades: Array<MempoolTrade> = mempooltxs[0];
-			if (mempoolTrades.length === 0) {
+			const mempoolTxs: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses);
+
+			if (mempoolTxs.length === 0) {
 				continue;
 			} else {
-				for (const trade of mempoolTrades) {
-					if (trade.sender && !this.ignoreAddresses[trade.sender]) {
-						applyMempoolTradesOnPools(this.pools, [trade]);
-					}
-				}
+				applyMempoolMessagesOnPools(this.pools, mempoolTxs);
 			}
 
 			const arbTrade = this.arbitrageFunction(this.paths, this.botConfig);
@@ -121,7 +109,7 @@ export class MempoolLoop {
 			if (arbTrade) {
 				await this.trade(arbTrade);
 				console.log("mempool transactions to backrun:");
-				mempoolTrades.map((mpt) => {
+				mempoolTxs.map((mpt) => {
 					console.log(toHex(sha256(mpt.txBytes)));
 				});
 				this.cdPaths(arbTrade.path);
@@ -145,7 +133,7 @@ export class MempoolLoop {
 	/**
 	 *
 	 */
-	private async trade(arbTrade: OptimalTrade) {
+	public async trade(arbTrade: OptimalTrade) {
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,
 			this.chainOperator.client.publicAddress,
@@ -157,7 +145,7 @@ export class MempoolLoop {
 		const TX_FEE =
 			this.botConfig.txFees.get(nrOfMessages) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
-
+		console.log(inspect(TX_FEE));
 		const txResponse = await this.chainOperator.signAndBroadcast(msgs, TX_FEE);
 
 		await this.logger?.sendMessage(JSON.stringify(txResponse), LogType.Console);

@@ -37,6 +37,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	private _spotQueryClient: IndexerGrpcSpotApi;
 	private _wasmQueryClient: ChainGrpcWasmApi;
 	private _httpClient: HttpBatchClient;
+	private _authClient: ChainRestAuthApi;
 	private _chainId: ChainId;
 
 	private _network: Network;
@@ -59,10 +60,16 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		this._signAndBroadcastClient = new MsgBroadcasterWithPk({
 			network: network,
 			privateKey: privateKey,
+			endpoints: {
+				indexer: endpoints.indexer,
+				grpc: botConfig.grpcUrl ?? endpoints.grpc,
+				rest: botConfig.restUrl ?? endpoints.rest,
+			},
 		});
 		this._spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
-		this._wasmQueryClient = new ChainGrpcWasmApi(endpoints.grpc);
-		this._httpClient = new HttpBatchClient(endpoints.rpc ?? botConfig.rpcUrls[0]);
+		this._wasmQueryClient = new ChainGrpcWasmApi(botConfig.grpcUrl ?? endpoints.grpc);
+		this._httpClient = new HttpBatchClient(botConfig.rpcUrls[0] ?? endpoints.rpc);
+		this._authClient = new ChainRestAuthApi(botConfig.restUrl ?? endpoints.rest);
 		this._chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
 		this._network = network;
 		this._publicKey = privateKey.toPublicKey();
@@ -103,9 +110,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 *
 	 */
 	async init(botConfig: BotConfig): Promise<void> {
-		const restEndpoint = getNetworkEndpoints(this._network).rest;
-		const chainRestAuthApi = new ChainRestAuthApi(restEndpoint);
-		const accountDetailsResponse = await chainRestAuthApi.fetchAccount(this._publicAddress);
+		const accountDetailsResponse = await this._authClient.fetchAccount(this._publicAddress);
 		const baseAccount = BaseAccount.fromRestApi(accountDetailsResponse);
 		const accountDetails = baseAccount.toAccountDetails();
 		this._accountNumber = accountDetails.accountNumber;
@@ -145,9 +150,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 *
 	 */
 	async reset(): Promise<void> {
-		const restEndpoint = getNetworkEndpoints(this._network).rest;
-		const chainRestAuthApi = new ChainRestAuthApi(restEndpoint);
-		const accountDetailsResponse = await chainRestAuthApi.fetchAccount(this._publicAddress);
+		const accountDetailsResponse = await this._authClient.fetchAccount(this._publicAddress);
 		const baseAccount = BaseAccount.fromRestApi(accountDetailsResponse);
 		const accountDetails = baseAccount.toAccountDetails();
 		this._accountNumber = accountDetails.accountNumber;
@@ -182,6 +185,8 @@ class InjectiveAdapter implements ChainOperatorInterface {
 					msgs: preppedMsgs,
 					injectiveAddress: this._publicAddress,
 					gasLimit: +fee.gas,
+					feePrice: String(+fee.amount[0].amount / +fee.gas),
+					feeDenom: "inj",
 				};
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
 				return {
