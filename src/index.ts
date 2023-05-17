@@ -146,7 +146,7 @@ Total Paths:** \t${paths.length}\n`;
 			const message = `**chain:** ${chainOperator.client.chainId} **wallet:**  **status:** running for ${
 				loop.iterations
 			} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
-			loop.clear_ignoreAddresses();
+			loop.clearIgnoreAddresses();
 			//switching RPCS every 6 Hrs
 			if (mins == 0 && hours === 6 && botConfig.rpcUrls.length > 1) {
 				await chainOperator.client.getNewClients();

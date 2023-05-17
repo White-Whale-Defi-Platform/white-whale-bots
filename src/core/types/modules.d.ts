@@ -130,5 +130,17 @@ declare namespace NodeJS {
 		 * The ratio of the profit to send as a bid.
 		 */
 		SKIP_BID_RATE: string | undefined;
+		/**
+		 * Try sending a regular TX if the next validator is not using Skip.
+		 */
+		TRY_WITHOUT_SKIP: string | undefined;
+		/**
+		 * Addresses of Transaction-Spammer that should be ignored.
+		 */
+		IGNORE_ADDRESSES: string | undefined;
+		/**
+		 * Timeout added addresses for this amount of blocks.
+		 */
+		TIMEOUT_DURATION: string | undefined;
 	}
 }

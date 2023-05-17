@@ -154,7 +154,7 @@ export class NoMempoolLoop {
 	/**
 	 *
 	 */
-	public clear_ignoreAddresses() {
+	public clearIgnoreAddresses() {
 		return;
 	}
 }

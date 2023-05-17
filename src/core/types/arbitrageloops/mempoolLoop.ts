@@ -8,7 +8,7 @@ import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
 import { BotConfig } from "../base/botConfig";
 import { LogType } from "../base/logging";
-import { decodeMempool, flushTxMemory, Mempool, MempoolTx } from "../base/mempool";
+import { decodeMempool, flushTxMemory, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
 import { Path } from "../base/path";
 import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
 /**
@@ -20,7 +20,7 @@ export class MempoolLoop {
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
-	ignoreAddresses: { [index: string]: { source: boolean; timeout_at: number; duration: number } };
+	ignoreAddresses: IgnoredAddresses;
 	botConfig: BotConfig;
 	logger: Logger | undefined;
 	// CACHE VALUES
@@ -56,7 +56,7 @@ export class MempoolLoop {
 		botConfig: BotConfig,
 		logger: Logger | undefined,
 		pathlib: Array<Path>,
-		ignoreAddresses: { [index: string]: { source: boolean; timeout_at: number; duration: number } },
+		ignoreAddresses: IgnoredAddresses,
 	) {
 		this.pools = pools;
 		this.CDpaths = new Map<string, [number, number, number]>();
@@ -95,35 +95,14 @@ export class MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempooltxs: [Array<MempoolTx>, Array<{ sender: string; reciever: string }>] = decodeMempool(
+			const mempoolTxs: Array<MempoolTx> = decodeMempool(
 				this.mempool,
 				this.ignoreAddresses,
+				this.botConfig.timeoutDuration,
+				this.iterations,
 			);
+
 			// Checks if there is a SendMsg from a blacklisted Address, if so add the reciever to the timeouted addresses
-			mempooltxs[1].forEach((Element) => {
-				if (this.ignoreAddresses[Element.sender]) {
-					if (
-						this.ignoreAddresses[Element.sender].source ||
-						this.ignoreAddresses[Element.sender].timeout_at +
-							this.ignoreAddresses[Element.sender].duration <=
-							this.iterations
-					) {
-						this.ignoreAddresses[Element.reciever] = {
-							source: false,
-							timeout_at: this.iterations,
-							duration: 100,
-						};
-						this.ignoreAddresses[Element.sender].timeout_at = this.iterations;
-					} else if (
-						this.ignoreAddresses[Element.sender].timeout_at +
-							this.ignoreAddresses[Element.sender].duration >=
-						this.iterations
-					) {
-						delete this.ignoreAddresses[Element.sender];
-					}
-				}
-			});
-			const mempoolTxs: Array<MempoolTx> = mempooltxs[0];
 			if (mempoolTxs.length === 0) {
 				continue;
 			} else {
@@ -228,12 +207,12 @@ export class MempoolLoop {
 	/**
 	 *
 	 */
-	public clear_ignoreAddresses() {
+	public clearIgnoreAddresses() {
 		const keys = Object.keys(this.ignoreAddresses);
 		for (let i = 0; i < keys.length; i++) {
 			if (
-				!this.ignoreAddresses[keys[i]].source &&
-				this.ignoreAddresses[keys[i]].timeout_at + this.ignoreAddresses[keys[i]].duration <= this.iterations
+				this.ignoreAddresses[keys[i]].timeoutAt > 0 &&
+				this.ignoreAddresses[keys[i]].timeoutAt + this.ignoreAddresses[keys[i]].duration <= this.iterations
 			) {
 				delete this.ignoreAddresses[keys[i]];
 			}

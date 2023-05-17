@@ -3,14 +3,14 @@ import axios from "axios";
 import { assert } from "console";
 
 import { NativeAssetInfo } from "./asset";
+import { IgnoredAddresses } from "./mempool";
 
 interface SkipConfig {
 	useSkip: boolean;
 	skipRpcUrl: string;
 	skipBidWallet: string;
 	skipBidRate: number;
-	trywithout: boolean;
-	timout_dur: number;
+	tryWithoutSkip: boolean;
 }
 
 interface LoggerConfig {
@@ -28,7 +28,7 @@ export interface BotConfig {
 	grpcUrl: string;
 	restUrl: string;
 	useRpcUrlScraper: boolean;
-	ignoreAddresses: { [index: string]: { source: boolean; timeout_at: number; duration: number } };
+	ignoreAddresses: IgnoredAddresses;
 	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
 	maxPathPools: number;
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
@@ -37,6 +37,7 @@ export interface BotConfig {
 	offerAssetInfo: NativeAssetInfo;
 	mnemonic: string;
 	useMempool: boolean;
+	timeoutDuration: number;
 	baseDenom: string;
 	gasDenom: string;
 	signOfLife: number;
@@ -89,12 +90,12 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 
 	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
 	const MAX_PATH_HOPS = +envs.MAX_PATH_HOPS; //required gas units per trade (hop)
-
-	const IGNORE_ADDRS: { [index: string]: { source: boolean; timeout_at: number; duration: number } } = {};
+	const timeoutDuration = envs.TIMEOUT_DURATION === undefined ? 100 : Number(envs.TIMEOUT_DURATION);
+	const IGNORE_ADDRS: IgnoredAddresses = {};
 	// set ignored Addresses
 	if (envs.IGNORE_ADDRESSES) {
 		const addrs = JSON.parse(envs.IGNORE_ADDRESSES);
-		addrs.forEach((element: string) => (IGNORE_ADDRS[element] = { source: true, timeout_at: 0, duration: 1000 }));
+		addrs.forEach((element: string) => (IGNORE_ADDRS[element] = { timeoutAt: 0, duration: timeoutDuration }));
 	}
 	// setup skipconfig if present
 	let skipConfig;
@@ -105,8 +106,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 			skipRpcUrl: envs.SKIP_URL ?? "",
 			skipBidWallet: envs.SKIP_BID_WALLET ?? "",
 			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
-			trywithout: envs.TRY_WO_SKIP === undefined || envs.TRY_WO_SKIP === "0" ? false : true,
-			timout_dur: envs.TIMEOUT_FOR_DUR === undefined ? 100 : Number(envs.TIMEOUT_FOR_DUR),
+			tryWithoutSkip: envs.TRY_WITHOUT_SKIP === undefined || envs.TRY_WITHOUT_SKIP === "0" ? false : true,
 		};
 	}
 
@@ -163,6 +163,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 		gasPrice: envs.GAS_UNIT_PRICE,
 		profitThresholds: PROFIT_THRESHOLDS,
 		txFees: TX_FEES,
+		timeoutDuration: timeoutDuration,
 		skipConfig: skipConfig,
 		loggerConfig: loggerConfig,
 		signOfLife: SIGN_OF_LIFE,
