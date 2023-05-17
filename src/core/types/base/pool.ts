@@ -326,69 +326,6 @@ function applySwapOperationMsg(poolsFromRouter: Array<Pool>, msg: MsgExecuteCont
 	}
 }
 
-// 			// not a direct swap or swaps on pools, but a routed message using a Router contract
-// 			else if (isSwapOperationsMessage(msg) && trade.offer_asset !== undefined) {
-// 				const poolsFromThisRouter = pools.filter((pool) => trade.contract === pool.routerAddress);
-// 				if (poolsFromThisRouter) {
-// 					let offerAsset: Asset = trade.offer_asset;
-// 					const operations = msg.execute_swap_operations.operations;
-// 					if (isWWSwapOperationsMessages(operations)) {
-// 						// terraswap router
-// 						for (const operation of operations) {
-// 							const currentPool = findPoolByInfos(
-// 								poolsFromThisRouter,
-// 								operation.terra_swap.offer_asset_info,
-// 								operation.terra_swap.ask_asset_info,
-// 							);
-
-// 							if (currentPool !== undefined) {
-// 								applyTradeOnPool(currentPool, offerAsset);
-// 								const [outGivenInNext, offerAssetInfoNext] = outGivenIn(currentPool, offerAsset);
-// 								offerAsset = { amount: String(outGivenInNext), info: offerAssetInfoNext };
-// 							}
-// 						}
-// 					}
-// 					if (isAstroSwapOperationsMessages(operations)) {
-// 						// astropoart router
-// 						for (const operation of operations) {
-// 							const currentPool = findPoolByInfos(
-// 								poolsFromThisRouter,
-// 								operation.astro_swap.offer_asset_info,
-// 								operation.astro_swap.ask_asset_info,
-// 							);
-// 							if (currentPool !== undefined) {
-// 								applyTradeOnPool(currentPool, offerAsset);
-// 								const [outGivenInNext, offerAssetInfoNext] = outGivenIn(currentPool, offerAsset);
-// 								offerAsset = { amount: String(outGivenInNext), info: offerAssetInfoNext };
-// 							}
-// 						}
-// 					}
-// 					if (isWyndDaoSwapOperationsMessages(operations)) {
-// 						for (const operation of operations) {
-// 							const offerAssetInfo = isWyndDaoNativeAsset(operation.wyndex_swap.offer_asset_info)
-// 								? { native_token: { denom: operation.wyndex_swap.offer_asset_info.native } }
-// 								: { token: { contract_addr: operation.wyndex_swap.offer_asset_info.token } };
-// 							const askAssetInfo = isWyndDaoNativeAsset(operation.wyndex_swap.ask_asset_info)
-// 								? { native_token: { denom: operation.wyndex_swap.ask_asset_info.native } }
-// 								: { token: { contract_addr: operation.wyndex_swap.ask_asset_info.token } };
-// 							const currentPool = findPoolByInfos(poolsFromThisRouter, offerAssetInfo, askAssetInfo);
-// 							if (currentPool !== undefined) {
-// 								applyTradeOnPool(currentPool, offerAsset);
-// 								const [outGivenInNext, offerAssetInfoNext] = outGivenIn(currentPool, offerAsset);
-// 								offerAsset = { amount: String(outGivenInNext), info: offerAssetInfoNext };
-// 							}
-// 						}
-// 					}
-// 				}
-// 			}
-// 		} catch (e) {
-// 			console.log("cannot apply trade on pools:");
-// 			console.log(trade);
-// 			console.log(e);
-// 		}
-// 	}
-// }
-
 /**
  *
  */
