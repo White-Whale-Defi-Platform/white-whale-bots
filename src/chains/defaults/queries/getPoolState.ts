@@ -9,6 +9,7 @@ import {
 } from "../../../core/types/base/asset";
 import { AmmDexName, Pool } from "../../../core/types/base/pool";
 import { Uint128 } from "../../../core/types/base/uint128";
+import { getPoolFees } from "./getPoolFees";
 import { getPoolsFromFactory } from "./getPoolsFromFactory";
 
 interface JunoSwapPoolState {
@@ -64,28 +65,65 @@ export async function initPools(
 ): Promise<Array<Pool>> {
 	const pools: Array<Pool> = [];
 	const factoryPools = await getPoolsFromFactory(chainOperator, factoryMapping);
-	for (const poolAddress of poolAddresses) {
+	const allKnownPools = factoryPools.map((fp) => fp.pool);
+	allKnownPools.push(...poolAddresses.map((pa) => pa.pool));
+	const uniquePools = new Set(allKnownPools);
+
+	for (const poolAddress of uniquePools) {
+		console.log("processing: ", poolAddress);
 		let assets: Array<Asset> = [];
 		let dexname: AmmDexName;
 		let totalShare: string;
+
 		try {
-			const poolState = <PoolState>await chainOperator.queryContractSmart(poolAddress.pool, { pool: {} });
+			const poolPair = await chainOperator.queryContractSmart(poolAddress, { pair: {} });
+			if (
+				poolPair.pair_type["stable" as keyof typeof poolPair.pair_type] ||
+				poolPair.pair_type["lsd" as keyof typeof poolPair.pair_type]
+			) {
+				console.log("---------stable pool, skipping for now--------");
+				continue;
+			}
+		} catch (error) {
+			console.log("cannot find stable/lsd pooltype for ", poolAddress, " assuming no stable pool");
+		}
+		try {
+			const poolState = <PoolState>await chainOperator.queryContractSmart(poolAddress, { pool: {} });
 			[assets, dexname, totalShare] = processPoolStateAssets(poolState);
 		} catch (error) {
-			const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(poolAddress.pool, { info: {} });
-			[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
+			try {
+				const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(poolAddress, { info: {} });
+				[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
+			} catch (error) {
+				console.log("cannot identify pool");
+				console.log(error);
+				continue;
+			}
 		}
-		const factory = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.factory ?? "";
-		const router = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.router ?? "";
+		const factory = factoryPools.find((fp) => fp.pool == poolAddress)?.factory ?? "";
+		const router = factoryPools.find((fp) => fp.pool == poolAddress)?.router ?? "";
+
+		let inputfee, outputfee, lpratio;
+		const manuallyProvidedPool = poolAddresses.find((pa) => pa.pool === poolAddress);
+		if (manuallyProvidedPool) {
+			console.log("manually entered fees for ", poolAddress);
+			//we provided pool info manually, overwrite queried results
+			(inputfee = manuallyProvidedPool.inputfee),
+				(outputfee = manuallyProvidedPool.outputfee),
+				(lpratio = manuallyProvidedPool.LPratio);
+		} else {
+			console.log("querying fees for ", poolAddress);
+			[inputfee, outputfee, lpratio] = await getPoolFees(chainOperator, poolAddress, dexname, factory);
+		}
 
 		pools.push({
 			assets: assets,
 			totalShare: totalShare,
-			address: poolAddress.pool,
+			address: poolAddress,
 			dexname: dexname,
-			inputfee: poolAddress.inputfee,
-			outputfee: poolAddress.outputfee,
-			LPratio: poolAddress.LPratio,
+			inputfee: inputfee,
+			outputfee: outputfee,
+			LPratio: lpratio,
 			factoryAddress: factory,
 			routerAddress: router,
 		});

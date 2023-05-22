@@ -60,6 +60,7 @@ async function main() {
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 	let setupMessage = "---".repeat(30);
 	const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+
 	const graph = newGraph(allPools);
 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 
