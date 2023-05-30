@@ -62,73 +62,102 @@ export async function initPools(
 	chainOperator: ChainOperator,
 	poolAddresses: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>,
 	factoryMapping: Array<{ factory: string; router: string }>,
+	valOfFile: Array<Pool> | undefined,
+	startWithoutQuery: boolean,
 ): Promise<Array<Pool>> {
 	const pools: Array<Pool> = [];
-	const factoryPools = await getPoolsFromFactory(chainOperator, factoryMapping);
-	const allKnownPools = factoryPools.map((fp) => fp.pool);
-	allKnownPools.push(...poolAddresses.map((pa) => pa.pool));
-	const uniquePools = new Set(allKnownPools);
 
-	for (const poolAddress of uniquePools) {
-		console.log("processing: ", poolAddress);
-		let assets: Array<Asset> = [];
-		let dexname: AmmDexName;
-		let totalShare: string;
-
-		try {
-			const poolPair = await chainOperator.queryContractSmart(poolAddress, { pair: {} });
-			if (
-				poolPair.pair_type["stable" as keyof typeof poolPair.pair_type] ||
-				poolPair.pair_type["lsd" as keyof typeof poolPair.pair_type]
-			) {
-				console.log("---------stable pool, skipping for now--------");
-				continue;
-			}
-		} catch (error) {
-			console.log("cannot find stable/lsd pooltype for ", poolAddress, " assuming no stable pool");
-		}
-		try {
-			const poolState = <PoolState>await chainOperator.queryContractSmart(poolAddress, { pool: {} });
-			[assets, dexname, totalShare] = processPoolStateAssets(poolState);
-		} catch (error) {
+	if (!valOfFile) {
+		const factoryPools = await getPoolsFromFactory(chainOperator, factoryMapping);
+		const allKnownPools = factoryPools.map((fp) => fp.pool);
+		allKnownPools.push(...poolAddresses.map((pa) => pa.pool));
+		const uniquePools = new Set(allKnownPools);
+		for (const poolAddress of uniquePools) {
+			console.log("processing: ", poolAddress);
 			try {
-				const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(poolAddress, { info: {} });
-				[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
+				const poolPair = await chainOperator.queryContractSmart(poolAddress, { pair: {} });
+				if (
+					poolPair.pair_type["stable" as keyof typeof poolPair.pair_type] ||
+					poolPair.pair_type["lsd" as keyof typeof poolPair.pair_type]
+				) {
+					console.log("---------stable pool, skipping for now--------");
+					continue;
+				}
 			} catch (error) {
-				console.log("cannot identify pool");
-				console.log(error);
+				console.log("cannot find stable/lsd pooltype for ", poolAddress, " assuming no stable pool");
+			}
+			const state = await queryPoolState(poolAddress, chainOperator);
+			if (!state) {
 				continue;
 			}
-		}
-		const factory = factoryPools.find((fp) => fp.pool == poolAddress)?.factory ?? "";
-		const router = factoryPools.find((fp) => fp.pool == poolAddress)?.router ?? "";
+			const factory = factoryPools.find((fp) => fp.pool == poolAddress)?.factory ?? "";
+			const router = factoryPools.find((fp) => fp.pool == poolAddress)?.router ?? "";
 
-		let inputfee, outputfee, lpratio;
-		const manuallyProvidedPool = poolAddresses.find((pa) => pa.pool === poolAddress);
-		if (manuallyProvidedPool) {
-			console.log("manually entered fees for ", poolAddress);
-			//we provided pool info manually, overwrite queried results
-			(inputfee = manuallyProvidedPool.inputfee),
-				(outputfee = manuallyProvidedPool.outputfee),
-				(lpratio = manuallyProvidedPool.LPratio);
+			let inputfee, outputfee, lpratio;
+			const manuallyProvidedPool = poolAddresses.find((pa) => pa.pool === poolAddress);
+			if (manuallyProvidedPool) {
+				console.log("manually entered fees for ", poolAddress);
+				//we provided pool info manually, overwrite queried results
+				(inputfee = manuallyProvidedPool.inputfee),
+					(outputfee = manuallyProvidedPool.outputfee),
+					(lpratio = manuallyProvidedPool.LPratio);
+			} else {
+				console.log("querying fees for ", poolAddress);
+				[inputfee, outputfee, lpratio] = await getPoolFees(chainOperator, poolAddress, state[1], factory);
+			}
+			pools.push({
+				assets: state[0],
+				totalShare: state[2],
+				address: poolAddress,
+				dexname: state[1],
+				inputfee: inputfee,
+				outputfee: outputfee,
+				LPratio: lpratio,
+				factoryAddress: factory,
+				routerAddress: router,
+			});
+		}
+	} else {
+		if (!startWithoutQuery) {
+			for (const pool of valOfFile) {
+				const poolstate = await queryPoolState(pool.address, chainOperator);
+				if (poolstate) {
+					pool.assets = poolstate[0];
+					pool.totalShare = poolstate[2];
+				}
+			}
 		} else {
-			console.log("querying fees for ", poolAddress);
-			[inputfee, outputfee, lpratio] = await getPoolFees(chainOperator, poolAddress, dexname, factory);
+			console.log("Skipping Query");
 		}
-
-		pools.push({
-			assets: assets,
-			totalShare: totalShare,
-			address: poolAddress,
-			dexname: dexname,
-			inputfee: inputfee,
-			outputfee: outputfee,
-			LPratio: lpratio,
-			factoryAddress: factory,
-			routerAddress: router,
-		});
+		return valOfFile;
 	}
 	return pools;
+}
+
+/**
+ *
+ */
+async function queryPoolState(
+	address: string,
+	chainOperator: ChainOperator,
+): Promise<[Array<Asset>, AmmDexName, string] | undefined> {
+	let assets: Array<Asset> = [];
+	let dexname: AmmDexName;
+	let totalShare: string;
+	try {
+		const poolState = <PoolState>await chainOperator.queryContractSmart(address, { pool: {} });
+		[assets, dexname, totalShare] = processPoolStateAssets(poolState);
+	} catch (error) {
+		try {
+			const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(address, { info: {} });
+			[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
+		} catch (error) {
+			console.log("cannot identify pool");
+			console.log(error);
+			return;
+		}
+	}
+	return [assets, dexname, totalShare];
 }
 
 /**

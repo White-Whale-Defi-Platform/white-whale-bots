@@ -1,4 +1,6 @@
 import dotenv from "dotenv";
+import { readFileSync, writeFileSync } from "fs";
+import { resolve } from "path";
 
 import * as chains from "./chains";
 import { trySomeArb } from "./core/arbitrage/arbitrage";
@@ -11,7 +13,7 @@ import { NoMempoolLoop } from "./core/types/arbitrageloops/nomempoolLoop";
 import { SkipLoop } from "./core/types/arbitrageloops/skipLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
 import { LogType } from "./core/types/base/logging";
-import { removedUnusedPools } from "./core/types/base/pool";
+import { clearPoolsbyLiqThreshold, removedUnusedPools } from "./core/types/base/pool";
 // load env files
 dotenv.config();
 
@@ -59,20 +61,34 @@ async function main() {
 	});
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 	let setupMessage = "---".repeat(30);
-	const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-
-	const graph = newGraph(allPools);
+	let data;
+	try {
+		data = readFileSync(resolve(__dirname, "pools.json"), "utf8");
+		data = JSON.parse(data);
+		console.log("Updating Pools in File...");
+	} catch (e) {
+		console.log("File not Found: Continue Query...");
+	}
+	const allPools = await initPools(
+		chainOperator,
+		botConfig.poolEnvs,
+		botConfig.mappingFactoryRouter,
+		data,
+		botConfig.startWithoutQuery,
+	);
+	writeFileSync(resolve(__dirname, "pools.json"), JSON.stringify(allPools));
+	const liquidPools = clearPoolsbyLiqThreshold(allPools, botConfig.liquidityThreshold, chainOperator.client.chainId);
+	const graph = newGraph(liquidPools);
 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
-
-	const filteredPools = removedUnusedPools(allPools, paths);
+	const filteredPools = removedUnusedPools(liquidPools, paths);
 	setupMessage += `**\nDerived Paths for Arbitrage:
 Total Paths:** \t${paths.length}\n`;
 	for (let pathlength = 2; pathlength <= botConfig.maxPathPools; pathlength++) {
 		const nrOfPaths = paths.filter((path) => path.pools.length === pathlength).length;
 		setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
 	}
-
-	setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
+	setupMessage += `(Removed ${allPools.length - liquidPools.length} pools without Liquidity above the threshold)\n`;
+	setupMessage += `(Removed ${liquidPools.length - filteredPools.length} unused pools)\n`;
 	setupMessage += "---".repeat(30);
 
 	startupMessage += setupMessage;

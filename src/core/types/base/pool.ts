@@ -15,7 +15,7 @@ import {
 	isWWSwapOperationsMessages,
 	isWyndDaoSwapOperationsMessages,
 } from "../messages/swapmessages";
-import { Asset, AssetInfo, fromChainAsset, isMatchingAssetInfos, isWyndDaoNativeAsset } from "./asset";
+import { Asset, AssetInfo, fromChainAsset, isMatchingAssetInfos, isNativeAsset, isWyndDaoNativeAsset } from "./asset";
 import { MempoolTx } from "./mempool";
 import { Path } from "./path";
 import { Uint128 } from "./uint128";
@@ -349,6 +349,129 @@ export function getAssetsOrder(pool: Pool, assetInfo: AssetInfo) {
 	} else {
 		return undefined;
 	}
+}
+
+/**
+ * Gets all unique Token values. Adds the liquidity of a Pool together to one stable Liquidity Value. Adds if this is greater than the user given threshold.
+ */
+export function clearPoolsbyLiqThreshold(pools: Array<Pool>, threshold: number, chainId: string) {
+	const out: Array<Pool> = [];
+	let stableCoin: Array<string>;
+	const values: { [tokenaddress: string]: { valuePerToken: number; wheight: number; stableCoin: string } } = {};
+	switch (chainId) {
+		case "phoenix-1":
+			stableCoin = ["ibc/B3504E092456BA618CC28AC671A71FB08C6CA0FD0BE7C8A5B5A3E2DD933CC9E4"];
+			break;
+		case "juno-1":
+			stableCoin = ["ibc/B3504E092456BA618CC28AC671A71FB08C6CA0FD0BE7C8A5B5A3E2DD933CC9E4"];
+			break;
+		case "inj-1":
+			stableCoin = [""];
+			break;
+	}
+	pools.forEach((elem: Pool) => {
+		const valueTok = getStableAsset(elem, stableCoin);
+		if (elem.address == "terra1zdpq84j8ex29wz9tmygqtftplrw87x8wmuyfh0rsy60uq7nadtsq5pjr7y") {
+			console.log("");
+		}
+		if (valueTok) {
+			if (values[valueTok.address]) {
+				if (
+					valueTok.stableCoin == values[valueTok.address].stableCoin &&
+					values[valueTok.address].wheight < valueTok.wheight
+				) {
+					values[valueTok.address].wheight == valueTok.wheight;
+					values[valueTok.address].valuePerToken = valueTok.valuePerToken;
+				}
+			} else {
+				values[valueTok.address] = {
+					stableCoin: valueTok.stableCoin,
+					valuePerToken: valueTok.valuePerToken,
+					wheight: valueTok.wheight,
+				};
+			}
+		}
+	});
+	console.log(values["ibc/36A02FFC4E74DF4F64305130C3DFA1B06BEAC775648927AA44467C76A77AB8DB"].valuePerToken);
+	const no_val = new Set();
+	pools.forEach((elem1) => {
+		let poolval = 0;
+		if (elem1.address == "terra1zdpq84j8ex29wz9tmygqtftplrw87x8wmuyfh0rsy60uq7nadtsq5pjr7y") {
+			console.log("");
+		}
+		const token = getAssetAddrs(elem1);
+
+		for (let y = 0; y < token.length; y++) {
+			const elem2 = token[y];
+			if (elem2.amount > 0) {
+				if (values[elem2.addrs] && values[elem2.addrs].valuePerToken >= 0) {
+					poolval = Number(poolval) + Number(values[elem2.addrs].valuePerToken) * Number(elem2.amount);
+				} else if (stableCoin.includes(elem2.addrs)) {
+					poolval = poolval + elem2.amount;
+				} else if (values[elem2.addrs]) {
+					if (token.indexOf(elem2) == 0 && values[token[1].addrs] && values[token[1].addrs].valuePerToken) {
+						poolval = Number(values[token[1].addrs].valuePerToken) * Number(token[1].amount) * 2;
+						break;
+					} else if (values[token[0].addrs] && values[token[0].addrs].valuePerToken) {
+						poolval = Number(values[token[0].addrs].valuePerToken) * Number(token[0].amount) * 2;
+						break;
+					}
+				}
+			}
+		}
+		if (poolval >= threshold) {
+			out.push(elem1);
+		} else {
+			no_val.add(elem1);
+		}
+	});
+	console.log(JSON.stringify(no_val));
+	return out;
+}
+
+/**
+ * Creates an Object of the Value of a Token.
+ */
+function getStableAsset(pool: Pool, stable: Array<string>) {
+	const asset = getAssetAddrs(pool);
+	let tokenval;
+	for (let i = 0; i < asset.length; i++) {
+		if (stable.includes(asset[i].addrs)) {
+			if (i == 0) {
+				const val = Number(pool.assets[0].amount) / 1000000 / (Number(pool.assets[1].amount) / 1000000);
+				tokenval = {
+					address: asset[1].addrs,
+					valuePerToken: val,
+					wheight: Number(pool.assets[i].amount) / 1000000,
+					stableCoin: asset[i].addrs,
+				};
+			} else {
+				const val = Number(pool.assets[1].amount) / 1000000 / (Number(pool.assets[0].amount) / 1000000);
+				tokenval = {
+					address: asset[0].addrs,
+					valuePerToken: val,
+					wheight: Number(pool.assets[i].amount) / 1000000,
+					stableCoin: asset[i].addrs,
+				};
+			}
+			return tokenval;
+		}
+	}
+}
+
+/**
+ * Get the Address and amount of the token in a Pool.
+ */
+function getAssetAddrs(pool: Pool) {
+	const out: Array<{ addrs: string; amount: number }> = [];
+	pool.assets.forEach((elem) => {
+		if (isNativeAsset(elem.info)) {
+			out.push({ addrs: elem.info.native_token.denom, amount: Number(elem.amount) / 1000000 });
+		} else {
+			out.push({ addrs: elem.info.token.contract_addr, amount: Number(elem.amount) / 1000000 });
+		}
+	});
+	return out;
 }
 
 /**

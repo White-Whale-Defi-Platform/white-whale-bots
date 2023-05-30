@@ -38,6 +38,8 @@ export interface BotConfig {
 	baseDenom: string;
 	gasDenom: string;
 	signOfLife: number;
+	liquidityThreshold: number;
+	startWithoutQuery: boolean;
 
 	gasPrice: string;
 	txFees: Map<number, StdFee>;
@@ -84,7 +86,8 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	const SIGN_OF_LIFE = Number(envs.SIGN_OF_LIFE === undefined ? 30 : +envs.SIGN_OF_LIFE);
 	const OFFER_ASSET_INFO: NativeAssetInfo = { native_token: { denom: envs.BASE_DENOM } };
 	const GAS_UNIT_PRICE = envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
-
+	const LIQUIDITY_THRESHOLD = Number(envs.LIQUIDITY_THRESHOLD === undefined ? 0 : +envs.LIQUIDITY_THRESHOLD);
+	const START_WITHOUT_QUERY = !envs.START_WITHOUT_QUERY || envs.START_WITHOUT_QUERY != "0" ? false : true;
 	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
 	const MAX_PATH_HOPS = +envs.MAX_PATH_HOPS; //required gas units per trade (hop)
 
@@ -163,6 +166,8 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 		loggerConfig: loggerConfig,
 		signOfLife: SIGN_OF_LIFE,
 		ignoreAddresses: IGNORE_ADDRS,
+		liquidityThreshold: LIQUIDITY_THRESHOLD,
+		startWithoutQuery: START_WITHOUT_QUERY,
 	};
 	return botConfig;
 }
