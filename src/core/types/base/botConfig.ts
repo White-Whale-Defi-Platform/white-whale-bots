@@ -106,7 +106,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 			skipRpcUrl: envs.SKIP_URL ?? "",
 			skipBidWallet: envs.SKIP_BID_WALLET ?? "",
 			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
-			tryWithoutSkip: envs.TRY_WITHOUT_SKIP === undefined || envs.TRY_WITHOUT_SKIP === "0" ? false : true,
+			tryWithoutSkip: envs.TRY_WITHOUT_SKIP === "1" ? true : false,
 		};
 	}
 
