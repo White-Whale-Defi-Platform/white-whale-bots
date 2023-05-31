@@ -24,3 +24,6 @@ out/
 .vscode/
 
 src/pools.json
+src/pools-juno-1.json
+src/pools-phoenix-1.json
+src/pools-injective-1.json

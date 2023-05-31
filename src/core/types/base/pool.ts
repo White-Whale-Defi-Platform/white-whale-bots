@@ -363,17 +363,14 @@ export function clearPoolsbyLiqThreshold(pools: Array<Pool>, threshold: number, 
 			stableCoin = ["ibc/B3504E092456BA618CC28AC671A71FB08C6CA0FD0BE7C8A5B5A3E2DD933CC9E4"];
 			break;
 		case "juno-1":
-			stableCoin = ["ibc/B3504E092456BA618CC28AC671A71FB08C6CA0FD0BE7C8A5B5A3E2DD933CC9E4"];
+			stableCoin = ["ibc/EAC38D55372F38F1AFD68DF7FE9EF762DCF69F26520643CF3F9D292A738D8034"];
 			break;
-		case "inj-1":
-			stableCoin = [""];
+		case "injective-1":
+			stableCoin = ["peggy0xdAC17F958D2ee523a2206206994597C13D831ec7"];
 			break;
 	}
 	pools.forEach((elem: Pool) => {
 		const valueTok = getStableAsset(elem, stableCoin);
-		if (elem.address == "terra1zdpq84j8ex29wz9tmygqtftplrw87x8wmuyfh0rsy60uq7nadtsq5pjr7y") {
-			console.log("");
-		}
 		if (valueTok) {
 			if (values[valueTok.address]) {
 				if (
@@ -392,13 +389,9 @@ export function clearPoolsbyLiqThreshold(pools: Array<Pool>, threshold: number, 
 			}
 		}
 	});
-	console.log(values["ibc/36A02FFC4E74DF4F64305130C3DFA1B06BEAC775648927AA44467C76A77AB8DB"].valuePerToken);
 	const no_val = new Set();
 	pools.forEach((elem1) => {
 		let poolval = 0;
-		if (elem1.address == "terra1zdpq84j8ex29wz9tmygqtftplrw87x8wmuyfh0rsy60uq7nadtsq5pjr7y") {
-			console.log("");
-		}
 		const token = getAssetAddrs(elem1);
 
 		for (let y = 0; y < token.length; y++) {

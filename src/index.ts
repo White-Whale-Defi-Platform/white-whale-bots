@@ -63,7 +63,7 @@ async function main() {
 	let setupMessage = "---".repeat(30);
 	let data;
 	try {
-		data = readFileSync(resolve(__dirname, "pools.json"), "utf8");
+		data = readFileSync(resolve(__dirname, `pools-${chainOperator.client.chainId}.json`), "utf8");
 		data = JSON.parse(data);
 		console.log("Updating Pools in File...");
 	} catch (e) {
@@ -76,7 +76,7 @@ async function main() {
 		data,
 		botConfig.startWithoutQuery,
 	);
-	writeFileSync(resolve(__dirname, "pools.json"), JSON.stringify(allPools));
+	writeFileSync(resolve(__dirname, `pools-${chainOperator.client.chainId}.json`), JSON.stringify(allPools));
 	const liquidPools = clearPoolsbyLiqThreshold(allPools, botConfig.liquidityThreshold, chainOperator.client.chainId);
 	const graph = newGraph(liquidPools);
 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
