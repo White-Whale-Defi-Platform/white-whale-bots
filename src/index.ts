@@ -143,7 +143,7 @@ Total Paths:** \t${paths.length}\n`;
 			const mins = (botConfig.signOfLife * timeIt) % 60;
 			const hours = ~~((botConfig.signOfLife * timeIt) / 60);
 			startupTime = now;
-			const message = `**chain:** ${chainOperator.client.chainId} **wallet:**  **status:** running for ${
+			const message = `**chain:** ${chainOperator.client.chainId} **wallet:** ${chainOperator.client.publicAddress} **status:** running for ${
 				loop.iterations
 			} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
 			loop.clearIgnoreAddresses();
