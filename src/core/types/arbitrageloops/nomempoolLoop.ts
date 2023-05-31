@@ -150,6 +150,13 @@ export class NoMempoolLoop {
 			}
 		});
 	}
+
+	/**
+	 *
+	 */
+	public clearIgnoreAddresses() {
+		return;
+	}
 }
 
 /**

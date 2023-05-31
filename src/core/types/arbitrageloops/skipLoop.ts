@@ -14,7 +14,7 @@ import { SkipResult } from "../../chainOperator/skipclients";
 import { Logger } from "../../logging";
 import { BotConfig } from "../base/botConfig";
 import { LogType } from "../base/logging";
-import { decodeMempool, MempoolTx } from "../base/mempool";
+import { decodeMempool, IgnoredAddresses, MempoolTx } from "../base/mempool";
 import { Path } from "../base/path";
 import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
 import { MempoolLoop } from "./mempoolLoop";
@@ -47,7 +47,7 @@ export class SkipLoop extends MempoolLoop {
 		logger: Logger | undefined,
 
 		pathlib: Array<Path>,
-		ignoreAddresses: { [index: string]: boolean },
+		ignoreAddresses: IgnoredAddresses,
 	) {
 		super(
 			pools,
@@ -88,7 +88,12 @@ export class SkipLoop extends MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempoolTxs: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses);
+			const mempoolTxs: Array<MempoolTx> = decodeMempool(
+				this.mempool,
+				this.ignoreAddresses,
+				this.botConfig.timeoutDuration,
+				this.iterations,
+			);
 
 			if (mempoolTxs.length === 0) {
 				continue;
@@ -122,8 +127,11 @@ export class SkipLoop extends MempoolLoop {
 			);
 			return;
 		}
+
+		const skipFee = Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651);
+
 		const bidMsgEncoded = getSendMessage(
-			String(Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651)),
+			String(skipFee),
 			this.botConfig.gasDenom,
 			this.chainOperator.client.publicAddress,
 			this.botConfig.skipConfig.skipBidWallet,
@@ -153,13 +161,15 @@ export class SkipLoop extends MempoolLoop {
 		console.log(inspect(res, { depth: null }));
 
 		let logItem = "";
-		let logMessage = `**wallet:** ${this.chainOperator.client.publicAddress}\t **block:** ${res.result.desired_height}\t **profit:** ${arbTrade.profit}`;
+		let logMessage = `**wallet:** ${this.chainOperator.client.publicAddress}\t **block:** ${
+			res.result.desired_height
+		}\t **profit:** ${arbTrade.profit - skipFee}`;
 
 		if (res.result.code !== 0) {
 			logMessage += `\t **error code:** ${res.result.code}\n**error:** ${res.result.error}\n`;
 		}
-		if (res.result.code === 4) {
-			console.log("no skip validator up, trying default broadcast");
+		if (this.botConfig.skipConfig.tryWithoutSkip && res.result.code === 4) {
+			await this.logger?.sendMessage("no skip validator up, trying default broadcast", LogType.Console);
 			await this.trade(arbTrade);
 		}
 
@@ -171,7 +181,10 @@ export class SkipLoop extends MempoolLoop {
 					const logMessageCheckTx = `**CheckTx Error:** index: ${idx}\t ${String(item.log)}\n`;
 					logMessage = logMessage.concat(logMessageCheckTx);
 					if (toArbTrade?.message.sender && idx == 0 && item["code"] == "5") {
-						this.ignoreAddresses[toArbTrade.message.sender] = true;
+						this.ignoreAddresses[toArbTrade.message.sender] = {
+							timeoutAt: this.iterations,
+							duration: this.botConfig.timeoutDuration,
+						};
 						await this.logger?.sendMessage(
 							"Error on Trade from Address: " + toArbTrade.message.sender,
 							LogType.Console,
@@ -189,7 +202,10 @@ export class SkipLoop extends MempoolLoop {
 					logMessage = logMessage.concat(logMessageDeliverTx);
 					if (idx == 0 && (item["code"] == 10 || item["code"] == 5)) {
 						if (toArbTrade?.message.sender) {
-							this.ignoreAddresses[toArbTrade.message.sender] = true;
+							this.ignoreAddresses[toArbTrade.message.sender] = {
+								timeoutAt: this.iterations,
+								duration: this.botConfig.timeoutDuration,
+							};
 							await this.logger?.sendMessage(
 								"Error on Trade from Address: " + toArbTrade.message.sender,
 								LogType.Console,
@@ -209,7 +225,6 @@ export class SkipLoop extends MempoolLoop {
 		if (res.result.code != 4) {
 			this.cdPaths(arbTrade.path);
 		}
-
 		if (res.result.code === 0) {
 			this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
 		}

@@ -8,7 +8,7 @@ import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
 import { BotConfig } from "../base/botConfig";
 import { LogType } from "../base/logging";
-import { decodeMempool, flushTxMemory, Mempool, MempoolTx } from "../base/mempool";
+import { decodeMempool, flushTxMemory, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
 import { Path } from "../base/path";
 import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
 /**
@@ -20,7 +20,7 @@ export class MempoolLoop {
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
-	ignoreAddresses: { [index: string]: boolean };
+	ignoreAddresses: IgnoredAddresses;
 	botConfig: BotConfig;
 	logger: Logger | undefined;
 	// CACHE VALUES
@@ -56,11 +56,10 @@ export class MempoolLoop {
 		botConfig: BotConfig,
 		logger: Logger | undefined,
 		pathlib: Array<Path>,
-		ignoreAddresses: { [index: string]: boolean },
+		ignoreAddresses: IgnoredAddresses,
 	) {
 		this.pools = pools;
 		this.CDpaths = new Map<string, [number, number, number]>();
-
 		this.paths = paths;
 		this.arbitrageFunction = arbitrage;
 		this.updateStateFunction = updateState;
@@ -96,8 +95,14 @@ export class MempoolLoop {
 				this.totalBytes = +this.mempool.total_bytes;
 			}
 
-			const mempoolTxs: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses);
+			const mempoolTxs: Array<MempoolTx> = decodeMempool(
+				this.mempool,
+				this.ignoreAddresses,
+				this.botConfig.timeoutDuration,
+				this.iterations,
+			);
 
+			// Checks if there is a SendMsg from a blacklisted Address, if so add the reciever to the timeouted addresses
 			if (mempoolTxs.length === 0) {
 				continue;
 			} else {
@@ -197,6 +202,21 @@ export class MempoolLoop {
 				this.paths.push(this.pathlib[value[2]]);
 			}
 		});
+	}
+
+	/**
+	 *
+	 */
+	public clearIgnoreAddresses() {
+		const keys = Object.keys(this.ignoreAddresses);
+		for (let i = 0; i < keys.length; i++) {
+			if (
+				this.ignoreAddresses[keys[i]].timeoutAt > 0 &&
+				this.ignoreAddresses[keys[i]].timeoutAt + this.ignoreAddresses[keys[i]].duration <= this.iterations
+			) {
+				delete this.ignoreAddresses[keys[i]];
+			}
+		}
 	}
 }
 

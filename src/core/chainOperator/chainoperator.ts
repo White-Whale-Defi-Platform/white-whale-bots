@@ -44,8 +44,17 @@ export class ChainOperator {
 	 *
 	 */
 	async queryContractSmart(address: string, queryMsg: Record<string, unknown>): Promise<JsonObject> {
-		//Error handled in getPoolState.
-		return await this.client.queryContractSmart(address, queryMsg);
+		try {
+			return await this.client.queryContractSmart(address, queryMsg);
+		} catch (e: any) {
+			//custom error for initPools JunoSwapPoolState
+			if (e.message.includes("Query failed with (18):")) {
+				throw new Error(e.message);
+			}
+			console.log(e);
+			await this.client.getNewClients();
+			await this.client.queryContractSmart(address, queryMsg);
+		}
 	}
 
 	/**
