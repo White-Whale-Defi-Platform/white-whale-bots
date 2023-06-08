@@ -46,6 +46,8 @@ export interface BotConfig {
 	txFees: Map<number, StdFee>;
 	profitThresholds: Map<number, number>;
 
+	overseerAddresses: Array<string>;
+
 	// Logger specific config.
 	loggerConfig: LoggerConfig;
 
@@ -97,6 +99,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 		const addrs = JSON.parse(envs.IGNORE_ADDRESSES);
 		addrs.forEach((element: string) => (IGNORE_ADDRS[element] = { timeoutAt: 0, duration: timeoutDuration }));
 	}
+	const OVERSEER_ADDRESSES = envs.OVERSEER_ADDRESSES ? JSON.parse(envs.OVERSEER_ADDRESSES) : undefined;
 	// setup skipconfig if present
 	let skipConfig;
 	if (envs.USE_SKIP == "1") {
@@ -168,6 +171,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 		loggerConfig: loggerConfig,
 		signOfLife: SIGN_OF_LIFE,
 		ignoreAddresses: IGNORE_ADDRS,
+		overseerAddresses: OVERSEER_ADDRESSES,
 	};
 	return botConfig;
 }

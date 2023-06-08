@@ -115,6 +115,10 @@ declare namespace NodeJS {
 		 */
 		EXTERNAL_EXEMPT_CODES: string | undefined;
 		/**
+		 * Overseer Liquidation Contracts.
+		 */
+		OVERSEER_ADDRESSES: string | undefined;
+		/**
 		 * Denotes whether we use skip for submitting transaction bundles.
 		 */
 		USE_SKIP: string | undefined;
