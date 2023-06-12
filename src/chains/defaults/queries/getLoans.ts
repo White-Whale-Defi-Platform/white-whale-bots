@@ -1,5 +1,5 @@
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
-import { AnchorOverseer, Loan, Loans, PriceFeed } from "../../../core/types/base/overseer";
+import { AnchorOverseer, AnchorWhitelist, Loan, Loans, PriceFeed } from "../../../core/types/base/overseer";
 
 /**
  * Queries all Loans connected to one Overseeraddress.
@@ -27,7 +27,7 @@ export async function getLoans(
 			};
 			collateral.collaterals.forEach((elem: [string, string]) => (loan.collaterals![elem[0]] = Number(elem[1])));
 
-			const lmt = calcBLfromCollaterals(loan, collateral.borrower, priceFeed);
+			const lmt = calcBLfromCollaterals(loan, overseer.whitelist, priceFeed);
 			if (allLoans.has(collateral.borrower)) {
 				loan.borrowLimit = Number(lmt);
 				if (allLoans.get(collateral.borrower)) {
@@ -48,17 +48,14 @@ export async function getLoans(
 /**
  *
  */
-function calcBLfromCollaterals(loan: Loan, borrower: string, priceFeed: PriceFeed) {
+function calcBLfromCollaterals(loan: Loan, whitelist: AnchorWhitelist, priceFeed: PriceFeed) {
 	if (loan.collaterals) {
 		let outLimit = 0;
-		const collateralIter = Object.keys(loan.collaterals!);
-		for (let i = 0; i < collateralIter.length; i++) {
-			if (priceFeed[collateralIter[i]]) {
-				outLimit =
-					outLimit +
-					loan.collaterals![collateralIter[i]]! *
-						priceFeed[collateralIter[i]].price *
-						priceFeed[collateralIter[i]].ltv;
+		for (const collateralToken in Object.keys(loan.collaterals)) {
+			const ltv = whitelist.elems.filter((elem) => elem.collateral_token === collateralToken)[0].max_ltv;
+			const tokenPrice = priceFeed.get(collateralToken);
+			if (tokenPrice) {
+				outLimit = outLimit + loan.collaterals[collateralToken]! * tokenPrice * +ltv;
 			}
 		}
 		return Math.floor(outLimit);

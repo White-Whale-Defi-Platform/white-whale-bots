@@ -1,57 +1,41 @@
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
 import { AnchorOverseer, AnchorWhitelist, Overseer } from "../../../core/types/base/overseer";
-import { getLoans } from "./getLoans";
 
 /**
  *
  */
-export async function initLiquidationOverseers(overseers: string | Array<string>, chainOperator: ChainOperator) {
+export async function initLiquidationOverseers(
+	overseerAddresses: string | Array<string>,
+	chainOperator: ChainOperator,
+) {
 	// export async function getliqudationinfos(overseer: Array<string>, operator: ChainOperator): Promise<Liquidate> {
 	let overseerAddresssArray: Array<string>;
-	if (typeof overseers === "string") {
-		overseerAddresssArray = [overseers];
+	if (typeof overseerAddresses === "string") {
+		overseerAddresssArray = [overseerAddresses];
 	} else {
-		overseerAddresssArray = overseers;
+		overseerAddresssArray = overseerAddresses;
 	}
 
+	const overseers: Array<Overseer> = [];
 	for (const overseerAddress of overseerAddresssArray) {
-			const overseer: AnchorOverseer | undefined = await initLiquidationOverseer(overseerAddress, chainOperator);
-			if(!overseer){
-                console.log("Overseer cannot be found: ", overseerAddress);
-                process.exit(1);
-            }
-            overseer.priceFeed = await initPriceFeeds(overseer, chainOperator);
-			
-			const loans = await getLoans(
-				overseer,
-				chainOperator,
-				overseer.marketAddress,
-				overseer.priceFeed,
-			);
-			outLoan[overseer[x]] = tmpOutLoan[overseer[x]];
-			outConfig[overseer[x]] = outCfgtmp[0][overseer[x]];
-
-			outCfgtmp[1].forEach((elem: string) => {
-				outFeeder[elem] = { overseer: overseer[x] };
-			});
-			outMMarkets[outConfig[overseer[x]].marketContract!] = { overseer: overseer[x] };
+		const overseer: AnchorOverseer | undefined = await initLiquidationOverseer(overseerAddress, chainOperator);
+		if (!overseer) {
+			console.log("Overseer cannot be found: ", overseerAddress);
+			process.exit(1);
 		}
+		overseer.priceFeed = await initPriceFeeds(overseer, chainOperator);
+		overseers.push(overseer);
 	}
-	await delay(1000);
-	const out: Liquidate = {
-		configs: outConfig,
-		loans: outLoan,
-		prices: outPrices,
-		feeder: outFeeder,
-		moneymarkets: outMMarkets,
-	};
-	return out;
+	return overseers;
 }
 
 /**
  *
  */
-async function initLiquidationOverseer(overseer: string, chainOperator: ChainOperator): Promise<AnchorOverseer | undefined> {
+async function initLiquidationOverseer(
+	overseer: string,
+	chainOperator: ChainOperator,
+): Promise<AnchorOverseer | undefined> {
 	const overseerConfig: AnchorOverseerConfig = await chainOperator.queryContractSmart(overseer, {
 		config: { limit: 100 },
 	});
@@ -76,21 +60,26 @@ async function initLiquidationOverseer(overseer: string, chainOperator: ChainOpe
 			marketAddress: overseerConfig.market_contract,
 			liquidatorAddress: overseerConfig.liquidation_contract,
 			priceFeeders: Array.from(priceFeeders),
-            priceFeed: new Map(),
-            whitelist: whitelist,
+			priceFeed: new Map(),
+			whitelist: whitelist,
 		};
 		return anchorOverseer;
 	}
 	console.log("cannot find overseer config for: ", overseer);
 	return undefined;
 }
-async function initPriceFeeds(overseer: AnchorOverseer, chainOperator: ChainOperator){
-    let priceFeed: typeof overseer['priceFeed'] = new Map();
-    const priceFeedRes: PriceFeedResult = await chainOperator.queryContractSmart( overseer.oracleAddress, {prices: { limit: 1000}});
-    for(const price of priceFeedRes.prices){
-        priceFeed.set(price.asset, +price.price);
-    }
-    return priceFeed
+/**
+ *
+ */
+async function initPriceFeeds(overseer: AnchorOverseer, chainOperator: ChainOperator) {
+	const priceFeed: (typeof overseer)["priceFeed"] = new Map();
+	const priceFeedRes: PriceFeedResult = await chainOperator.queryContractSmart(overseer.oracleAddress, {
+		prices: { limit: 1000 },
+	});
+	for (const price of priceFeedRes.prices) {
+		priceFeed.set(price.asset, +price.price);
+	}
+	return priceFeed;
 }
 interface AnchorOverseerConfig {
 	owner_addr: string;
@@ -111,13 +100,12 @@ interface AnchorOverseerConfig {
 	dyn_rate_max: string;
 }
 
-interface PriceFeedResult { 
-    prices: Array<
-        {
-          asset: string,
-          price: string,
-          last_updated_time: 1686224223
-        }>
+interface PriceFeedResult {
+	prices: Array<{
+		asset: string;
+		price: string;
+		last_updated_time: 1686224223;
+	}>;
 }
 
 interface AnchorAssetFeeder {

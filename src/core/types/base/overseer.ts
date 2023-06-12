@@ -7,7 +7,7 @@ export interface AnchorOverseer extends Overseer {
 	marketAddress: string;
 	liquidatorAddress: string;
 	priceFeeders?: Array<string>;
-	priceFeed: Map<string, number>;
+	priceFeed: PriceFeed;
 	whitelist: AnchorWhitelist;
 }
 
@@ -33,6 +33,4 @@ export interface Loan {
 	loanAmt?: number | undefined;
 }
 
-export interface PriceFeed {
-	[tokenaddrs: string]: { price: number; custodyAddrs: string; ltv: number };
-}
+export type PriceFeed = Map<string, number>;
