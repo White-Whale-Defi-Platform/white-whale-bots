@@ -105,7 +105,6 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		this._tmClient = await Tendermint34Client.create(this._httpClient);
 		this._wasmQueryClient = QueryClient.withExtensions(this._tmClient, setupWasmExtension, setupAuthExtension);
 		this._signingCWClient = await SigningCosmWasmClient.connectWithSigner(rpcUrl, this._signer, {
-			prefix: this._chainPrefix,
 			gasPrice: GasPrice.fromString(this._gasPrice + this._denom),
 		});
 	}

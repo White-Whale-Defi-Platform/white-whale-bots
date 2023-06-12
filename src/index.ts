@@ -1,19 +1,16 @@
 import dotenv from "dotenv";
 
 import * as chains from "./chains";
-import { trySomeArb } from "./core/arbitrage/arbitrage";
-import { getPaths, newGraph } from "./core/arbitrage/graph";
+import { getLoans } from "./chains/defaults/queries/getLoans";
+import { initLiquidationOverseers } from "./chains/defaults/queries/initOverseers";
 import { ChainOperator } from "./core/chainOperator/chainoperator";
-import { getSkipClient } from "./core/chainOperator/skipclients";
 import { Logger } from "./core/logging";
-import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
-import { NoMempoolLoop } from "./core/types/arbitrageloops/nomempoolLoop";
-import { SkipLoop } from "./core/types/arbitrageloops/skipLoop";
+import { LiquidationLoop } from "./core/types/arbitrageloops/liquidationLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
 import { LogType } from "./core/types/base/logging";
-import { removedUnusedPools } from "./core/types/base/pool";
+import { AnchorOverseer } from "./core/types/base/overseer";
 // load env files
-dotenv.config();
+dotenv.config({ path: "./src/envs/terra.env" });
 
 /**
  * Runs the main program.
@@ -45,8 +42,8 @@ async function main() {
 	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
 	let getPoolStates = chains.defaults.getPoolStates;
 	let initPools = chains.defaults.initPools;
-	let startupTime = Date.now();
-	let timeIt = 0;
+	const startupTime = Date.now();
+	const timeIt = 0;
 
 	await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
 		if (chainSetups === undefined) {
@@ -58,102 +55,111 @@ async function main() {
 		return;
 	});
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
-	let setupMessage = "---".repeat(30);
-	const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-	const graph = newGraph(allPools);
-	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 
-	const filteredPools = removedUnusedPools(allPools, paths);
-	setupMessage += `**\nDerived Paths for Arbitrage:
-Total Paths:** \t${paths.length}\n`;
-	for (let pathlength = 2; pathlength <= botConfig.maxPathPools; pathlength++) {
-		const nrOfPaths = paths.filter((path) => path.pools.length === pathlength).length;
-		setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
+	// let setupMessage = "---".repeat(30);
+	// 	const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+	// 	const graph = newGraph(allPools);
+	// 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+
+	// 	const filteredPools = removedUnusedPools(allPools, paths);
+	// 	setupMessage += `**\nDerived Paths for Arbitrage:
+	// Total Paths:** \t${paths.length}\n`;
+	// 	for (let pathlength = 2; pathlength <= botConfig.maxPathPools; pathlength++) {
+	// 		const nrOfPaths = paths.filter((path) => path.pools.length === pathlength).length;
+	// 		setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
+	// 	}
+	// 	setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
+	// 	setupMessage += "---".repeat(30);
+
+	// 	startupMessage += setupMessage;
+
+	const overseers = await initLiquidationOverseers(botConfig.overseerAddresses, chainOperator);
+
+	for (const overseer of overseers) {
+		const loans = await getLoans(<AnchorOverseer>overseer, chainOperator);
+		(<AnchorOverseer>overseer).loans = loans;
 	}
-
-	setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
-	setupMessage += "---".repeat(30);
-
-	startupMessage += setupMessage;
 	await logger.sendMessage(startupMessage, LogType.Console);
 
-	let loop;
+	const loop = new LiquidationLoop(overseers.map((overseer) => <AnchorOverseer>overseer));
+	console.log(loop.overseers[0].loans);
+	// if (botConfig.skipConfig) {
+	// 	await logger.sendMessage("Initializing skip loop...", LogType.Console);
+	// 	const [skipClient, skipSigner] = await getSkipClient(
+	// 		botConfig.skipConfig.skipRpcUrl,
+	// 		botConfig.mnemonic,
+	// 		botConfig.chainPrefix,
+	// 	);
+	// 	loop = new SkipLoop(
+	// 		filteredPools,
+	// 		paths,
+	// 		trySomeArb,
+	// 		getPoolStates,
+	// 		getFlashArbMessages,
+	// 		chainOperator,
+	// 		botConfig,
+	// 		skipClient,
+	// 		skipSigner,
+	// 		logger,
+	// 		[...paths],
+	// 		botConfig.ignoreAddresses,
+	// 		liquidate,
+	// 	);
+	// } else if (botConfig.useMempool === true) {
+	// 	await logger.sendMessage("Initializing mempool loop...", LogType.Console);
 
-	if (botConfig.skipConfig) {
-		await logger.sendMessage("Initializing skip loop...", LogType.Console);
-		const [skipClient, skipSigner] = await getSkipClient(
-			botConfig.skipConfig.skipRpcUrl,
-			botConfig.mnemonic,
-			botConfig.chainPrefix,
-		);
-		loop = new SkipLoop(
-			filteredPools,
-			paths,
-			trySomeArb,
-			getPoolStates,
-			getFlashArbMessages,
-			chainOperator,
-			botConfig,
-			skipClient,
-			skipSigner,
-			logger,
-			[...paths],
-			botConfig.ignoreAddresses,
-		);
-	} else if (botConfig.useMempool === true) {
-		await logger.sendMessage("Initializing mempool loop...", LogType.Console);
-
-		loop = new MempoolLoop(
-			filteredPools,
-			paths,
-			trySomeArb,
-			getPoolStates,
-			getFlashArbMessages,
-			chainOperator,
-			botConfig,
-			logger,
-			[...paths],
-			botConfig.ignoreAddresses,
-		);
-	} else {
-		await logger.sendMessage("Initializing non-mempool loop...", LogType.Console);
-		loop = new NoMempoolLoop(
-			filteredPools,
-			paths,
-			trySomeArb,
-			getPoolStates,
-			getFlashArbMessages,
-			chainOperator,
-			botConfig,
-			logger,
-			[...paths],
-		);
-	}
+	// 	loop = new MempoolLoop(
+	// 		filteredPools,
+	// 		paths,
+	// 		trySomeArb,
+	// 		getPoolStates,
+	// 		getFlashArbMessages,
+	// 		chainOperator,
+	// 		botConfig,
+	// 		logger,
+	// 		[...paths],
+	// 		botConfig.ignoreAddresses,
+	// 		liquidate,
+	// 	);
+	// } else {
+	// 	await logger.sendMessage("Initializing non-mempool loop...", LogType.Console);
+	// 	loop = new NoMempoolLoop(
+	// 		filteredPools,
+	// 		paths,
+	// 		trySomeArb,
+	// 		getPoolStates,
+	// 		getFlashArbMessages,
+	// 		chainOperator,
+	// 		botConfig,
+	// 		logger,
+	// 		[...paths],
+	// 	);
+	// }
 
 	// main loop of the bot
 	// await loop.fetchRequiredChainData();
 
-	await logger.sendMessage("Starting loop...", LogType.All);
-	while (true) {
-		await loop.step();
-		await loop.reset();
-		const now = Date.now();
-		if (startupTime - now + botConfig.signOfLife * 60000 <= 0) {
-			timeIt++;
-			const mins = (botConfig.signOfLife * timeIt) % 60;
-			const hours = ~~((botConfig.signOfLife * timeIt) / 60);
-			startupTime = now;
-			const message = `**chain:** ${chainOperator.client.chainId} **wallet:** ${chainOperator.client.publicAddress} **status:** running for ${
-				loop.iterations
-			} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
-			loop.clearIgnoreAddresses();
-			//switching RPCS every 6 Hrs
-			if (mins == 0 && hours === 6 && botConfig.rpcUrls.length > 1) {
-				await chainOperator.client.getNewClients();
-			}
-			await logger.sendMessage(message);
-		}
-	}
+	// await logger.sendMessage("Starting loop...", LogType.All);
+	// while (true) {
+	// 	await loop.step();
+	// 	await loop.reset();
+	// 	const now = Date.now();
+	// 	if (startupTime - now + botConfig.signOfLife * 60000 <= 0) {
+	// 		timeIt++;
+	// 		const mins = (botConfig.signOfLife * timeIt) % 60;
+	// 		const hours = ~~((botConfig.signOfLife * timeIt) / 60);
+	// 		startupTime = now;
+	// 		const message = `**chain:** ${chainOperator.client.chainId} **wallet:**  **status:** running for ${
+	// 			loop.iterations
+	// 		} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
+	// 		loop.clearIgnoreAddresses();
+	// 		//switching RPCS every 6 Hrs
+	// 		if (mins == 0 && hours === 6 && botConfig.rpcUrls.length > 1) {
+	// 			await chainOperator.client.getNewClients();
+	// 		}
+	// 		await logger.sendMessage(message);
+	// 	}
+	// }
 }
 
 main().catch((e) => {

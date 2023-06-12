@@ -9,6 +9,7 @@ export interface AnchorOverseer extends Overseer {
 	priceFeeders?: Array<string>;
 	priceFeed: PriceFeed;
 	whitelist: AnchorWhitelist;
+	loans: Loans;
 }
 
 export interface AnchorWhitelist {

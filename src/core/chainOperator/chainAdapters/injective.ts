@@ -227,16 +227,16 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			fee: fee,
 			memo: memo,
 			chainId: this._chainId,
-			message: preppedMsgs.map((msg) => msg.toDirectSign()),
+			message: preppedMsgs,
 			pubKey: this._publicKey.toBase64(),
 			sequence: this._sequence,
 			accountNumber: this._accountNumber,
 		});
 		const signature = await this._privateKey.sign(Buffer.from(signBytes));
 
-		txRaw.setSignaturesList([signature]);
+		txRaw.signatures = [signature];
 		const cosmTxRaw = {
-			signatures: txRaw.getSignaturesList_asU8(),
+			signatures: txRaw.signatures,
 			bodyBytes: bodyBytes,
 			authInfoBytes: authInfoBytes,
 		};

@@ -1,17 +1,15 @@
-import { Loans, Overseer } from "../base/overseer";
+import { AnchorOverseer } from "../base/overseer";
 
 /**
  *
  */
 export class LiquidationLoop {
-	overseers: Array<Overseer>;
-	loans: Loans;
+	overseers: Array<AnchorOverseer>;
 
 	/**
 	 *
 	 */
-	constructor(overseers: Array<Overseer>, loans: Loans) {
+	constructor(overseers: Array<AnchorOverseer>) {
 		this.overseers = overseers;
-		this.loans = loans;
 	}
 }
