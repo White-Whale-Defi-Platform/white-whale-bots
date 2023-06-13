@@ -1,8 +1,10 @@
+import { fromUtf8 } from "@cosmjs/encoding";
+
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { BotConfig } from "../base/botConfig";
 import { decodeMempool, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
-import { AnchorOverseer } from "../base/overseer";
-
+import { AnchorOverseer, processPriceFeed } from "../base/overseer";
+import { PriceFeedMessage } from "../messages/pricefeedmessage";
 /**
  *
  */
@@ -14,9 +16,9 @@ export class LiquidationLoop {
 	mempool!: Mempool;
 	overseers: Array<AnchorOverseer>;
 	totalBytes = 0;
-	allOverseerAddresses: Array<string> = [];
-	allOverseerPriceFeeders: Array<string> = [];
-	allOverseerMoneyMarkets: Array<string> = [];
+	allOverseerAddresses: Record<string, AnchorOverseer> = {};
+	allOverseerPriceFeeders: Record<string, AnchorOverseer> = {};
+	allOverseerMoneyMarkets: Record<string, AnchorOverseer> = {};
 
 	/**
 	 *
@@ -27,11 +29,13 @@ export class LiquidationLoop {
 		this.chainOperator = chainOperator;
 
 		overseers.map((overseer) => {
-			this.allOverseerAddresses.push(overseer.overseerAddress);
+			this.allOverseerAddresses[overseer.overseerAddress] = overseer;
 			if (overseer.priceFeeders) {
-				this.allOverseerPriceFeeders.push(...overseer.priceFeeders);
+				for (const priceFeedAddress of overseer.priceFeeders) {
+					this.allOverseerPriceFeeders[priceFeedAddress] = overseer;
+				}
 			}
-			this.allOverseerMoneyMarkets.push(overseer.marketAddress);
+			this.allOverseerMoneyMarkets[overseer.marketAddress] = overseer;
 		});
 	}
 
@@ -59,12 +63,25 @@ export class LiquidationLoop {
 	 */
 	applyMempoolMessagesOnLiquidation(mempoolTxs: Array<MempoolTx>) {
 		for (const tx of mempoolTxs) {
-			if (this.allOverseerPriceFeeders.includes(tx.message.contract)) {
-				// its a price update transaction
-			} else if (this.allOverseerAddresses.includes(tx.message.contract)) {
-				// its a collateral change action
-			} else if (this.allOverseerMoneyMarkets.includes(tx.message.contract)) {
-				// its a change in borrow positions
+			const pf = this.allOverseerPriceFeeders[tx.message.contract];
+			if (pf) {
+				const pfMessage: PriceFeedMessage = JSON.parse(fromUtf8(tx.message.msg));
+				processPriceFeed(pfMessage, pf.priceFeed);
+				continue;
+			} else {
+				const overseer = this.allOverseerAddresses[tx.message.contract];
+				if (overseer) {
+					//its an overseer message
+					// do something
+					continue;
+				} else {
+					const mm = this.allOverseerMoneyMarkets[tx.message.contract];
+					if (mm) {
+						//its an money market message
+						//do something
+						continue;
+					}
+				}
 			}
 		}
 	}

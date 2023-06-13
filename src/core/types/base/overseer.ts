@@ -1,3 +1,5 @@
+import { PriceFeedMessage } from "../messages/pricefeedmessage";
+
 export interface Overseer {
 	overseerAddress: string;
 }
@@ -35,3 +37,12 @@ export interface Loan {
 }
 
 export type PriceFeed = Map<string, number>;
+
+/**
+ * Update prices.
+ */
+export function processPriceFeed(msg: PriceFeedMessage, overseerPriceFeed: PriceFeed) {
+	for (const priceFeedEntry of msg.feed_price.prices) {
+		overseerPriceFeed.set(priceFeedEntry[0], +priceFeedEntry[1]);
+	}
+}
