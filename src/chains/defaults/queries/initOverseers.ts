@@ -1,5 +1,6 @@
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
-import { AnchorOverseer, AnchorWhitelist, Overseer } from "../../../core/types/base/overseer";
+import { AnchorOverseer, AnchorWhitelist, setBorrowLimits } from "../../../core/types/base/overseer";
+import { setLoans } from "./getLoans";
 
 /**
  *
@@ -16,7 +17,7 @@ export async function initLiquidationOverseers(
 		overseerAddresssArray = overseerAddresses;
 	}
 
-	const overseers: Array<Overseer> = [];
+	const overseers: Array<AnchorOverseer> = [];
 	for (const overseerAddress of overseerAddresssArray) {
 		const overseer: AnchorOverseer | undefined = await initLiquidationOverseer(overseerAddress, chainOperator);
 		if (!overseer) {
@@ -24,6 +25,8 @@ export async function initLiquidationOverseers(
 			process.exit(1);
 		}
 		overseer.priceFeed = await initPriceFeeds(overseer, chainOperator);
+		await setLoans(overseer, chainOperator);
+		setBorrowLimits(overseer);
 		overseers.push(overseer);
 	}
 	return overseers;
@@ -39,19 +42,19 @@ async function initLiquidationOverseer(
 	const overseerConfig: AnchorOverseerConfig = await chainOperator.queryContractSmart(overseer, {
 		config: { limit: 100 },
 	});
-	await delay(5000);
+	await delay(500);
 	if (overseerConfig) {
 		const whitelist: AnchorWhitelist = await chainOperator.queryContractSmart(overseer, {
 			whitelist: { limit: 100 },
 		});
-		await delay(2000);
+		await delay(200);
 		const priceFeeders: Set<string> = new Set();
 
 		for (const whitelisted of whitelist.elems) {
 			const feeder: AnchorAssetFeeder = await chainOperator.queryContractSmart(overseerConfig.oracle_contract, {
 				feeder: { asset: whitelisted.collateral_token },
 			});
-			await delay(2000);
+			await delay(200);
 			priceFeeders.add(feeder.feeder);
 		}
 		const anchorOverseer: AnchorOverseer = {

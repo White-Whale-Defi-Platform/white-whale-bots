@@ -3,7 +3,7 @@ import { fromUtf8 } from "@cosmjs/encoding";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { BotConfig } from "../base/botConfig";
 import { decodeMempool, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
-import { AnchorOverseer, processPriceFeed } from "../base/overseer";
+import { AnchorOverseer, setBorrowLimits, setPriceFeed } from "../base/overseer";
 import { PriceFeedMessage } from "../messages/pricefeedmessage";
 /**
  *
@@ -56,27 +56,34 @@ export class LiquidationLoop {
 		}
 
 		const mempoolTxs: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses, this.iterations);
+		this.applyMempoolMessagesOnLiquidation(mempoolTxs);
 	}
 
 	/**
 	 *
 	 */
 	applyMempoolMessagesOnLiquidation(mempoolTxs: Array<MempoolTx>) {
+		console.log(mempoolTxs.length);
 		for (const tx of mempoolTxs) {
-			const pf = this.allOverseerPriceFeeders[tx.message.contract];
-			if (pf) {
+			const pfOverseer = this.allOverseerPriceFeeders[tx.message.contract];
+			if (pfOverseer) {
 				const pfMessage: PriceFeedMessage = JSON.parse(fromUtf8(tx.message.msg));
-				processPriceFeed(pfMessage, pf.priceFeed);
+				setPriceFeed(pfOverseer, pfMessage);
+				setBorrowLimits(pfOverseer);
+				console.log("new price feed");
 				continue;
 			} else {
 				const overseer = this.allOverseerAddresses[tx.message.contract];
 				if (overseer) {
+					console.log("new overseer message");
 					//its an overseer message
 					// do something
 					continue;
 				} else {
 					const mm = this.allOverseerMoneyMarkets[tx.message.contract];
+
 					if (mm) {
+						console.log("new money market message");
 						//its an money market message
 						//do something
 						continue;

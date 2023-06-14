@@ -30,10 +30,10 @@ export type Loans = Array<Loan>;
 
 export interface Loan {
 	borrowerAddress: string;
-	collaterals?: { [address: string]: number | undefined };
-	borrowLimit?: number | undefined;
-	riskRatio?: number | undefined;
-	loanAmt?: number | undefined;
+	collaterals: { [address: string]: { amount: number; ltv: number } };
+	borrowLimit: number;
+	riskRatio: number;
+	loanAmt: number;
 }
 
 export type PriceFeed = Map<string, number>;
@@ -41,8 +41,29 @@ export type PriceFeed = Map<string, number>;
 /**
  * Update prices.
  */
-export function processPriceFeed(msg: PriceFeedMessage, overseerPriceFeed: PriceFeed) {
+export function setPriceFeed(overseer: AnchorOverseer, msg: PriceFeedMessage) {
 	for (const priceFeedEntry of msg.feed_price.prices) {
-		overseerPriceFeed.set(priceFeedEntry[0], +priceFeedEntry[1]);
+		overseer.priceFeed.set(priceFeedEntry[0], +priceFeedEntry[1]);
+	}
+}
+
+/**
+ *
+ */
+export function setBorrowLimits(overseer: AnchorOverseer) {
+	for (const loan of overseer.loans) {
+		if (loan.collaterals) {
+			let newLTV = 0;
+			for (const collateralToken of Object.keys(loan.collaterals)) {
+				const tokenPrice = overseer.priceFeed.get(collateralToken);
+				if (tokenPrice) {
+					newLTV =
+						newLTV +
+						loan.collaterals[collateralToken].amount * tokenPrice * loan.collaterals[collateralToken]!.ltv;
+				}
+			}
+			loan.borrowLimit = newLTV;
+			loan.riskRatio = loan.loanAmt / loan.borrowLimit;
+		}
 	}
 }

@@ -359,7 +359,21 @@ export async function processMempoolLiquidation(
 	}
 	return liqChanges;
 }
+/**
+ * Update prices.
+ */
+export function processPriceFeed(containedMsg: any, priceFeed: PriceFeed): PriceFeed {
+	const out: PriceFeed = priceFeed;
+	if (containedMsg.feed_price) {
+		containedMsg.feed_price.prices.forEach((e: [string, string]) => {
+			if (out[e[0]]) {
+				out[e[0]].price = Number(e[1]);
+			}
+		});
+	}
 
+	return out;
+}
 /**
  * Updates Borrow Limits if new prices were recieved, adds/removes collateral, adds/updates loans.
  * Returns [0]: Addresses to liquidate.

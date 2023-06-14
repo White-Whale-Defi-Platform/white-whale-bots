@@ -1,16 +1,18 @@
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
-import { AnchorOverseer, AnchorWhitelist, Loan, Loans, PriceFeed } from "../../../core/types/base/overseer";
+import { AnchorOverseer, Loan, Loans } from "../../../core/types/base/overseer";
 
 /**
  * Queries all Loans connected to one Overseeraddress.
  */
-export async function getLoans(overseer: AnchorOverseer, chainOperator: ChainOperator): Promise<Loans> {
+export async function setLoans(overseer: AnchorOverseer, chainOperator: ChainOperator) {
 	const allBorrowers = await getAllBorrowers(overseer, chainOperator);
 	const allCollateral = await getAllCollaterals(overseer, chainOperator);
 	const allLoans = await getAllLoans(overseer.marketAddress, chainOperator);
 
 	const loans: Loans = [];
 	for (const collateral of allCollateral) {
+		const ltv = overseer.whitelist.elems.filter((elem) => elem.collateral_token === collateral.collaterals[0][0])[0]
+			.max_ltv;
 		// const e = allCollaterLs[o];
 		if (allBorrowers.has(collateral.borrower)) {
 			const loan: Loan = {
@@ -20,42 +22,19 @@ export async function getLoans(overseer: AnchorOverseer, chainOperator: ChainOpe
 				riskRatio: 0,
 				loanAmt: 0,
 			};
-			collateral.collaterals.forEach((elem: [string, string]) => (loan.collaterals![elem[0]] = Number(elem[1])));
+			collateral.collaterals.forEach((elem: [string, string]) => {
+				loan.collaterals![elem[0]] = { amount: Number(elem[1]), ltv: +ltv };
+			});
 
-			const lmt = calcBLfromCollaterals(loan, overseer.whitelist, overseer.priceFeed);
-			if (allLoans.has(collateral.borrower)) {
-				loan.borrowLimit = Number(lmt);
-				if (allLoans.get(collateral.borrower)) {
-					loan.loanAmt = allLoans.get(collateral.borrower);
-				} else {
-					loan.loanAmt = 0;
-				}
-				loan.riskRatio = loan.loanAmt! / loan.borrowLimit!;
-			}
+			loan.loanAmt = allLoans.get(collateral.borrower) ?? 0;
 			loans.push(loan);
 		} else {
 			console.log("Borrower not found");
 		}
 	}
+	overseer.loans = loans;
+}
 
-	return loans;
-}
-/**
- *
- */
-function calcBLfromCollaterals(loan: Loan, whitelist: AnchorWhitelist, priceFeed: PriceFeed) {
-	if (loan.collaterals) {
-		let outLimit = 0;
-		for (const collateralToken of Object.keys(loan.collaterals)) {
-			const ltv = whitelist.elems.filter((elem) => elem.collateral_token === collateralToken)[0].max_ltv;
-			const tokenPrice = priceFeed.get(collateralToken);
-			if (tokenPrice) {
-				outLimit = outLimit + loan.collaterals[collateralToken]! * tokenPrice * +ltv;
-			}
-		}
-		return Math.floor(outLimit);
-	}
-}
 /**
  *
  */
@@ -97,7 +76,7 @@ async function getAllCollaterals(
 	);
 	const allCollaterals = collateralResponse.all_collaterals;
 	let currentCollaterals = collateralResponse.all_collaterals;
-	await delay(1000);
+	await delay(50);
 	while (currentCollaterals.length === 10) {
 		const msg = {
 			all_collaterals: {
@@ -108,7 +87,7 @@ async function getAllCollaterals(
 		collateralResponse = await chainOperator.queryContractSmart(overseer.overseerAddress, msg);
 		currentCollaterals = collateralResponse.all_collaterals;
 		allCollaterals.push(...currentCollaterals);
-		await delay(500);
+		await delay(50);
 	}
 	return allCollaterals;
 }
@@ -136,7 +115,7 @@ async function getAllBorrowers(overseer: AnchorOverseer, chainOperator: ChainOpe
 			borrowersCustody.push(...borrowersResponseNext.borrowers);
 			borrowers = borrowersResponseNext.borrowers;
 		}
-		await delay(2000);
+		await delay(150);
 		processBorrowers(borrowerList, borrowersCustody);
 	}
 	return borrowerList;

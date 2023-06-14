@@ -1,14 +1,12 @@
 import dotenv from "dotenv";
 
 import * as chains from "./chains";
-import { getLoans } from "./chains/defaults/queries/getLoans";
 import { initLiquidationOverseers } from "./chains/defaults/queries/initOverseers";
 import { ChainOperator } from "./core/chainOperator/chainoperator";
 import { Logger } from "./core/logging";
 import { LiquidationLoop } from "./core/types/arbitrageloops/liquidationLoop";
 import { setBotConfig } from "./core/types/base/botConfig";
 import { LogType } from "./core/types/base/logging";
-import { AnchorOverseer } from "./core/types/base/overseer";
 // load env files
 dotenv.config({ path: "./src/envs/terra.env" });
 
@@ -75,14 +73,17 @@ async function main() {
 
 	const overseers = await initLiquidationOverseers(botConfig.overseerAddresses, chainOperator);
 
-	for (const overseer of overseers) {
-		const loans = await getLoans(<AnchorOverseer>overseer, chainOperator);
-		(<AnchorOverseer>overseer).loans = loans;
-	}
 	await logger.sendMessage(startupMessage, LogType.Console);
 
-	const loop = new LiquidationLoop(overseers.map((overseer) => <AnchorOverseer>overseer));
-	console.log(loop.overseers[0].loans);
+	const loop = new LiquidationLoop(chainOperator, botConfig, overseers);
+	console.log(
+		Object.keys(loop.allOverseerAddresses),
+		Object.keys(loop.allOverseerPriceFeeders),
+		Object.keys(loop.allOverseerMoneyMarkets),
+	);
+	while (true) {
+		await loop.step();
+	}
 	// if (botConfig.skipConfig) {
 	// 	await logger.sendMessage("Initializing skip loop...", LogType.Console);
 	// 	const [skipClient, skipSigner] = await getSkipClient(
