@@ -12,6 +12,7 @@ export interface AnchorOverseer extends Overseer {
 	priceFeed: PriceFeed;
 	whitelist: AnchorWhitelist;
 	loans: Loans;
+	stableDenom: string;
 }
 
 export interface AnchorWhitelist {
@@ -26,7 +27,7 @@ interface AnchorWhitelistElement {
 	collateral_token: string;
 }
 
-export type Loans = Array<Loan>;
+export type Loans = { [borrower: string]: Loan };
 
 export interface Loan {
 	borrowerAddress: string;
@@ -51,7 +52,7 @@ export function setPriceFeed(overseer: AnchorOverseer, msg: PriceFeedMessage) {
  *
  */
 export function setBorrowLimits(overseer: AnchorOverseer) {
-	for (const loan of overseer.loans) {
+	for (const loan of Object.values(overseer.loans)) {
 		if (loan.collaterals) {
 			let newLTV = 0;
 			for (const collateralToken of Object.keys(loan.collaterals)) {
@@ -65,5 +66,46 @@ export function setBorrowLimits(overseer: AnchorOverseer) {
 			loan.borrowLimit = newLTV;
 			loan.riskRatio = loan.loanAmt / loan.borrowLimit;
 		}
+	}
+}
+
+/**
+ *
+ */
+export function adjustCollateral(
+	overseer: AnchorOverseer,
+	sender: string,
+	collaterals: Array<[string, string]>,
+	add: boolean,
+) {
+	const loan = overseer.loans[sender];
+	if (!loan) {
+		return;
+	} else {
+		for (const collateral of collaterals) {
+			if (loan.collaterals[collateral[0]]) {
+				if (add) {
+					loan.collaterals[collateral[0]].amount = loan.collaterals[collateral[0]].amount + +collateral[1];
+				} else {
+					loan.collaterals[collateral[0]].amount = loan.collaterals[collateral[0]].amount - +collateral[1];
+				}
+			} else {
+				const ltv = overseer.whitelist.elems.filter((elem) => elem.collateral_token === collateral[0])[0]
+					.max_ltv;
+				loan.collaterals[collateral[0]] = { amount: loan.collaterals[collateral[0]].amount, ltv: +ltv };
+			}
+		}
+	}
+}
+
+/**
+ *
+ */
+export function borrowStable(overseer: AnchorOverseer, sender: string, amount: string, to?: string) {
+	const loan = overseer.loans[sender];
+	if (!loan) {
+		//create new loan?
+	} else {
+		loan.loanAmt = loan.loanAmt + +amount;
 	}
 }

@@ -65,7 +65,8 @@ async function initLiquidationOverseer(
 			priceFeeders: Array.from(priceFeeders),
 			priceFeed: new Map(),
 			whitelist: whitelist,
-			loans: [],
+			loans: {},
+			stableDenom: overseerConfig.stable_denom,
 		};
 		return anchorOverseer;
 	}

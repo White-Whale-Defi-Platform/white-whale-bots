@@ -9,7 +9,7 @@ export async function setLoans(overseer: AnchorOverseer, chainOperator: ChainOpe
 	const allCollateral = await getAllCollaterals(overseer, chainOperator);
 	const allLoans = await getAllLoans(overseer.marketAddress, chainOperator);
 
-	const loans: Loans = [];
+	const loans: Loans = {};
 	for (const collateral of allCollateral) {
 		const ltv = overseer.whitelist.elems.filter((elem) => elem.collateral_token === collateral.collaterals[0][0])[0]
 			.max_ltv;
@@ -27,7 +27,7 @@ export async function setLoans(overseer: AnchorOverseer, chainOperator: ChainOpe
 			});
 
 			loan.loanAmt = allLoans.get(collateral.borrower) ?? 0;
-			loans.push(loan);
+			loans[collateral.borrower] = loan;
 		} else {
 			console.log("Borrower not found");
 		}

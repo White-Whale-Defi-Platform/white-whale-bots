@@ -3,7 +3,9 @@ import { fromUtf8 } from "@cosmjs/encoding";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { BotConfig } from "../base/botConfig";
 import { decodeMempool, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
-import { AnchorOverseer, setBorrowLimits, setPriceFeed } from "../base/overseer";
+import { adjustCollateral, AnchorOverseer, setBorrowLimits, setPriceFeed } from "../base/overseer";
+import { isLockCollateralMessage, isUnlockCollateralMessage } from "../messages/collateralmessage";
+import { isBorrowStableMessage, isRepayStableMessage } from "../messages/loanmessage";
 import { PriceFeedMessage } from "../messages/pricefeedmessage";
 /**
  *
@@ -63,11 +65,11 @@ export class LiquidationLoop {
 	 *
 	 */
 	applyMempoolMessagesOnLiquidation(mempoolTxs: Array<MempoolTx>) {
-		console.log(mempoolTxs.length);
 		for (const tx of mempoolTxs) {
-			const pfOverseer = this.allOverseerPriceFeeders[tx.message.contract];
+			const message = JSON.parse(fromUtf8(tx.message.msg));
+			const pfOverseer = this.allOverseerPriceFeeders[tx.message.sender];
 			if (pfOverseer) {
-				const pfMessage: PriceFeedMessage = JSON.parse(fromUtf8(tx.message.msg));
+				const pfMessage = <PriceFeedMessage>message;
 				setPriceFeed(pfOverseer, pfMessage);
 				setBorrowLimits(pfOverseer);
 				console.log("new price feed");
@@ -76,16 +78,28 @@ export class LiquidationLoop {
 				const overseer = this.allOverseerAddresses[tx.message.contract];
 				if (overseer) {
 					console.log("new overseer message");
-					//its an overseer message
-					// do something
+					if (isLockCollateralMessage(message)) {
+						adjustCollateral(overseer, tx.message.sender, message.lock_collateral.collaterals, true);
+					} else if (isUnlockCollateralMessage(message)) {
+						adjustCollateral(overseer, tx.message.sender, message.unlock_collateral.collaterals, false);
+					}
 					continue;
 				} else {
 					const mm = this.allOverseerMoneyMarkets[tx.message.contract];
 
 					if (mm) {
 						console.log("new money market message");
-						//its an money market message
-						//do something
+						if (isBorrowStableMessage(message)) {
+							//borrow stable handler
+							borrowStable(
+								overseer,
+								tx.message.sender,
+								message.borrow_stable.borrow_amount,
+								message.borrow_stable.to,
+							);
+						} else if (isRepayStableMessage(message)) {
+							//handle repay stable
+						}
 						continue;
 					}
 				}
