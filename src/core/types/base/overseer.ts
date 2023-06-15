@@ -1,3 +1,5 @@
+import { Coin } from "@cosmjs/stargate";
+
 import { PriceFeedMessage } from "../messages/pricefeedmessage";
 
 export interface Overseer {
@@ -102,10 +104,26 @@ export function adjustCollateral(
  *
  */
 export function borrowStable(overseer: AnchorOverseer, sender: string, amount: string, to?: string) {
-	const loan = overseer.loans[sender];
+	const borrower = to ?? sender;
+	const loan = overseer.loans[borrower];
 	if (!loan) {
 		//create new loan?
 	} else {
 		loan.loanAmt = loan.loanAmt + +amount;
+	}
+}
+
+/**
+ *
+ */
+export function repayStable(overseer: AnchorOverseer, sender: string, coins: Array<Coin>) {
+	const loan = overseer.loans[sender];
+	if (!loan) {
+		//create new loan?
+	} else {
+		const coin = coins.find((coin) => coin.denom === overseer.stableDenom);
+		if (coin) {
+			loan.loanAmt = loan.loanAmt - +coin.amount;
+		}
 	}
 }

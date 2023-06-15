@@ -1,5 +1,6 @@
 import { Asset } from "../types/base/asset";
 import { BotConfig } from "../types/base/botConfig";
+import { AnchorOverseer } from "../types/base/overseer";
 import { Path } from "../types/base/path";
 import { getOptimalTrade } from "./optimizers/analyticalOptimizer";
 
@@ -21,6 +22,22 @@ export function trySomeArb(paths: Array<Path>, botConfig: BotConfig): OptimalTra
 			return undefined;
 		} else {
 			return optimalTrade;
+		}
+	}
+}
+
+/**
+ *
+ */
+export function tryLiquidationArb(
+	overseers: Array<AnchorOverseer>,
+	botConfig: BotConfig,
+): [AnchorOverseer, string] | undefined {
+	for (const overseer of overseers) {
+		for (const loan of Object.entries(overseer.loans)) {
+			if (loan[1].riskRatio >= 0) {
+				return [overseer, loan[0]];
+			}
 		}
 	}
 }

@@ -1,9 +1,19 @@
 import { fromUtf8 } from "@cosmjs/encoding";
+import { StdFee } from "@cosmjs/stargate";
 
+import { getliqudationMessage } from "../../../chains/defaults/messages/getLiquidationMessage";
+import { tryLiquidationArb } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { BotConfig } from "../base/botConfig";
 import { decodeMempool, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
-import { adjustCollateral, AnchorOverseer, setBorrowLimits, setPriceFeed } from "../base/overseer";
+import {
+	adjustCollateral,
+	AnchorOverseer,
+	borrowStable,
+	repayStable,
+	setBorrowLimits,
+	setPriceFeed,
+} from "../base/overseer";
 import { isLockCollateralMessage, isUnlockCollateralMessage } from "../messages/collateralmessage";
 import { isBorrowStableMessage, isRepayStableMessage } from "../messages/loanmessage";
 import { PriceFeedMessage } from "../messages/pricefeedmessage";
@@ -58,21 +68,44 @@ export class LiquidationLoop {
 		}
 
 		const mempoolTxs: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses, this.iterations);
-		this.applyMempoolMessagesOnLiquidation(mempoolTxs);
+		if (mempoolTxs.length > 0) {
+			this.applyMempoolMessagesOnLiquidation(mempoolTxs);
+		}
+		const toLiquidate = tryLiquidationArb(this.overseers, this.botConfig);
+		if (toLiquidate) {
+			await this.liquidate(...toLiquidate);
+		}
 	}
+	/**
+	 *
+	 */
+	async liquidate(overseer: AnchorOverseer, address: string) {
+		const liquidationMessage = getliqudationMessage(
+			this.chainOperator.client.publicAddress,
+			overseer.overseerAddress,
+			address,
+		);
+		const TX_FEE: StdFee = { amount: [{ amount: String(42000), denom: this.botConfig.gasDenom }], gas: "2800000" };
 
+		const txResponse = await this.chainOperator.signAndBroadcast([liquidationMessage], TX_FEE);
+		if (txResponse.code === 0) {
+			this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
+		}
+		console.log(txResponse);
+	}
 	/**
 	 *
 	 */
 	applyMempoolMessagesOnLiquidation(mempoolTxs: Array<MempoolTx>) {
+		const overseersToUpdate: Array<AnchorOverseer> = [];
 		for (const tx of mempoolTxs) {
 			const message = JSON.parse(fromUtf8(tx.message.msg));
 			const pfOverseer = this.allOverseerPriceFeeders[tx.message.sender];
 			if (pfOverseer) {
 				const pfMessage = <PriceFeedMessage>message;
 				setPriceFeed(pfOverseer, pfMessage);
-				setBorrowLimits(pfOverseer);
 				console.log("new price feed");
+				overseersToUpdate.push(pfOverseer);
 				continue;
 			} else {
 				const overseer = this.allOverseerAddresses[tx.message.contract];
@@ -83,6 +116,7 @@ export class LiquidationLoop {
 					} else if (isUnlockCollateralMessage(message)) {
 						adjustCollateral(overseer, tx.message.sender, message.unlock_collateral.collaterals, false);
 					}
+					overseersToUpdate.push(overseer);
 					continue;
 				} else {
 					const mm = this.allOverseerMoneyMarkets[tx.message.contract];
@@ -99,11 +133,16 @@ export class LiquidationLoop {
 							);
 						} else if (isRepayStableMessage(message)) {
 							//handle repay stable
+							repayStable(overseer, tx.message.sender, tx.message.funds);
 						}
+						overseersToUpdate.push(mm);
 						continue;
 					}
 				}
 			}
+		}
+		for (const overseer of Array.from(new Set(this.overseers))) {
+			setBorrowLimits(overseer);
 		}
 	}
 }
