@@ -94,6 +94,7 @@ export function adjustCollateral(
 			const ltv = overseer.whitelist.elems.filter((elem) => elem.collateral_token === collateral[0])[0].max_ltv;
 			loan.collaterals[collateral[0]] = { amount: +collateral[1], ltv: +ltv };
 		}
+		overseer.loans[sender] = loan;
 		return;
 	} else {
 		for (const collateral of collaterals) {
