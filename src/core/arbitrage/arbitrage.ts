@@ -35,7 +35,7 @@ export function tryLiquidationArb(
 ): [AnchorOverseer, string] | undefined {
 	for (const overseer of overseers) {
 		for (const loan of Object.entries(overseer.loans)) {
-			if (loan[1].riskRatio >= 0) {
+			if (loan[1].riskRatio >= 1) {
 				return [overseer, loan[0]];
 			}
 		}

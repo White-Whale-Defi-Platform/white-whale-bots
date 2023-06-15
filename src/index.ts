@@ -76,11 +76,6 @@ async function main() {
 	await logger.sendMessage(startupMessage, LogType.Console);
 
 	const loop = new LiquidationLoop(chainOperator, botConfig, overseers);
-	console.log(
-		Object.keys(loop.allOverseerAddresses),
-		Object.keys(loop.allOverseerPriceFeeders),
-		Object.keys(loop.allOverseerMoneyMarkets),
-	);
 	while (true) {
 		await loop.step();
 	}

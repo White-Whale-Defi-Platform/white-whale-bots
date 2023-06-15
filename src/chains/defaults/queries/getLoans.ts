@@ -40,18 +40,17 @@ export async function setLoans(overseer: AnchorOverseer, chainOperator: ChainOpe
  */
 async function getAllLoans(marketAddress: string, chainOperator: ChainOperator): Promise<Map<string, number>> {
 	let tmploans = await await chainOperator.queryContractSmart(marketAddress, {
-		borrower_infos: { limit: 10 },
+		borrower_infos: { limit: 30 },
 	});
 	let allLoans = tmploans.borrower_infos;
-	while (tmploans.borrower_infos.length == 10) {
+	while (tmploans.borrower_infos.length == 30) {
 		tmploans = await await chainOperator.queryContractSmart(marketAddress, {
 			borrower_infos: {
-				limit: 10,
+				limit: 30,
 				start_after: tmploans.borrower_infos[tmploans.borrower_infos.length - 1].borrower,
 			},
 		});
 		allLoans = allLoans.concat(tmploans.borrower_infos);
-		await delay(500);
 	}
 
 	const tmpMapLoans: Map<string, number> = new Map();
@@ -68,7 +67,7 @@ async function getAllCollaterals(
 	chainOperator: ChainOperator,
 ): Promise<CollateralResponse["all_collaterals"]> {
 	const collQuery = {
-		all_collaterals: { limit: 10 },
+		all_collaterals: { limit: 30 },
 	};
 	let collateralResponse: CollateralResponse = await chainOperator.queryContractSmart(
 		overseer.overseerAddress,
@@ -76,18 +75,16 @@ async function getAllCollaterals(
 	);
 	const allCollaterals = collateralResponse.all_collaterals;
 	let currentCollaterals = collateralResponse.all_collaterals;
-	await delay(50);
-	while (currentCollaterals.length === 10) {
+	while (currentCollaterals.length === 30) {
 		const msg = {
 			all_collaterals: {
-				limit: 10,
+				limit: 30,
 				start_after: currentCollaterals[currentCollaterals.length - 1].borrower,
 			},
 		};
 		collateralResponse = await chainOperator.queryContractSmart(overseer.overseerAddress, msg);
 		currentCollaterals = collateralResponse.all_collaterals;
 		allCollaterals.push(...currentCollaterals);
-		await delay(50);
 	}
 	return allCollaterals;
 }
@@ -99,14 +96,14 @@ async function getAllBorrowers(overseer: AnchorOverseer, chainOperator: ChainOpe
 
 	for (const asset of overseer.whitelist.elems) {
 		const borrowersResponse: BorrowersResponse = await chainOperator.queryContractSmart(asset.custody_contract, {
-			borrowers: { limit: 10 },
+			borrowers: { limit: 30 },
 		});
 		const borrowersCustody = borrowersResponse.borrowers;
 
 		let borrowers = borrowersResponse.borrowers;
-		while (borrowers.length === 10) {
+		while (borrowers.length === 30) {
 			const msg = {
-				borrowers: { limit: 10, start_after: borrowers[borrowers.length - 1].borrower },
+				borrowers: { limit: 30, start_after: borrowers[borrowers.length - 1].borrower },
 			};
 			const borrowersResponseNext: BorrowersResponse = await chainOperator.queryContractSmart(
 				asset.custody_contract,
@@ -115,7 +112,6 @@ async function getAllBorrowers(overseer: AnchorOverseer, chainOperator: ChainOpe
 			borrowersCustody.push(...borrowersResponseNext.borrowers);
 			borrowers = borrowersResponseNext.borrowers;
 		}
-		await delay(150);
 		processBorrowers(borrowerList, borrowersCustody);
 	}
 	return borrowerList;

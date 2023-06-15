@@ -81,7 +81,19 @@ export function adjustCollateral(
 	add: boolean,
 ) {
 	const loan = overseer.loans[sender];
+
 	if (!loan) {
+		const loan: Loan = {
+			borrowerAddress: sender,
+			collaterals: {},
+			borrowLimit: 0,
+			riskRatio: 0,
+			loanAmt: 0,
+		};
+		for (const collateral of collaterals) {
+			const ltv = overseer.whitelist.elems.filter((elem) => elem.collateral_token === collateral[0])[0].max_ltv;
+			loan.collaterals[collateral[0]] = { amount: +collateral[1], ltv: +ltv };
+		}
 		return;
 	} else {
 		for (const collateral of collaterals) {
@@ -103,11 +115,11 @@ export function adjustCollateral(
 /**
  *
  */
-export function borrowStable(overseer: AnchorOverseer, sender: string, amount: string, to?: string) {
-	const borrower = to ?? sender;
-	const loan = overseer.loans[borrower];
+export function borrowStable(overseer: AnchorOverseer, sender: string, amount: string) {
+	const loan = overseer.loans[sender];
 	if (!loan) {
 		//create new loan?
+		return;
 	} else {
 		loan.loanAmt = loan.loanAmt + +amount;
 	}

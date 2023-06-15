@@ -103,18 +103,25 @@ export class LiquidationLoop {
 			const pfOverseer = this.allOverseerPriceFeeders[tx.message.sender];
 			if (pfOverseer) {
 				const pfMessage = <PriceFeedMessage>message;
-				setPriceFeed(pfOverseer, pfMessage);
 				console.log("new price feed");
+
+				setPriceFeed(pfOverseer, pfMessage);
 				overseersToUpdate.push(pfOverseer);
+
 				continue;
 			} else {
 				const overseer = this.allOverseerAddresses[tx.message.contract];
 				if (overseer) {
-					console.log("new overseer message");
 					if (isLockCollateralMessage(message)) {
+						console.log("collateral add");
+						console.log("before: ", Object.entries(overseer.loans[tx.message.sender].collaterals));
 						adjustCollateral(overseer, tx.message.sender, message.lock_collateral.collaterals, true);
+						console.log("after: ", Object.entries(overseer.loans[tx.message.sender].collaterals));
 					} else if (isUnlockCollateralMessage(message)) {
+						console.log("collateral remove");
+						console.log("before: ", Object.entries(overseer.loans[tx.message.sender].collaterals));
 						adjustCollateral(overseer, tx.message.sender, message.unlock_collateral.collaterals, false);
+						console.log("after: ", Object.entries(overseer.loans[tx.message.sender].collaterals));
 					}
 					overseersToUpdate.push(overseer);
 					continue;
@@ -125,11 +132,19 @@ export class LiquidationLoop {
 						console.log("new money market message");
 						if (isBorrowStableMessage(message)) {
 							//borrow stable handler
-							borrowStable(
-								overseer,
-								tx.message.sender,
-								message.borrow_stable.borrow_amount,
-								message.borrow_stable.to,
+							console.log("borrow stable");
+							console.log(
+								"before: ",
+								mm.loans[tx.message.sender].loanAmt,
+								mm.loans[tx.message.sender].riskRatio,
+							);
+							borrowStable(mm, tx.message.sender, message.borrow_stable.borrow_amount);
+							//borrow stable handler
+							console.log("borrow stable");
+							console.log(
+								"after: ",
+								mm.loans[tx.message.sender].loanAmt,
+								mm.loans[tx.message.sender].riskRatio,
 							);
 						} else if (isRepayStableMessage(message)) {
 							//handle repay stable
@@ -141,7 +156,7 @@ export class LiquidationLoop {
 				}
 			}
 		}
-		for (const overseer of Array.from(new Set(this.overseers))) {
+		for (const overseer of Array.from(new Set(overseersToUpdate))) {
 			setBorrowLimits(overseer);
 		}
 	}
