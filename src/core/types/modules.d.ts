@@ -130,5 +130,15 @@ declare namespace NodeJS {
 		 * The ratio of the profit to send as a bid.
 		 */
 		SKIP_BID_RATE: string | undefined;
+		/**
+		 * Threshold for adding pools to the active arbitrage pools.
+		 * In USD$
+		 */
+		LIQUIDITY_THRESHOLD: string | undefined;
+		/**
+		 * Start the Bot with using the poolstates from file. 
+		 */
+		START_WITHOUT_QUERY: string | undefined;
+
 	}
 }
