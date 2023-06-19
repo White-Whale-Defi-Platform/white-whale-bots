@@ -1,6 +1,7 @@
 import { Coin } from "@cosmjs/stargate";
+import { inspect } from "util";
 
-import { PriceFeedMessage } from "../messages/pricefeedmessage";
+import { PriceFeedMessage } from "../messages/liquidationmessages";
 
 export interface Overseer {
 	overseerAddress: string;
@@ -97,6 +98,7 @@ export function adjustCollateral(
 		overseer.loans[sender] = loan;
 		return;
 	} else {
+		console.log("loan: ", inspect(loan, true, 3, true));
 		for (const collateral of collaterals) {
 			if (loan.collaterals[collateral[0]]) {
 				if (add) {

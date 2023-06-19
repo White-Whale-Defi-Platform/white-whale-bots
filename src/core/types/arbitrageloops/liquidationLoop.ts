@@ -14,9 +14,16 @@ import {
 	setBorrowLimits,
 	setPriceFeed,
 } from "../base/overseer";
-import { isLockCollateralMessage, isUnlockCollateralMessage } from "../messages/collateralmessage";
-import { isBorrowStableMessage, isRepayStableMessage } from "../messages/loanmessage";
-import { PriceFeedMessage } from "../messages/pricefeedmessage";
+import {
+	isBorrowStableMessage,
+	isLockCollateralMessage,
+	isRepayStableMessage,
+	isUnlockCollateralMessage,
+	PriceFeedMessage,
+} from "../messages/liquidationmessages";
+/*
+ *
+ */
 /**
  *
  */
@@ -92,6 +99,7 @@ export class LiquidationLoop {
 			this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
 		}
 		console.log(txResponse);
+		await delay(5000);
 	}
 	/**
 	 *
@@ -103,25 +111,16 @@ export class LiquidationLoop {
 			const pfOverseer = this.allOverseerPriceFeeders[tx.message.sender];
 			if (pfOverseer) {
 				const pfMessage = <PriceFeedMessage>message;
-				console.log("new price feed");
-
 				setPriceFeed(pfOverseer, pfMessage);
 				overseersToUpdate.push(pfOverseer);
-
 				continue;
 			} else {
 				const overseer = this.allOverseerAddresses[tx.message.contract];
 				if (overseer) {
 					if (isLockCollateralMessage(message)) {
-						console.log("collateral add");
-						console.log("before: ", Object.entries(overseer.loans[tx.message.sender].collaterals));
 						adjustCollateral(overseer, tx.message.sender, message.lock_collateral.collaterals, true);
-						console.log("after: ", Object.entries(overseer.loans[tx.message.sender].collaterals));
 					} else if (isUnlockCollateralMessage(message)) {
-						console.log("collateral remove");
-						console.log("before: ", Object.entries(overseer.loans[tx.message.sender].collaterals));
 						adjustCollateral(overseer, tx.message.sender, message.unlock_collateral.collaterals, false);
-						console.log("after: ", Object.entries(overseer.loans[tx.message.sender].collaterals));
 					}
 					overseersToUpdate.push(overseer);
 					continue;
@@ -129,23 +128,10 @@ export class LiquidationLoop {
 					const mm = this.allOverseerMoneyMarkets[tx.message.contract];
 
 					if (mm) {
-						console.log("new money market message");
 						if (isBorrowStableMessage(message)) {
 							//borrow stable handler
-							console.log("borrow stable");
-							console.log(
-								"before: ",
-								mm.loans[tx.message.sender].loanAmt,
-								mm.loans[tx.message.sender].riskRatio,
-							);
 							borrowStable(mm, tx.message.sender, message.borrow_stable.borrow_amount);
 							//borrow stable handler
-							console.log("borrow stable");
-							console.log(
-								"after: ",
-								mm.loans[tx.message.sender].loanAmt,
-								mm.loans[tx.message.sender].riskRatio,
-							);
 						} else if (isRepayStableMessage(message)) {
 							//handle repay stable
 							repayStable(overseer, tx.message.sender, tx.message.funds);
@@ -160,4 +146,11 @@ export class LiquidationLoop {
 			setBorrowLimits(overseer);
 		}
 	}
+}
+
+/**
+ *
+ */
+function delay(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -55,27 +55,28 @@ async function main() {
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 
 	// let setupMessage = "---".repeat(30);
-	// 	const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-	// 	const graph = newGraph(allPools);
-	// 	const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+	// const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+	// const graph = newGraph(allPools);
+	// const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 
-	// 	const filteredPools = removedUnusedPools(allPools, paths);
-	// 	setupMessage += `**\nDerived Paths for Arbitrage:
+	// const filteredPools = removedUnusedPools(allPools, paths);
+	// setupMessage += `**\nDerived Paths for Arbitrage:
 	// Total Paths:** \t${paths.length}\n`;
-	// 	for (let pathlength = 2; pathlength <= botConfig.maxPathPools; pathlength++) {
-	// 		const nrOfPaths = paths.filter((path) => path.pools.length === pathlength).length;
-	// 		setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
-	// 	}
-	// 	setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
-	// 	setupMessage += "---".repeat(30);
+	// for (let pathlength = 2; pathlength <= botConfig.maxPathPools; pathlength++) {
+	// 	const nrOfPaths = paths.filter((path) => path.pools.length === pathlength).length;
+	// 	setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
+	// }
+	// setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
+	// setupMessage += "---".repeat(30);
 
-	// 	startupMessage += setupMessage;
+	// startupMessage += setupMessage;
 
 	const overseers = await initLiquidationOverseers(botConfig.overseerAddresses, chainOperator);
 
 	await logger.sendMessage(startupMessage, LogType.Console);
 
 	const loop = new LiquidationLoop(chainOperator, botConfig, overseers);
+
 	while (true) {
 		await loop.step();
 	}
