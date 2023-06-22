@@ -4,7 +4,7 @@ import { inspect } from "util";
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
-import { BotConfig } from "../base/botConfig";
+import { BotConfig, DexConfig } from "../base/configs";
 import { Mempool } from "../base/mempool";
 import { Path } from "../base/path";
 import { Pool } from "../base/pool";
@@ -21,7 +21,7 @@ export class NoMempoolLoop {
 	accountNumber = 0;
 	sequence = 0;
 	chainid = "";
-	botConfig: BotConfig;
+	botConfig: DexConfig;
 	logger: Logger | undefined;
 	// CACHE VALUES
 	totalBytes = 0;
@@ -53,7 +53,7 @@ export class NoMempoolLoop {
 			flashloancontract: string,
 		) => [Array<EncodeObject>, number],
 		chainOperator: ChainOperator,
-		botConfig: BotConfig,
+		botConfig: DexConfig,
 		logger: Logger | undefined,
 		pathlib: Array<Path>,
 	) {

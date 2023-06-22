@@ -25,7 +25,7 @@ import { MsgSend as CosmJSMsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { MsgExecuteContract as CosmJSMsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
-import { BotConfig } from "../../types/base/botConfig";
+import { BotConfig } from "../../types/base/configs";
 import { Mempool } from "../../types/base/mempool";
 import { ChainOperatorInterface, TxResponse } from "../chainOperatorInterface";
 /**

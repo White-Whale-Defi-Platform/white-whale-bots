@@ -1,11 +1,9 @@
 import dotenv from "dotenv";
 
 import * as chains from "./chains";
-import { initLiquidationOverseers } from "./chains/defaults/queries/initOverseers";
 import { ChainOperator } from "./core/chainOperator/chainoperator";
 import { Logger } from "./core/logging";
-import { LiquidationLoop } from "./core/types/arbitrageloops/liquidationLoop";
-import { setBotConfig } from "./core/types/base/botConfig";
+import { setBotConfig } from "./core/types/base/configs";
 import { LogType } from "./core/types/base/logging";
 // load env files
 dotenv.config({ path: "./src/envs/terra.env" });
@@ -13,29 +11,27 @@ dotenv.config({ path: "./src/envs/terra.env" });
 /**
  * Runs the main program.
  */
-
-// let getPoolStates: (chainOperator: ChainOperator, pools: Array<Pool>) => void;
-/**
- *
- */
 async function main() {
 	const botConfig = await setBotConfig(process.env);
-	let startupMessage = "===".repeat(30);
-	startupMessage += "\n**White Whale Bot**\n";
-	startupMessage += "===".repeat(30);
-	startupMessage += `\nEnvironment Variables:\n
-**RPC ENDPOINT SCRAPER: ** \t${botConfig.useRpcUrlScraper}
-**RPC ENPDOINTS:** \t${botConfig.rpcUrls}
-**OFFER DENOM:** \t${JSON.stringify(botConfig.offerAssetInfo)}
-**FACTORIES_TO_ROUTERS_MAPPING:** \t${JSON.stringify(botConfig.mappingFactoryRouter)}
-**USE MEMPOOL:** \t${botConfig.useMempool}
-**USE SKIP:** \t${botConfig.skipConfig?.useSkip}
-`;
-	if (botConfig.skipConfig) {
-		startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
-		startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
-	}
-	startupMessage += "---".repeat(30);
+
+	// 	let startupMessage = "===".repeat(30);
+	// 	startupMessage += "\n**White Whale Bot**\n";
+	// 	startupMessage += `\n**Setup type: ${botConfig.setupType}**\n`;
+	// 	startupMessage += "===".repeat(30);
+
+	// 	startupMessage += `\nEnvironment Variables:\n
+	// **RPC ENDPOINT SCRAPER: ** \t${botConfig.useRpcUrlScraper}
+	// **RPC ENPDOINTS:** \t${botConfig.rpcUrls}
+	// **OFFER DENOM:** \t${JSON.stringify(botConfig.offerAssetInfo)}
+	// **FACTORIES_TO_ROUTERS_MAPPING:** \t${JSON.stringify(botConfig.mappingFactoryRouter)}
+	// **USE MEMPOOL:** \t${botConfig.useMempool}
+	// **USE SKIP:** \t${botConfig.skipConfig?.useSkip}
+	// `;
+	// if (botConfig.skipConfig) {
+	// 	startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
+	// 	startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
+	// }
+	// startupMessage += "---".repeat(30);
 	const logger = new Logger(botConfig);
 	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
 	let getPoolStates = chains.defaults.getPoolStates;
@@ -71,15 +67,15 @@ async function main() {
 
 	// startupMessage += setupMessage;
 
-	const overseers = await initLiquidationOverseers(botConfig.overseerAddresses, chainOperator);
+	// const overseers = await initLiquidationOverseers(botConfig.overseerAddresses, chainOperator);
 
-	await logger.sendMessage(startupMessage, LogType.Console);
+	// await logger.sendMessage(startupMessage, LogType.Console);
 
-	const loop = new LiquidationLoop(chainOperator, botConfig, overseers);
+	// const loop = new LiquidationLoop(chainOperator, botConfig, overseers);
 
-	while (true) {
-		await loop.step();
-	}
+	// while (true) {
+	// 	await loop.step();
+	// }
 	// if (botConfig.skipConfig) {
 	// 	await logger.sendMessage("Initializing skip loop...", LogType.Console);
 	// 	const [skipClient, skipSigner] = await getSkipClient(

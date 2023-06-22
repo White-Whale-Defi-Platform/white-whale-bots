@@ -6,7 +6,7 @@ import { inspect } from "util";
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
-import { BotConfig } from "../base/botConfig";
+import { BotConfig, DexConfig } from "../base/configs";
 import { LogType } from "../base/logging";
 import { decodeMempool, flushTxMemory, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
 import { Path } from "../base/path";
@@ -21,7 +21,7 @@ export class MempoolLoop {
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
 	ignoreAddresses: IgnoredAddresses;
-	botConfig: BotConfig;
+	botConfig: DexConfig;
 	logger: Logger | undefined;
 	// CACHE VALUES
 	totalBytes = 0;
@@ -53,7 +53,7 @@ export class MempoolLoop {
 			flashloancontract: string,
 		) => [Array<EncodeObject>, number],
 		chainOperator: ChainOperator,
-		botConfig: BotConfig,
+		botConfig: DexConfig,
 		logger: Logger | undefined,
 		pathlib: Array<Path>,
 		ignoreAddresses: IgnoredAddresses,

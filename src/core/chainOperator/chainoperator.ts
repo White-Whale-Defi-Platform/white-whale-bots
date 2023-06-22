@@ -4,7 +4,7 @@ import { StdFee } from "@cosmjs/stargate";
 import { Network } from "@injectivelabs/networks";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
-import { BotConfig } from "../types/base/botConfig";
+import { BotConfig } from "../types/base/configs";
 import CosmjsAdapter from "./chainAdapters/cosmjs";
 import InjectiveAdapter from "./chainAdapters/injective";
 import { TxResponse } from "./chainOperatorInterface";

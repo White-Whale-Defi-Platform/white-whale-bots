@@ -4,7 +4,7 @@ import { StdFee } from "@cosmjs/stargate";
 import { getliqudationMessage } from "../../../chains/defaults/messages/getLiquidationMessage";
 import { tryLiquidationArb } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
-import { BotConfig } from "../base/botConfig";
+import { LiquidationConfig } from "../base/configs";
 import { decodeMempool, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
 import {
 	adjustCollateral,
@@ -28,7 +28,7 @@ import {
  *
  */
 export class LiquidationLoop {
-	botConfig: BotConfig;
+	botConfig: LiquidationConfig;
 	chainOperator: ChainOperator;
 	ignoreAddresses: IgnoredAddresses = {};
 	iterations = 0;
@@ -42,7 +42,7 @@ export class LiquidationLoop {
 	/**
 	 *
 	 */
-	constructor(chainOperator: ChainOperator, botConfig: BotConfig, overseers: Array<AnchorOverseer>) {
+	constructor(chainOperator: ChainOperator, botConfig: LiquidationConfig, overseers: Array<AnchorOverseer>) {
 		this.botConfig = botConfig;
 		this.overseers = overseers;
 		this.chainOperator = chainOperator;

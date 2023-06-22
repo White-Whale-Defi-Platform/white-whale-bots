@@ -1,6 +1,10 @@
 declare namespace NodeJS {
 	export interface ProcessEnv {
 		/**
+		 * Denotes the type of bot that will be started: "dex", "liquidations" or "ibc".
+		 */
+		SETUP_TYPE: string;
+		/**
 		 * The mnemonic associated with the wallet for performing arbitrage transactions.
 		 */
 		WALLET_MNEMONIC: string;
@@ -117,7 +121,7 @@ declare namespace NodeJS {
 		/**
 		 * Overseer Liquidation Contracts.
 		 */
-		OVERSEER_ADDRESSES: string | undefined;
+		OVERSEER_ADDRESSES: string;
 		/**
 		 * Denotes whether we use skip for submitting transaction bundles.
 		 */

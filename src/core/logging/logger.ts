@@ -1,4 +1,4 @@
-import { BotConfig } from "../types/base/botConfig";
+import { BotConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";
 import { DiscordLogger } from "./discordLogger";
 import { SlackLogger } from "./slackLogger";

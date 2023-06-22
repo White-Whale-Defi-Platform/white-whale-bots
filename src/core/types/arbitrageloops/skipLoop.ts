@@ -12,7 +12,7 @@ import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { SkipResult } from "../../chainOperator/skipclients";
 import { Logger } from "../../logging";
-import { BotConfig } from "../base/botConfig";
+import { BotConfig, DexConfig } from "../base/configs";
 import { LogType } from "../base/logging";
 import { decodeMempool, IgnoredAddresses, MempoolTx } from "../base/mempool";
 import { Path } from "../base/path";
@@ -41,7 +41,7 @@ export class SkipLoop extends MempoolLoop {
 			flashloanRouterAddress: string,
 		) => [Array<EncodeObject>, number],
 		chainOperator: ChainOperator,
-		botConfig: BotConfig,
+		botConfig: DexConfig,
 		skipClient: SkipBundleClient,
 		skipSigner: DirectSecp256k1HdWallet,
 		logger: Logger | undefined,

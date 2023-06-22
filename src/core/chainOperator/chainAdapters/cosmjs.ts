@@ -8,7 +8,7 @@ import { HttpBatchClient, HttpClient } from "@cosmjs/tendermint-rpc/build/rpccli
 import { SkipBundleClient } from "@skip-mev/skipjs";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
-import { BotConfig } from "../../types/base/botConfig";
+import { BotConfig } from "../../types/base/configs";
 import { Mempool } from "../../types/base/mempool";
 import { ChainOperatorInterface, TxResponse } from "../chainOperatorInterface";
 
