@@ -1,3 +1,5 @@
+/* eslint-disable simple-import-sort/imports */
+import { DexLoop } from "./dexloop";
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
@@ -6,76 +8,49 @@ import { inspect } from "util";
 import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { Logger } from "../../logging";
-import { BotConfig, DexConfig } from "../base/configs";
+import { DexConfig } from "../base/configs";
+import { Liquidate } from "../base/liquidate";
 import { LogType } from "../base/logging";
 import { decodeMempool, flushTxMemory, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
 import { Path } from "../base/path";
 import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
+
 /**
  *
  */
-export class MempoolLoop {
-	pools: Array<Pool>;
-	paths: Array<Path>; //holds all known paths minus cooldowned paths
-	pathlib: Array<Path>; //holds all known paths
-	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
-	chainOperator: ChainOperator;
+export class DexMempoolLoop extends DexLoop {
 	ignoreAddresses: IgnoredAddresses;
-	botConfig: DexConfig;
-	logger: Logger | undefined;
 	// CACHE VALUES
 	totalBytes = 0;
 	mempool!: Mempool;
 	iterations = 0;
-
-	/**
-	 *
-	 */
-	arbitrageFunction: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined;
-	updateStateFunction: (chainOperator: ChainOperator, pools: Array<Pool>) => void;
-	messageFunction: (
-		arbTrade: OptimalTrade,
-		walletAddress: string,
-		flashloancontract: string,
-	) => [Array<EncodeObject>, number];
+	liquidate?: Liquidate;
 
 	/**
 	 *
 	 */
 	public constructor(
-		pools: Array<Pool>,
-		paths: Array<Path>,
-		arbitrage: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined,
-		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => void,
+		chainOperator: ChainOperator,
+		botConfig: DexConfig,
+		logger: Logger | undefined,
+		allPools: Array<Pool>,
+		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
 		messageFunction: (
 			arbTrade: OptimalTrade,
 			walletAddress: string,
 			flashloancontract: string,
 		) => [Array<EncodeObject>, number],
-		chainOperator: ChainOperator,
-		botConfig: DexConfig,
-		logger: Logger | undefined,
-		pathlib: Array<Path>,
-		ignoreAddresses: IgnoredAddresses,
 	) {
-		this.pools = pools;
-		this.CDpaths = new Map<string, [number, number, number]>();
-		this.paths = paths;
-		this.arbitrageFunction = arbitrage;
-		this.updateStateFunction = updateState;
-		this.messageFunction = messageFunction;
-		this.chainOperator = chainOperator;
-		this.botConfig = botConfig;
-		this.logger = logger;
-		this.pathlib = pathlib;
-		this.ignoreAddresses = ignoreAddresses;
+		super(chainOperator, botConfig, logger, allPools, updateState, messageFunction);
+		this.ignoreAddresses = botConfig.ignoreAddresses ?? {};
 	}
-
 	/**
 	 *
 	 */
 	public async step() {
 		this.iterations++;
+		await this.updateStateFunction(this.chainOperator, this.pools);
+
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
 		if (arbTrade) {
@@ -129,7 +104,6 @@ export class MempoolLoop {
 	 *
 	 */
 	async reset() {
-		this.updateStateFunction(this.chainOperator, this.pools);
 		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();

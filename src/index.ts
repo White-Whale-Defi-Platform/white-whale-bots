@@ -1,12 +1,9 @@
 import dotenv from "dotenv";
 
-import * as chains from "./chains";
-import { trySomeArb } from "./core/arbitrage/arbitrage";
 import { ChainOperator } from "./core/chainOperator/chainoperator";
 import { Logger } from "./core/logging";
-import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
-import { NoMempoolLoop } from "./core/types/arbitrageloops/nomempoolLoop";
-import { setBotConfig, SetupType } from "./core/types/base/configs";
+import { createLoop } from "./core/types/arbitrageloops/dexloop";
+import { DexConfig, setBotConfig, SetupType } from "./core/types/base/configs";
 import { LogType } from "./core/types/base/logging";
 // load env files
 dotenv.config({ path: "./src/envs/terra.env" });
@@ -35,21 +32,7 @@ async function main() {
 	startupMessage += "---".repeat(30);
 
 	const logger = new Logger(botConfig);
-	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
-	let getPoolStates = chains.defaults.getPoolStates;
-	let initPools = chains.defaults.initPools;
-	const startupTime = Date.now();
-	const timeIt = 0;
 
-	await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
-		if (chainSetups === undefined) {
-			await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
-		}
-		getFlashArbMessages = chainSetups.getFlashArbMessages;
-		getPoolStates = chainSetups.getPoolStates;
-		initPools = chainSetups.initPools;
-		return;
-	});
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 
 	//todo: place each loop setup output in logger class
@@ -77,49 +60,52 @@ async function main() {
 	let loop;
 	if (botConfig.setupType === SetupType.DEX) {
 		await logger.sendMessage("Initializing DEX arbitrage loop...", LogType.Console);
-		loop = new DexLoop(chainOperator, botConfig, logger);
 
-		// 	trySomeArb,
-		// 	getPoolStates,
-		// 	getFlashArbMessages,
-		// 	chainOperator,
-		// 	botConfig,
-
-		// 	logger,
-		// 	[...paths],
-		// 	botConfig.ignoreAddresses,
-		// 	liquidate,
-		// );
-	} else if (botConfig.useMempool === true) {
-		await logger.sendMessage("Initializing mempool loop...", LogType.Console);
-
-		loop = new MempoolLoop(
-			filteredPools,
-			paths,
-			trySomeArb,
-			getPoolStates,
-			getFlashArbMessages,
-			chainOperator,
-			botConfig,
-			logger,
-			[...paths],
-			botConfig.ignoreAddresses,
-			liquidate,
-		);
-	} else {
-		await logger.sendMessage("Initializing non-mempool loop...", LogType.Console);
-		loop = new NoMempoolLoop(
-			filteredPools,
-			paths,
-			trySomeArb,
-			getPoolStates,
-			getFlashArbMessages,
-			chainOperator,
-			botConfig,
-			logger,
-			[...paths],
-		);
+		loop = await createLoop(chainOperator, <DexConfig>botConfig, logger);
+	} else if (botConfig.setupType === SetupType.LIQUIDATION) {
+		// loop = new LiquidationLoop(chainOperator, botConfig, logger);
 	}
+	// 	trySomeArb,
+	// 	getPoolStates,
+	// 	getFlashArbMessages,
+	// 	chainOperator,
+	// 	botConfig,
+
+	// 	logger,
+	// 	[...paths],
+	// 	botConfig.ignoreAddresses,
+	// 	liquidate,
+	// 	// );
+	// } else if (botConfig.useMempool === true) {
+	// 	await logger.sendMessage("Initializing mempool loop...", LogType.Console);
+
+	// 	loop = new MempoolLoop(
+	// 		filteredPools,
+	// 		paths,
+	// 		trySomeArb,
+	// 		getPoolStates,
+	// 		getFlashArbMessages,
+	// 		chainOperator,
+	// 		botConfig,
+	// 		logger,
+	// 		[...paths],
+	// 		botConfig.ignoreAddresses,
+	// 		liquidate,
+	// 	);
+	// } else {
+	// 	await logger.sendMessage("Initializing non-mempool loop...", LogType.Console);
+	// 	loop = new NoMempoolLoop(
+	// 		filteredPools,
+	// 		paths,
+	// 		trySomeArb,
+	// 		getPoolStates,
+	// 		getFlashArbMessages,
+	// 		chainOperator,
+	// 		botConfig,
+	// 		logger,
+	// 		[...paths],
+	// 	);
+	// }
 
 	// main loop of the bot
 	// await loop.fetchRequiredChainData();

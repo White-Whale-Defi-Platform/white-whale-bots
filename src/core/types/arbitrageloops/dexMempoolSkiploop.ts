@@ -1,9 +1,7 @@
 import { sha256 } from "@cosmjs/crypto";
-import { toHex } from "@cosmjs/encoding";
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
+import { toHex, toUtf8 } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
-import { SkipBundleClient } from "@skip-mev/skipjs";
-import { WebClient } from "@slack/web-api";
+import { coin, StdFee } from "@cosmjs/stargate";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { inspect } from "util";
 
@@ -12,56 +10,32 @@ import { OptimalTrade } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
 import { SkipResult } from "../../chainOperator/skipclients";
 import { Logger } from "../../logging";
-import { BotConfig, DexConfig } from "../base/configs";
+import { DexConfig } from "../base/configs";
+import { addNewBorrower, processLiquidate, processMempoolLiquidation } from "../base/liquidate";
 import { LogType } from "../base/logging";
-import { decodeMempool, IgnoredAddresses, MempoolTx } from "../base/mempool";
-import { Path } from "../base/path";
+import { decodeMempool, MempoolTx } from "../base/mempool";
 import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
-import { MempoolLoop } from "./mempoolLoop";
+import { DexMempoolLoop } from "./dexMempoolloop";
 /**
  *
  */
-export class SkipLoop extends MempoolLoop {
-	skipClient: SkipBundleClient;
-	skipSigner: DirectSecp256k1HdWallet;
-	slackLogger: WebClient | undefined;
-	logger: Logger | undefined;
-
+export class DexMempoolSkipLoop extends DexMempoolLoop {
 	/**
 	 *
 	 */
 	public constructor(
-		pools: Array<Pool>,
-		paths: Array<Path>,
-		arbitrage: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined,
-		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => void,
+		chainOperator: ChainOperator,
+		botConfig: DexConfig,
+		logger: Logger | undefined,
+		allPools: Array<Pool>,
+		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
 		messageFunction: (
 			arbTrade: OptimalTrade,
 			walletAddress: string,
-			flashloanRouterAddress: string,
+			flashloancontract: string,
 		) => [Array<EncodeObject>, number],
-		chainOperator: ChainOperator,
-		botConfig: DexConfig,
-		skipClient: SkipBundleClient,
-		skipSigner: DirectSecp256k1HdWallet,
-		logger: Logger | undefined,
-
-		pathlib: Array<Path>,
-		ignoreAddresses: IgnoredAddresses,
 	) {
-		super(
-			pools,
-			paths,
-			arbitrage,
-			updateState,
-			messageFunction,
-			chainOperator,
-			botConfig,
-			logger,
-			pathlib,
-			ignoreAddresses,
-		);
-		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.logger = logger);
+		super(chainOperator, botConfig, logger, allPools, updateState, messageFunction);
 	}
 
 	/**
@@ -72,7 +46,7 @@ export class SkipLoop extends MempoolLoop {
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
 		if (arbTrade) {
-			await this.skipTrade(arbTrade);
+			await this.trade(arbTrade);
 			this.cdPaths(arbTrade.path);
 			return;
 		}
@@ -95,6 +69,20 @@ export class SkipLoop extends MempoolLoop {
 				this.iterations,
 			);
 
+			if (this.liquidate) {
+				const liquidActions = await processMempoolLiquidation(this.mempool, this.liquidate);
+				const toLiquidate = await processLiquidate(this.liquidate.loans, this.liquidate.prices, liquidActions);
+
+				if (toLiquidate[0].length > 0) {
+					for (let x = 0; x < toLiquidate[0].length; x++) {
+						await this.skipLiquidate(toLiquidate[0][x].overseer, toLiquidate[0][x].address);
+					}
+					newLoans = newLoans.concat(toLiquidate[0]);
+				}
+				if (toLiquidate[1].length > 0) {
+					newLoans = newLoans.concat(toLiquidate[1]);
+				}
+			}
 			if (mempoolTxs.length === 0) {
 				continue;
 			} else {
@@ -102,7 +90,7 @@ export class SkipLoop extends MempoolLoop {
 					applyMempoolMessagesOnPools(this.pools, [mempoolTx]);
 					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 					if (arbTrade) {
-						await this.skipTrade(arbTrade, mempoolTx);
+						await this.trade(arbTrade, mempoolTx);
 						this.cdPaths(arbTrade.path);
 						await this.chainOperator.reset();
 						return;
@@ -110,11 +98,59 @@ export class SkipLoop extends MempoolLoop {
 				}
 			}
 		}
+		if (newLoans.length > 0) {
+			newLoans = new Set(newLoans);
+			await addNewBorrower([...newLoans], this.liquidate!, this.chainOperator);
+		}
 	}
+
 	/**
 	 *
 	 */
-	private async skipTrade(arbTrade: OptimalTrade, toArbTrade?: MempoolTx) {
+	async skipLiquidate(overseer: string, addressToLiquidate: string) {
+		const bidMsgEncoded = getSendMessage(
+			String(651),
+			this.botConfig.gasDenom,
+			this.chainOperator.client.publicAddress,
+			this.botConfig.skipConfig!.skipBidWallet,
+		);
+		const message = {
+			liquidate_collateral: {
+				borrower: addressToLiquidate,
+			},
+		};
+		const encodedMsgObject: EncodeObject = {
+			typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+			value: MsgExecuteContract.fromPartial({
+				sender: this.chainOperator.client.publicAddress,
+				contract: overseer,
+				msg: toUtf8(JSON.stringify(message)),
+				funds: [],
+			}),
+		};
+		const msgs = [encodedMsgObject, bidMsgEncoded];
+		const TX_FEE: StdFee = { amount: [coin(10000, this.botConfig.gasDenom)], gas: "2800000" };
+
+		const txResponse: any = await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE);
+		if (txResponse.result.code === 4) {
+			await this.sendLiquidation(overseer, addressToLiquidate);
+		} else if (txResponse.result.code === 0) {
+			this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
+			await this.logger?.sendMessage("Sucessful Liquidation!!", LogType.All);
+		} else if (txResponse.result.code === 5) {
+			await addNewBorrower(
+				[{ overseer: overseer, address: addressToLiquidate }],
+				this.liquidate!,
+				this.chainOperator,
+			);
+		}
+		console.log(JSON.stringify(txResponse));
+	}
+
+	/**
+	 *
+	 */
+	public async trade(arbTrade: OptimalTrade, toArbTrade?: MempoolTx) {
 		if (
 			!this.botConfig.skipConfig?.useSkip ||
 			this.botConfig.skipConfig?.skipRpcUrl === undefined ||
