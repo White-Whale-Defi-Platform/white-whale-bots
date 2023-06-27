@@ -12,7 +12,7 @@ import { Pool } from "../base/pool";
 /**
  *
  */
-export class NoMempoolLoop {
+export class DexLoop {
 	pools: Array<Pool>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
 	pathlib: Array<Path>; //holds all known paths

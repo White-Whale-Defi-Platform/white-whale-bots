@@ -1,9 +1,12 @@
 import dotenv from "dotenv";
 
 import * as chains from "./chains";
+import { trySomeArb } from "./core/arbitrage/arbitrage";
 import { ChainOperator } from "./core/chainOperator/chainoperator";
 import { Logger } from "./core/logging";
-import { setBotConfig } from "./core/types/base/configs";
+import { MempoolLoop } from "./core/types/arbitrageloops/mempoolLoop";
+import { NoMempoolLoop } from "./core/types/arbitrageloops/nomempoolLoop";
+import { setBotConfig, SetupType } from "./core/types/base/configs";
 import { LogType } from "./core/types/base/logging";
 // load env files
 dotenv.config({ path: "./src/envs/terra.env" });
@@ -14,24 +17,23 @@ dotenv.config({ path: "./src/envs/terra.env" });
 async function main() {
 	const botConfig = await setBotConfig(process.env);
 
-	// 	let startupMessage = "===".repeat(30);
-	// 	startupMessage += "\n**White Whale Bot**\n";
-	// 	startupMessage += `\n**Setup type: ${botConfig.setupType}**\n`;
-	// 	startupMessage += "===".repeat(30);
+	//todo: place this in the logger class
+	let startupMessage = "===".repeat(30);
+	startupMessage += "\n**White Whale Bot**\n";
+	startupMessage += `\n**Setup type: ${botConfig.setupType}**\n`;
+	startupMessage += "===".repeat(30);
 
-	// 	startupMessage += `\nEnvironment Variables:\n
-	// **RPC ENDPOINT SCRAPER: ** \t${botConfig.useRpcUrlScraper}
-	// **RPC ENPDOINTS:** \t${botConfig.rpcUrls}
-	// **OFFER DENOM:** \t${JSON.stringify(botConfig.offerAssetInfo)}
-	// **FACTORIES_TO_ROUTERS_MAPPING:** \t${JSON.stringify(botConfig.mappingFactoryRouter)}
-	// **USE MEMPOOL:** \t${botConfig.useMempool}
-	// **USE SKIP:** \t${botConfig.skipConfig?.useSkip}
-	// `;
-	// if (botConfig.skipConfig) {
-	// 	startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
-	// 	startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
-	// }
-	// startupMessage += "---".repeat(30);
+	startupMessage += `\nEnvironment Variables:\n
+	**RPC ENPDOINTS:** \t${botConfig.rpcUrls}
+	**USE MEMPOOL:** \t${botConfig.useMempool}
+	**USE SKIP:** \t${botConfig.skipConfig?.useSkip}
+	`;
+	if (botConfig.skipConfig) {
+		startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
+		startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
+	}
+	startupMessage += "---".repeat(30);
+
 	const logger = new Logger(botConfig);
 	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
 	let getPoolStates = chains.defaults.getPoolStates;
@@ -50,6 +52,7 @@ async function main() {
 	});
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 
+	//todo: place each loop setup output in logger class
 	// let setupMessage = "---".repeat(30);
 	// const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
 	// const graph = newGraph(allPools);
@@ -71,63 +74,52 @@ async function main() {
 
 	// await logger.sendMessage(startupMessage, LogType.Console);
 
-	// const loop = new LiquidationLoop(chainOperator, botConfig, overseers);
+	let loop;
+	if (botConfig.setupType === SetupType.DEX) {
+		await logger.sendMessage("Initializing DEX arbitrage loop...", LogType.Console);
+		loop = new DexLoop(chainOperator, botConfig, logger);
 
-	// while (true) {
-	// 	await loop.step();
-	// }
-	// if (botConfig.skipConfig) {
-	// 	await logger.sendMessage("Initializing skip loop...", LogType.Console);
-	// 	const [skipClient, skipSigner] = await getSkipClient(
-	// 		botConfig.skipConfig.skipRpcUrl,
-	// 		botConfig.mnemonic,
-	// 		botConfig.chainPrefix,
-	// 	);
-	// 	loop = new SkipLoop(
-	// 		filteredPools,
-	// 		paths,
-	// 		trySomeArb,
-	// 		getPoolStates,
-	// 		getFlashArbMessages,
-	// 		chainOperator,
-	// 		botConfig,
-	// 		skipClient,
-	// 		skipSigner,
-	// 		logger,
-	// 		[...paths],
-	// 		botConfig.ignoreAddresses,
-	// 		liquidate,
-	// 	);
-	// } else if (botConfig.useMempool === true) {
-	// 	await logger.sendMessage("Initializing mempool loop...", LogType.Console);
+		// 	trySomeArb,
+		// 	getPoolStates,
+		// 	getFlashArbMessages,
+		// 	chainOperator,
+		// 	botConfig,
 
-	// 	loop = new MempoolLoop(
-	// 		filteredPools,
-	// 		paths,
-	// 		trySomeArb,
-	// 		getPoolStates,
-	// 		getFlashArbMessages,
-	// 		chainOperator,
-	// 		botConfig,
-	// 		logger,
-	// 		[...paths],
-	// 		botConfig.ignoreAddresses,
-	// 		liquidate,
-	// 	);
-	// } else {
-	// 	await logger.sendMessage("Initializing non-mempool loop...", LogType.Console);
-	// 	loop = new NoMempoolLoop(
-	// 		filteredPools,
-	// 		paths,
-	// 		trySomeArb,
-	// 		getPoolStates,
-	// 		getFlashArbMessages,
-	// 		chainOperator,
-	// 		botConfig,
-	// 		logger,
-	// 		[...paths],
-	// 	);
-	// }
+		// 	logger,
+		// 	[...paths],
+		// 	botConfig.ignoreAddresses,
+		// 	liquidate,
+		// );
+	} else if (botConfig.useMempool === true) {
+		await logger.sendMessage("Initializing mempool loop...", LogType.Console);
+
+		loop = new MempoolLoop(
+			filteredPools,
+			paths,
+			trySomeArb,
+			getPoolStates,
+			getFlashArbMessages,
+			chainOperator,
+			botConfig,
+			logger,
+			[...paths],
+			botConfig.ignoreAddresses,
+			liquidate,
+		);
+	} else {
+		await logger.sendMessage("Initializing non-mempool loop...", LogType.Console);
+		loop = new NoMempoolLoop(
+			filteredPools,
+			paths,
+			trySomeArb,
+			getPoolStates,
+			getFlashArbMessages,
+			chainOperator,
+			botConfig,
+			logger,
+			[...paths],
+		);
+	}
 
 	// main loop of the bot
 	// await loop.fetchRequiredChainData();
