@@ -2,8 +2,9 @@ import dotenv from "dotenv";
 
 import { ChainOperator } from "./core/chainOperator/chainoperator";
 import { Logger } from "./core/logging";
-import { createLoop } from "./core/types/arbitrageloops/dexloop";
-import { DexConfig, setBotConfig, SetupType } from "./core/types/base/configs";
+import { LiquidationLoop } from "./core/types/arbitrageloops/liquidationLoop";
+import { DexLoop } from "./core/types/arbitrageloops/loops/dexloop";
+import { DexConfig, LiquidationConfig, setBotConfig, SetupType } from "./core/types/base/configs";
 import { LogType } from "./core/types/base/logging";
 // load env files
 dotenv.config({ path: "./src/envs/terra.env" });
@@ -35,102 +36,36 @@ async function main() {
 
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 
-	//todo: place each loop setup output in logger class
-	// let setupMessage = "---".repeat(30);
-	// const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-	// const graph = newGraph(allPools);
-	// const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
-
-	// const filteredPools = removedUnusedPools(allPools, paths);
-	// setupMessage += `**\nDerived Paths for Arbitrage:
-	// Total Paths:** \t${paths.length}\n`;
-	// for (let pathlength = 2; pathlength <= botConfig.maxPathPools; pathlength++) {
-	// 	const nrOfPaths = paths.filter((path) => path.pools.length === pathlength).length;
-	// 	setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
-	// }
-	// setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
-	// setupMessage += "---".repeat(30);
-
-	// startupMessage += setupMessage;
-
-	// const overseers = await initLiquidationOverseers(botConfig.overseerAddresses, chainOperator);
-
-	// await logger.sendMessage(startupMessage, LogType.Console);
-
 	let loop;
 	if (botConfig.setupType === SetupType.DEX) {
 		await logger.sendMessage("Initializing DEX arbitrage loop...", LogType.Console);
-
-		loop = await createLoop(chainOperator, <DexConfig>botConfig, logger);
+		loop = await DexLoop.createLoop(chainOperator, <DexConfig>botConfig, logger);
 	} else if (botConfig.setupType === SetupType.LIQUIDATION) {
-		// loop = new LiquidationLoop(chainOperator, botConfig, logger);
+		await logger.sendMessage("Initializing liquidation arbitrage loop...", LogType.Console);
+		loop = await LiquidationLoop.createLoop(chainOperator, <LiquidationConfig>botConfig, logger);
 	}
-	// 	trySomeArb,
-	// 	getPoolStates,
-	// 	getFlashArbMessages,
-	// 	chainOperator,
-	// 	botConfig,
 
-	// 	logger,
-	// 	[...paths],
-	// 	botConfig.ignoreAddresses,
-	// 	liquidate,
-	// 	// );
-	// } else if (botConfig.useMempool === true) {
-	// 	await logger.sendMessage("Initializing mempool loop...", LogType.Console);
-
-	// 	loop = new MempoolLoop(
-	// 		filteredPools,
-	// 		paths,
-	// 		trySomeArb,
-	// 		getPoolStates,
-	// 		getFlashArbMessages,
-	// 		chainOperator,
-	// 		botConfig,
-	// 		logger,
-	// 		[...paths],
-	// 		botConfig.ignoreAddresses,
-	// 		liquidate,
-	// 	);
-	// } else {
-	// 	await logger.sendMessage("Initializing non-mempool loop...", LogType.Console);
-	// 	loop = new NoMempoolLoop(
-	// 		filteredPools,
-	// 		paths,
-	// 		trySomeArb,
-	// 		getPoolStates,
-	// 		getFlashArbMessages,
-	// 		chainOperator,
-	// 		botConfig,
-	// 		logger,
-	// 		[...paths],
-	// 	);
-	// }
-
-	// main loop of the bot
-	// await loop.fetchRequiredChainData();
-
-	// await logger.sendMessage("Starting loop...", LogType.All);
-	// while (true) {
-	// 	await loop.step();
-	// 	await loop.reset();
-	// 	const now = Date.now();
-	// 	if (startupTime - now + botConfig.signOfLife * 60000 <= 0) {
-	// 		timeIt++;
-	// 		const mins = (botConfig.signOfLife * timeIt) % 60;
-	// 		const hours = ~~((botConfig.signOfLife * timeIt) / 60);
-	// 		startupTime = now;
-	// 		const message = `**chain:** ${chainOperator.client.chainId} **wallet:**  **status:** running for ${
-	// 			loop.iterations
-	// 		} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
-	// 		loop.clearIgnoreAddresses();
-	// 		//switching RPCS every 6 Hrs
-	// 		if (mins == 0 && hours === 6 && botConfig.rpcUrls.length > 1) {
-	// 			await chainOperator.client.getNewClients();
-	// 		}
-	// 		await logger.sendMessage(message);
-	// 	}
-	// }
+	await logger.sendMessage("Starting loop...", LogType.All);
+	while (true && loop) {
+		await loop.step();
+		await loop.reset();
+		// const now = Date.now();
+		// if (startupTime - now + botConfig.signOfLife * 60000 <= 0) {
+		// 	timeIt++;
+		// 	const mins = (botConfig.signOfLife * timeIt) % 60;
+		// 	const hours = ~~((botConfig.signOfLife * timeIt) / 60);
+		// 	startupTime = now;
+		// 	const message = `**chain:** ${chainOperator.client.chainId} **wallet:**  **status:** running for ${
+		// 		loop.iterations
+		// 	} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
+		// 	loop.clearIgnoreAddresses();
+		// 	//switching RPCS every 6 Hrs
+		// 	if (mins == 0 && hours === 6 && botConfig.rpcUrls.length > 1) {
+		// 		await chainOperator.client.getNewClients();
+		// 	}
+		// 	await logger.sendMessage(message);
+		// }
+	}
 }
 
 main().catch((e) => {

@@ -2,8 +2,10 @@ import { fromUtf8 } from "@cosmjs/encoding";
 import { StdFee } from "@cosmjs/stargate";
 
 import { getliqudationMessage } from "../../../chains/defaults/messages/getLiquidationMessage";
+import { initLiquidationOverseers } from "../../../chains/defaults/queries/initOverseers";
 import { tryLiquidationArb } from "../../arbitrage/arbitrage";
 import { ChainOperator } from "../../chainOperator/chainoperator";
+import { Logger } from "../../logging";
 import { LiquidationConfig } from "../base/configs";
 import { decodeMempool, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
 import {
@@ -32,6 +34,7 @@ export class LiquidationLoop {
 	chainOperator: ChainOperator;
 	ignoreAddresses: IgnoredAddresses = {};
 	iterations = 0;
+	logger: Logger | undefined;
 	mempool!: Mempool;
 	overseers: Array<AnchorOverseer>;
 	totalBytes = 0;
@@ -42,10 +45,16 @@ export class LiquidationLoop {
 	/**
 	 *
 	 */
-	constructor(chainOperator: ChainOperator, botConfig: LiquidationConfig, overseers: Array<AnchorOverseer>) {
+	constructor(
+		chainOperator: ChainOperator,
+		botConfig: LiquidationConfig,
+		overseers: Array<AnchorOverseer>,
+		logger: Logger,
+	) {
 		this.botConfig = botConfig;
 		this.overseers = overseers;
 		this.chainOperator = chainOperator;
+		this.logger = logger;
 
 		overseers.map((overseer) => {
 			this.allOverseerAddresses[overseer.overseerAddress] = overseer;
@@ -56,6 +65,14 @@ export class LiquidationLoop {
 			}
 			this.allOverseerMoneyMarkets[overseer.marketAddress] = overseer;
 		});
+	}
+
+	/**
+	 *
+	 */
+	static async createLoop(chainOperator: ChainOperator, botConfig: LiquidationConfig, logger: Logger) {
+		const overseers = await initLiquidationOverseers(botConfig.overseerAddresses, chainOperator);
+		return new LiquidationLoop(chainOperator, botConfig, overseers, logger);
 	}
 
 	/**
@@ -145,6 +162,13 @@ export class LiquidationLoop {
 		for (const overseer of Array.from(new Set(overseersToUpdate))) {
 			setBorrowLimits(overseer);
 		}
+	}
+
+	/**
+	 *
+	 */
+	async reset() {
+		return;
 	}
 }
 

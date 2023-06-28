@@ -5,16 +5,16 @@ import { coin, StdFee } from "@cosmjs/stargate";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { inspect } from "util";
 
-import { getSendMessage } from "../../../chains/defaults/messages/getSendMessage";
-import { OptimalTrade } from "../../arbitrage/arbitrage";
-import { ChainOperator } from "../../chainOperator/chainoperator";
-import { SkipResult } from "../../chainOperator/skipclients";
-import { Logger } from "../../logging";
-import { DexConfig } from "../base/configs";
-import { addNewBorrower, processLiquidate, processMempoolLiquidation } from "../base/liquidate";
-import { LogType } from "../base/logging";
-import { decodeMempool, MempoolTx } from "../base/mempool";
-import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
+import { getSendMessage } from "../../../../chains/defaults/messages/getSendMessage";
+import { OptimalTrade } from "../../../arbitrage/arbitrage";
+import { ChainOperator } from "../../../chainOperator/chainoperator";
+import { SkipResult } from "../../../chainOperator/skipclients";
+import { Logger } from "../../../logging";
+import { DexConfig } from "../../base/configs";
+import { addNewBorrower, processLiquidate, processMempoolLiquidation } from "../../base/liquidate";
+import { LogType } from "../../base/logging";
+import { decodeMempool, MempoolTx } from "../../base/mempool";
+import { applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexMempoolLoop } from "./dexMempoolloop";
 /**
  *

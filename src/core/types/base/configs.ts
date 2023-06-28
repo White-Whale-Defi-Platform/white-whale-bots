@@ -216,12 +216,13 @@ function getDexConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): DexConfi
 	const OFFER_ASSET_INFO: NativeAssetInfo = { native_token: { denom: envs.BASE_DENOM } };
 
 	const IGNORE_ADDRS: IgnoredAddresses = {};
+	const timeoutDuration = envs.TIMEOUT_DURATION === undefined ? 100 : Number(envs.TIMEOUT_DURATION);
 	// set ignored Addresses
 	if (envs.IGNORE_ADDRESSES) {
 		const addrs = JSON.parse(envs.IGNORE_ADDRESSES);
 		addrs.forEach((element: string) => (IGNORE_ADDRS[element] = { timeoutAt: 0, duration: timeoutDuration }));
 	}
-	const timeoutDuration = envs.TIMEOUT_DURATION === undefined ? 100 : Number(envs.TIMEOUT_DURATION);
+
 	return {
 		...baseConfig,
 		flashloanRouterAddress: envs.FLASHLOAN_ROUTER_ADDRESS,

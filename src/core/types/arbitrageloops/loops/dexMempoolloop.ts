@@ -1,30 +1,43 @@
 /* eslint-disable simple-import-sort/imports */
-import { DexLoop } from "./dexloop";
+
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
+import { getPaths, newGraph } from "../../../arbitrage/graph";
 import { inspect } from "util";
-
-import { OptimalTrade } from "../../arbitrage/arbitrage";
-import { ChainOperator } from "../../chainOperator/chainoperator";
-import { Logger } from "../../logging";
-import { DexConfig } from "../base/configs";
-import { Liquidate } from "../base/liquidate";
-import { LogType } from "../base/logging";
-import { decodeMempool, flushTxMemory, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
-import { Path } from "../base/path";
-import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
+import { OptimalTrade, trySomeArb } from "../../../arbitrage/arbitrage";
+import { ChainOperator } from "../../../chainOperator/chainoperator";
+import { Logger } from "../../../logging/logger";
+import { DexConfig } from "../../base/configs";
+import { Liquidate } from "../../base/liquidate";
+import { LogType } from "../../base/logging";
+import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } from "../../base/mempool";
+import { Path } from "../../base/path";
+import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
+import { DexLoopInterface } from "../interfaces/dexloopInterface";
 
 /**
  *
  */
-export class DexMempoolLoop extends DexLoop {
-	ignoreAddresses: IgnoredAddresses;
+export class DexMempoolLoop implements DexLoopInterface {
+	pools: Array<Pool>;
+	paths: Array<Path>; //holds all known paths minus cooldowned paths
+	pathlib: Array<Path>; //holds all known paths
+	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
+	chainOperator: ChainOperator;
+	accountNumber = 0;
+	sequence = 0;
+	botConfig: DexConfig;
+	logger: Logger | undefined;
+	iterations = 0;
+	updateStateFunction: DexLoopInterface["updateStateFunction"];
+	messageFunction: DexLoopInterface["messageFunction"];
+	arbitrageFunction: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
 	// CACHE VALUES
 	totalBytes = 0;
 	mempool!: Mempool;
-	iterations = 0;
 	liquidate?: Liquidate;
+	ignoreAddresses!: IgnoredAddresses;
 
 	/**
 	 *
@@ -41,8 +54,19 @@ export class DexMempoolLoop extends DexLoop {
 			flashloancontract: string,
 		) => [Array<EncodeObject>, number],
 	) {
-		super(chainOperator, botConfig, logger, allPools, updateState, messageFunction);
-		this.ignoreAddresses = botConfig.ignoreAddresses ?? {};
+		const graph = newGraph(allPools);
+		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+		const filteredPools = removedUnusedPools(allPools, paths);
+		this.pools = filteredPools;
+		this.CDpaths = new Map<string, [number, number, number]>();
+		this.paths = paths;
+		this.pathlib = paths;
+		this.arbitrageFunction = trySomeArb;
+		this.updateStateFunction = updateState;
+		this.messageFunction = messageFunction;
+		this.chainOperator = chainOperator;
+		this.botConfig = botConfig;
+		this.logger = logger;
 	}
 	/**
 	 *

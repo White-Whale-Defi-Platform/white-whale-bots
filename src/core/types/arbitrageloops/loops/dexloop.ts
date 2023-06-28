@@ -1,20 +1,22 @@
-import { EncodeObject } from "@cosmjs/proto-signing";
 import { inspect } from "util";
 
-import * as chains from "../../../chains";
-import { OptimalTrade, trySomeArb } from "../../arbitrage/arbitrage";
-import { getPaths, newGraph } from "../../arbitrage/graph";
-import { ChainOperator } from "../../chainOperator/chainoperator";
-import { Logger } from "../../logging";
-import { DexConfig } from "../base/configs";
-import { LogType } from "../base/logging";
-import { Path } from "../base/path";
-import { Pool, removedUnusedPools } from "../base/pool";
+import * as chains from "../../../../chains";
+import { OptimalTrade, trySomeArb } from "../../../arbitrage/arbitrage";
+import { getPaths, newGraph } from "../../../arbitrage/graph";
+import { ChainOperator } from "../../../chainOperator/chainoperator";
+import { Logger } from "../../../logging";
+import { DexConfig } from "../../base/configs";
+import { LogType } from "../../base/logging";
+import { Path } from "../../base/path";
+import { Pool, removedUnusedPools } from "../../base/pool";
+import { DexLoopInterface } from "../interfaces/dexloopInterface";
+import { DexMempoolLoop } from "./dexMempoolloop";
+import { DexMempoolSkipLoop } from "./dexMempoolSkiploop";
 
 /**
  *
  */
-export class DexLoop {
+export class DexLoop implements DexLoopInterface {
 	pools: Array<Pool>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
 	pathlib: Array<Path>; //holds all known paths
@@ -22,21 +24,12 @@ export class DexLoop {
 	chainOperator: ChainOperator;
 	accountNumber = 0;
 	sequence = 0;
-	chainid = "";
 	botConfig: DexConfig;
 	logger: Logger | undefined;
 	iterations = 0;
-
-	/**
-	 *
-	 */
+	updateStateFunction: DexLoopInterface["updateStateFunction"];
+	messageFunction: DexLoopInterface["messageFunction"];
 	arbitrageFunction: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
-	updateStateFunction: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>;
-	messageFunction: (
-		arbTrade: OptimalTrade,
-		walletAddress: string,
-		flashloancontract: string,
-	) => [Array<EncodeObject>, number];
 
 	/**
 	 *
@@ -46,12 +39,8 @@ export class DexLoop {
 		botConfig: DexConfig,
 		logger: Logger | undefined,
 		allPools: Array<Pool>,
-		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
-		messageFunction: (
-			arbTrade: OptimalTrade,
-			walletAddress: string,
-			flashloancontract: string,
-		) => [Array<EncodeObject>, number],
+		updateState: DexLoopInterface["updateStateFunction"],
+		messageFunction: DexLoopInterface["messageFunction"],
 	) {
 		const graph = newGraph(allPools);
 		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
@@ -66,6 +55,54 @@ export class DexLoop {
 		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
 		this.logger = logger;
+
+		let setupMessage = "---".repeat(30);
+		setupMessage += `**\nDerived Paths for Arbitrage:
+	Total Paths:** \t${paths.length}\n`;
+		for (let pathlength = 2; pathlength <= botConfig.maxPathPools; pathlength++) {
+			const nrOfPaths = paths.filter((path) => path.pools.length === pathlength).length;
+			setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
+		}
+		setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
+		setupMessage += "---".repeat(30);
+		console.log(setupMessage);
+	}
+	/**
+	 *
+	 */
+	static async createLoop(
+		chainOperator: ChainOperator,
+		botConfig: DexConfig,
+		logger: Logger,
+	): Promise<DexLoopInterface> {
+		let getFlashArbMessages = chains.defaults.getFlashArbMessages;
+		let getPoolStates = chains.defaults.getPoolStates;
+		let initPools = chains.defaults.initPools;
+
+		await import("../../../../chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
+			if (chainSetups === undefined) {
+				await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
+			}
+			getFlashArbMessages = chainSetups.getFlashArbMessages;
+			getPoolStates = chainSetups.getPoolStates;
+			initPools = chainSetups.initPools;
+			return;
+		});
+		const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+
+		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
+			return new DexMempoolLoop(chainOperator, botConfig, logger, allPools, getPoolStates, getFlashArbMessages);
+		} else if (botConfig.useMempool && botConfig.skipConfig?.useSkip) {
+			return new DexMempoolSkipLoop(
+				chainOperator,
+				botConfig,
+				logger,
+				allPools,
+				getPoolStates,
+				getFlashArbMessages,
+			);
+		}
+		return new DexLoop(chainOperator, botConfig, logger, allPools, getPoolStates, getFlashArbMessages);
 	}
 	/**
 	 *
@@ -161,31 +198,4 @@ export class DexLoop {
  */
 function delay(ms: number) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
-}
-import { DexMempoolLoop } from "./dexMempoolloop";
-import { DexMempoolSkipLoop } from "./dexMempoolSkiploop";
-/**
- *
- */
-export async function createLoop(chainOperator: ChainOperator, botConfig: DexConfig, logger: Logger): Promise<DexLoop> {
-	let getFlashArbMessages = chains.defaults.getFlashArbMessages;
-	let getPoolStates = chains.defaults.getPoolStates;
-	let initPools = chains.defaults.initPools;
-
-	await import("./chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
-		if (chainSetups === undefined) {
-			await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
-		}
-		getFlashArbMessages = chainSetups.getFlashArbMessages;
-		getPoolStates = chainSetups.getPoolStates;
-		initPools = chainSetups.initPools;
-		return;
-	});
-	const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-	if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
-		return new DexMempoolLoop(chainOperator, botConfig, logger, allPools, getPoolStates, getFlashArbMessages);
-	} else if (botConfig.useMempool && botConfig.skipConfig?.useSkip) {
-		return new DexMempoolSkipLoop(chainOperator, botConfig, logger, allPools, getPoolStates, getFlashArbMessages);
-	}
-	return new DexLoop(chainOperator, botConfig, logger, allPools, getPoolStates, getFlashArbMessages);
 }
