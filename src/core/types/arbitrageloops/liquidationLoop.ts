@@ -79,6 +79,7 @@ export class LiquidationLoop {
 	 *
 	 */
 	public async step() {
+		this.iterations++;
 		while (true) {
 			this.mempool = await this.chainOperator.queryMempool();
 
@@ -126,6 +127,7 @@ export class LiquidationLoop {
 		for (const tx of mempoolTxs) {
 			const message = JSON.parse(fromUtf8(tx.message.msg));
 			const pfOverseer = this.allOverseerPriceFeeders[tx.message.sender];
+
 			if (pfOverseer) {
 				const pfMessage = <PriceFeedMessage>message;
 				setPriceFeed(pfOverseer, pfMessage);
