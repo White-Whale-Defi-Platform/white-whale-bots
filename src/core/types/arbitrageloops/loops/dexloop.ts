@@ -55,17 +55,6 @@ export class DexLoop implements DexLoopInterface {
 		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
 		this.logger = logger;
-
-		let setupMessage = "---".repeat(30);
-		setupMessage += `**\nDerived Paths for Arbitrage:
-	Total Paths:** \t${paths.length}\n`;
-		for (let pathlength = 2; pathlength <= botConfig.maxPathPools; pathlength++) {
-			const nrOfPaths = paths.filter((path) => path.pools.length === pathlength).length;
-			setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
-		}
-		setupMessage += `(Removed ${allPools.length - filteredPools.length} unused pools)\n`;
-		setupMessage += "---".repeat(30);
-		console.log(setupMessage);
 	}
 	/**
 	 *

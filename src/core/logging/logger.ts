@@ -1,3 +1,5 @@
+import { DexLoopInterface } from "../types/arbitrageloops/interfaces/dexloopInterface";
+import { LiquidationLoop } from "../types/arbitrageloops/loops/liqMempoolLoop";
 import { BotConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";
 import { DiscordLogger } from "./discordLogger";
@@ -42,7 +44,54 @@ export class Logger {
 			);
 		}
 	}
+	public defaults = {
+		_sendMessage: this.sendMessage,
+		/**
+		 *
+		 */
+		async logConfig(botConfig: BotConfig) {
+			//todo: place this in the logger class
+			let startupMessage = "===".repeat(30);
+			startupMessage += "\n**White Whale Bot**\n";
+			startupMessage += `\n**Setup type: ${botConfig.setupType}**\n`;
+			startupMessage += "===".repeat(30);
 
+			startupMessage += `\nEnvironment Variables:\n
+				**RPC ENPDOINTS:** \t${botConfig.rpcUrls}
+				**USE MEMPOOL:** \t${botConfig.useMempool}
+				**USE SKIP:** \t${botConfig.skipConfig?.useSkip}
+				`;
+			if (botConfig.skipConfig) {
+				startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
+				startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
+			}
+			startupMessage += "---".repeat(30);
+			await this._sendMessage(startupMessage, LogType.All);
+		},
+		/**
+		 *
+		 */
+		async logDexLoop(loop: DexLoopInterface) {
+			let setupMessage = "---".repeat(30);
+			setupMessage += `**\nDerived Paths for Arbitrage:
+				Total Paths:** \t${loop.paths.length}\n`;
+			for (let pathlength = 2; pathlength <= loop.botConfig.maxPathPools; pathlength++) {
+				const nrOfPaths = loop.paths.filter((path) => path.pools.length === pathlength).length;
+				setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
+			}
+			setupMessage += "---".repeat(30);
+			await this._sendMessage(setupMessage, LogType.All);
+		},
+
+		/**
+		 *
+		 */
+		async logLiqLoop(loop: LiquidationLoop) {
+			let setupMessage = "---".repeat(30);
+			setupMessage += `**\nDerived Overseers: ${loop.allOverseerAddresses}`;
+			await this._sendMessage(setupMessage, LogType.All);
+		},
+	};
 	/**
 	 * Sends the `message` to the console and other external messaging systems if defined.
 	 * @param message The message to log.

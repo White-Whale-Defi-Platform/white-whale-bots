@@ -2,10 +2,9 @@ import dotenv from "dotenv";
 
 import { ChainOperator } from "./core/chainOperator/chainoperator";
 import { Logger } from "./core/logging";
-import { LiquidationLoop } from "./core/types/arbitrageloops/liquidationLoop";
 import { DexLoop } from "./core/types/arbitrageloops/loops/dexloop";
+import { LiquidationLoop } from "./core/types/arbitrageloops/loops/liqMempoolLoop";
 import { DexConfig, LiquidationConfig, setBotConfig, SetupType } from "./core/types/base/configs";
-import { LogType } from "./core/types/base/logging";
 // load env files
 dotenv.config({ path: "./src/envs/terra.env" });
 
@@ -13,39 +12,32 @@ dotenv.config({ path: "./src/envs/terra.env" });
  * Runs the main program.
  */
 async function main() {
+	//creat config based on environment variables
 	const botConfig = await setBotConfig(process.env);
 
-	//todo: place this in the logger class
-	let startupMessage = "===".repeat(30);
-	startupMessage += "\n**White Whale Bot**\n";
-	startupMessage += `\n**Setup type: ${botConfig.setupType}**\n`;
-	startupMessage += "===".repeat(30);
-
-	startupMessage += `\nEnvironment Variables:\n
-	**RPC ENPDOINTS:** \t${botConfig.rpcUrls}
-	**USE MEMPOOL:** \t${botConfig.useMempool}
-	**USE SKIP:** \t${botConfig.skipConfig?.useSkip}
-	`;
-	if (botConfig.skipConfig) {
-		startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
-		startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
-	}
-	startupMessage += "---".repeat(30);
-
+	//create a logger based on the config
 	const logger = new Logger(botConfig);
 
+	// print the config
+	await logger.defaults.logConfig(botConfig);
+
+	//spawn chainOperator for interaction with blockchains
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 
+	//create the arbitrage loop based on input config
 	let loop;
 	if (botConfig.setupType === SetupType.DEX) {
-		await logger.sendMessage("Initializing DEX arbitrage loop...", LogType.Console);
 		loop = await DexLoop.createLoop(chainOperator, <DexConfig>botConfig, logger);
+
+		//print the created arbitrage loop
+		await logger.defaults.logDexLoop(loop);
 	} else if (botConfig.setupType === SetupType.LIQUIDATION) {
-		await logger.sendMessage("Initializing liquidation arbitrage loop...", LogType.Console);
 		loop = await LiquidationLoop.createLoop(chainOperator, <LiquidationConfig>botConfig, logger);
+
+		//print the created arbitrage loop
+		await logger.defaults.logLiqLoop(loop);
 	}
 
-	await logger.sendMessage("Starting loop...", LogType.All);
 	while (true && loop) {
 		await loop.step();
 		await loop.reset();
