@@ -9,7 +9,6 @@ import { OptimalTrade, trySomeArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
-import { Liquidate } from "../../base/liquidate";
 import { LogType } from "../../base/logging";
 import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } from "../../base/mempool";
 import { Path } from "../../base/path";
@@ -36,7 +35,6 @@ export class DexMempoolLoop implements DexLoopInterface {
 	// CACHE VALUES
 	totalBytes = 0;
 	mempool!: Mempool;
-	liquidate?: Liquidate;
 	ignoreAddresses!: IgnoredAddresses;
 
 	/**
