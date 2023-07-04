@@ -33,4 +33,5 @@ export interface DexLoopInterface {
 	) => [Array<EncodeObject>, number];
 	step: () => Promise<void>;
 	reset: () => Promise<void>;
+	clearIgnoreAddresses: () => void;
 }

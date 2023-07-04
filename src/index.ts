@@ -26,7 +26,6 @@ async function main() {
 	let loop;
 	if (botConfig.setupType === SetupType.DEX) {
 		loop = await DexLoop.createLoop(chainOperator, <DexConfig>botConfig, logger);
-
 		//print the created arbitrage loop
 		await logger.defaults.logDexLoop(loop);
 	} else if (botConfig.setupType === SetupType.LIQUIDATION) {
@@ -35,25 +34,28 @@ async function main() {
 		await logger.defaults.logLiqLoop(loop);
 	}
 
+	let startupTime = Date.now();
+	let timeIt = 0;
 	while (true && loop) {
 		await loop.step();
 		await loop.reset();
-		// const now = Date.now();
-		// if (startupTime - now + botConfig.signOfLife * 60000 <= 0) {
-		// 	timeIt++;
-		// 	const mins = (botConfig.signOfLife * timeIt) % 60;
-		// 	const hours = ~~((botConfig.signOfLife * timeIt) / 60);
-		// 	startupTime = now;
-		// 	const message = `**chain:** ${chainOperator.client.chainId} **wallet:**  **status:** running for ${
-		// 		loop.iterations
-		// 	} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
-		// 	loop.clearIgnoreAddresses();
-		// 	//switching RPCS every 6 Hrs
-		// 	if (mins == 0 && hours === 6 && botConfig.rpcUrls.length > 1) {
-		// 		await chainOperator.client.getNewClients();
-		// 	}
-		// 	await logger.sendMessage(message);
-		// }
+		const now = Date.now();
+		if (startupTime - now + botConfig.signOfLife * 60000 <= 0) {
+			timeIt++;
+			const mins = (botConfig.signOfLife * timeIt) % 60;
+			const hours = ~~((botConfig.signOfLife * timeIt) / 60);
+			startupTime = now;
+			const message = `**chain:** ${chainOperator.client.chainId} **wallet:**  **status:** running for ${
+				loop.iterations
+			} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
+			loop.clearIgnoreAddresses();
+
+			//switching RPCS every 6 Hrs
+			if (mins == 0 && hours === 6 && botConfig.rpcUrls.length > 1) {
+				await chainOperator.client.getNewClients();
+			}
+			await logger.sendMessage(message);
+		}
 	}
 }
 

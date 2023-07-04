@@ -165,6 +165,12 @@ export class LiquidationLoop {
 			setBorrowLimits(overseer);
 		}
 	}
+	/**
+	 *
+	 */
+	public clearIgnoreAddresses() {
+		return;
+	}
 
 	/**
 	 *
