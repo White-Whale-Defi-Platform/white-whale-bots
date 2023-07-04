@@ -2,6 +2,7 @@ import { DexLoopInterface } from "../types/arbitrageloops/interfaces/dexloopInte
 import { LiquidationLoop } from "../types/arbitrageloops/loops/liqMempoolLoop";
 import { BotConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";
+import { Loan } from "../types/base/overseer";
 import { DiscordLogger } from "./discordLogger";
 import { SlackLogger } from "./slackLogger";
 import { TelegramLogger } from "./telegramLogger";
@@ -69,6 +70,7 @@ export class Logger {
 				startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
 				startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
 			}
+			startupMessage += "\n";
 			startupMessage += "---".repeat(30);
 			await this._sendMessage(startupMessage, LogType.All);
 		},
@@ -91,8 +93,21 @@ export class Logger {
 		 *
 		 */
 		async logLiqLoop(loop: LiquidationLoop) {
+			const allLoans: Array<Loan> = [];
+			loop.overseers.map((overseer) => {
+				for (const loan of Object.values(overseer.loans)) {
+					allLoans.push(loan);
+				}
+			});
+			const maxRisk = allLoans.sort((a, b) => b.riskRatio - a.riskRatio);
+			const totalLoan = allLoans.map((loan) => loan.loanAmt).reduce((sum, current) => (sum += current), 0);
 			let setupMessage = "---".repeat(30);
-			setupMessage += `**\nDerived Overseers: ${loop.allOverseerAddresses}`;
+			setupMessage += `**\nDerived Overseers: ${loop.allOverseerAddresses.toString()}`;
+			setupMessage += `**\nMax Risk ratio: ${maxRisk[0].riskRatio.toPrecision(3)}
+Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
+			setupMessage += `**\nAmount of outstanding loans: ${allLoans.length}`;
+			setupMessage += `**\nTotal amount of outstanding value: ${totalLoan / 1e6}`;
+
 			await this._sendMessage(setupMessage, LogType.All);
 		},
 	};
