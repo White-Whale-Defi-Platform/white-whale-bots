@@ -1,7 +1,6 @@
 import { sha256 } from "@cosmjs/crypto";
-import { toHex, toUtf8 } from "@cosmjs/encoding";
+import { toHex } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
-import { coin, StdFee } from "@cosmjs/stargate";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { inspect } from "util";
 
@@ -11,7 +10,6 @@ import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { SkipResult } from "../../../chainOperator/skipclients";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
-import { addNewBorrower, processLiquidate, processMempoolLiquidation } from "../../base/liquidate";
 import { LogType } from "../../base/logging";
 import { decodeMempool, MempoolTx } from "../../base/mempool";
 import { applyMempoolMessagesOnPools, Pool } from "../../base/pool";
@@ -68,21 +66,6 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 				this.botConfig.timeoutDuration,
 				this.iterations,
 			);
-
-			if (this.liquidate) {
-				const liquidActions = await processMempoolLiquidation(this.mempool, this.liquidate);
-				const toLiquidate = await processLiquidate(this.liquidate.loans, this.liquidate.prices, liquidActions);
-
-				if (toLiquidate[0].length > 0) {
-					for (let x = 0; x < toLiquidate[0].length; x++) {
-						await this.skipLiquidate(toLiquidate[0][x].overseer, toLiquidate[0][x].address);
-					}
-					newLoans = newLoans.concat(toLiquidate[0]);
-				}
-				if (toLiquidate[1].length > 0) {
-					newLoans = newLoans.concat(toLiquidate[1]);
-				}
-			}
 			if (mempoolTxs.length === 0) {
 				continue;
 			} else {
@@ -98,54 +81,50 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 				}
 			}
 		}
-		if (newLoans.length > 0) {
-			newLoans = new Set(newLoans);
-			await addNewBorrower([...newLoans], this.liquidate!, this.chainOperator);
-		}
 	}
 
-	/**
-	 *
-	 */
-	async skipLiquidate(overseer: string, addressToLiquidate: string) {
-		const bidMsgEncoded = getSendMessage(
-			String(651),
-			this.botConfig.gasDenom,
-			this.chainOperator.client.publicAddress,
-			this.botConfig.skipConfig!.skipBidWallet,
-		);
-		const message = {
-			liquidate_collateral: {
-				borrower: addressToLiquidate,
-			},
-		};
-		const encodedMsgObject: EncodeObject = {
-			typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
-			value: MsgExecuteContract.fromPartial({
-				sender: this.chainOperator.client.publicAddress,
-				contract: overseer,
-				msg: toUtf8(JSON.stringify(message)),
-				funds: [],
-			}),
-		};
-		const msgs = [encodedMsgObject, bidMsgEncoded];
-		const TX_FEE: StdFee = { amount: [coin(10000, this.botConfig.gasDenom)], gas: "2800000" };
+	// /**
+	//  *
+	//  */
+	// async skipLiquidate(overseer: string, addressToLiquidate: string) {
+	// 	const bidMsgEncoded = getSendMessage(
+	// 		String(651),
+	// 		this.botConfig.gasDenom,
+	// 		this.chainOperator.client.publicAddress,
+	// 		this.botConfig.skipConfig!.skipBidWallet,
+	// 	);
+	// 	const message = {
+	// 		liquidate_collateral: {
+	// 			borrower: addressToLiquidate,
+	// 		},
+	// 	};
+	// 	const encodedMsgObject: EncodeObject = {
+	// 		typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
+	// 		value: MsgExecuteContract.fromPartial({
+	// 			sender: this.chainOperator.client.publicAddress,
+	// 			contract: overseer,
+	// 			msg: toUtf8(JSON.stringify(message)),
+	// 			funds: [],
+	// 		}),
+	// 	};
+	// 	const msgs = [encodedMsgObject, bidMsgEncoded];
+	// 	const TX_FEE: StdFee = { amount: [coin(10000, this.botConfig.gasDenom)], gas: "2800000" };
 
-		const txResponse: any = await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE);
-		if (txResponse.result.code === 4) {
-			await this.sendLiquidation(overseer, addressToLiquidate);
-		} else if (txResponse.result.code === 0) {
-			this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
-			await this.logger?.sendMessage("Sucessful Liquidation!!", LogType.All);
-		} else if (txResponse.result.code === 5) {
-			await addNewBorrower(
-				[{ overseer: overseer, address: addressToLiquidate }],
-				this.liquidate!,
-				this.chainOperator,
-			);
-		}
-		console.log(JSON.stringify(txResponse));
-	}
+	// 	const txResponse: any = await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE);
+	// 	if (txResponse.result.code === 4) {
+	// 		await this.sendLiquidation(overseer, addressToLiquidate);
+	// 	} else if (txResponse.result.code === 0) {
+	// 		this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
+	// 		await this.logger?.sendMessage("Sucessful Liquidation!!", LogType.All);
+	// 	} else if (txResponse.result.code === 5) {
+	// 		await addNewBorrower(
+	// 			[{ overseer: overseer, address: addressToLiquidate }],
+	// 			this.liquidate!,
+	// 			this.chainOperator,
+	// 		);
+	// 	}
+	// 	console.log(JSON.stringify(txResponse));
+	// }
 
 	/**
 	 *

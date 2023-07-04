@@ -10,13 +10,13 @@ import { TelegramLogger } from "./telegramLogger";
  *
  */
 export class Logger {
-	private botConfig: BotConfig;
+	botConfig: BotConfig;
 	public discordLogger?: DiscordLogger;
 	public slackLogger?: SlackLogger;
 	private telegramLogger?: TelegramLogger;
 
 	// Codes that are not sent to external sources (discord, slack)
-	private externalExemptCodes: Array<number> = [];
+	externalExemptCodes: Array<number> = [];
 
 	/**
 	 *
@@ -45,7 +45,11 @@ export class Logger {
 		}
 	}
 	public defaults = {
-		_sendMessage: this.sendMessage,
+		/**
+		 *
+		 */
+		_sendMessage: async (message: string, type: LogType = LogType.All, code = -1) =>
+			this.sendMessage(message, type, code),
 		/**
 		 *
 		 */
@@ -57,9 +61,9 @@ export class Logger {
 			startupMessage += "===".repeat(30);
 
 			startupMessage += `\nEnvironment Variables:\n
-				**RPC ENPDOINTS:** \t${botConfig.rpcUrls}
-				**USE MEMPOOL:** \t${botConfig.useMempool}
-				**USE SKIP:** \t${botConfig.skipConfig?.useSkip}
+**RPC ENPDOINTS:** \t${botConfig.rpcUrls}
+**USE MEMPOOL:** \t${botConfig.useMempool}
+**USE SKIP:** \t${botConfig.skipConfig?.useSkip}
 				`;
 			if (botConfig.skipConfig) {
 				startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
@@ -101,7 +105,11 @@ export class Logger {
 	public async sendMessage(message: string, type: LogType = LogType.All, code = -1) {
 		if (message) {
 			// Don't send common errors to discord/slack
-			if (type != LogType.Console && !this.externalExemptCodes.includes(code)) {
+			if (
+				type != LogType.Console &&
+				this.externalExemptCodes.length > 0 &&
+				!this.externalExemptCodes.includes(code)
+			) {
 				// Add indicator on success
 				if (code === 0) message = ":tada: **Success!** :tada:\n" + message;
 

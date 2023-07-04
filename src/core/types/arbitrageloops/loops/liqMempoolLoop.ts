@@ -92,7 +92,7 @@ export class LiquidationLoop {
 			}
 		}
 
-		const mempoolTxs: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses, this.iterations);
+		const mempoolTxs: Array<MempoolTx> = decodeMempool(this.mempool, this.ignoreAddresses, 0, this.iterations);
 		if (mempoolTxs.length > 0) {
 			this.applyMempoolMessagesOnLiquidation(mempoolTxs);
 		}

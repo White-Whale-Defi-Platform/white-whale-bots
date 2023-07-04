@@ -20,10 +20,8 @@ async function main() {
 
 	// print the config
 	await logger.defaults.logConfig(botConfig);
-
 	//spawn chainOperator for interaction with blockchains
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
-
 	//create the arbitrage loop based on input config
 	let loop;
 	if (botConfig.setupType === SetupType.DEX) {
@@ -33,7 +31,6 @@ async function main() {
 		await logger.defaults.logDexLoop(loop);
 	} else if (botConfig.setupType === SetupType.LIQUIDATION) {
 		loop = await LiquidationLoop.createLoop(chainOperator, <LiquidationConfig>botConfig, logger);
-
 		//print the created arbitrage loop
 		await logger.defaults.logLiqLoop(loop);
 	}
