@@ -7,6 +7,7 @@ import { tryLiquidationArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { LiquidationConfig } from "../../base/configs";
+import { LogType } from "../../base/logging";
 import { decodeMempool, IgnoredAddresses, Mempool, MempoolTx } from "../../base/mempool";
 import {
 	adjustCollateral,
@@ -71,6 +72,13 @@ export class LiquidationLoop {
 	 *
 	 */
 	static async createLoop(chainOperator: ChainOperator, botConfig: LiquidationConfig, logger: Logger) {
+		if (botConfig.useMempool === false || botConfig.skipConfig?.useSkip === true) {
+			await logger.sendMessage(
+				"Currently not possible to start liquidation bot without mempool or with skip",
+				LogType.Console,
+			);
+			process.exit(1);
+		}
 		const overseers = await initLiquidationOverseers(botConfig.overseerAddresses, chainOperator);
 		return new LiquidationLoop(chainOperator, botConfig, overseers, logger);
 	}

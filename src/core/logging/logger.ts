@@ -102,7 +102,7 @@ export class Logger {
 			const maxRisk = allLoans.sort((a, b) => b.riskRatio - a.riskRatio);
 			const totalLoan = allLoans.map((loan) => loan.loanAmt).reduce((sum, current) => (sum += current), 0);
 			let setupMessage = "---".repeat(30);
-			setupMessage += `**\nDerived Overseers: ${loop.allOverseerAddresses.toString()}`;
+			setupMessage += `**\nDerived Overseers: ${Object.keys(loop.allOverseerAddresses)}`;
 			setupMessage += `**\nMax Risk ratio: ${maxRisk[0].riskRatio.toPrecision(3)}
 Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			setupMessage += `**\nAmount of outstanding loans: ${allLoans.length}`;

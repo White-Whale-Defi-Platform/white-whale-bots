@@ -98,7 +98,7 @@ export function adjustCollateral(
 		overseer.loans[sender] = loan;
 		return;
 	} else {
-		console.log("loan: ", inspect(loan, true, 3, true));
+		console.log("loan before: ", inspect(loan, true, 3, true));
 		for (const collateral of collaterals) {
 			if (loan.collaterals[collateral[0]]) {
 				if (add) {
@@ -112,6 +112,7 @@ export function adjustCollateral(
 				loan.collaterals[collateral[0]] = { amount: loan.collaterals[collateral[0]].amount, ltv: +ltv };
 			}
 		}
+		console.log("loan after: ", inspect(loan, true, 3, true));
 	}
 }
 
