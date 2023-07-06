@@ -83,49 +83,6 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		}
 	}
 
-	// /**
-	//  *
-	//  */
-	// async skipLiquidate(overseer: string, addressToLiquidate: string) {
-	// 	const bidMsgEncoded = getSendMessage(
-	// 		String(651),
-	// 		this.botConfig.gasDenom,
-	// 		this.chainOperator.client.publicAddress,
-	// 		this.botConfig.skipConfig!.skipBidWallet,
-	// 	);
-	// 	const message = {
-	// 		liquidate_collateral: {
-	// 			borrower: addressToLiquidate,
-	// 		},
-	// 	};
-	// 	const encodedMsgObject: EncodeObject = {
-	// 		typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
-	// 		value: MsgExecuteContract.fromPartial({
-	// 			sender: this.chainOperator.client.publicAddress,
-	// 			contract: overseer,
-	// 			msg: toUtf8(JSON.stringify(message)),
-	// 			funds: [],
-	// 		}),
-	// 	};
-	// 	const msgs = [encodedMsgObject, bidMsgEncoded];
-	// 	const TX_FEE: StdFee = { amount: [coin(10000, this.botConfig.gasDenom)], gas: "2800000" };
-
-	// 	const txResponse: any = await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE);
-	// 	if (txResponse.result.code === 4) {
-	// 		await this.sendLiquidation(overseer, addressToLiquidate);
-	// 	} else if (txResponse.result.code === 0) {
-	// 		this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
-	// 		await this.logger?.sendMessage("Sucessful Liquidation!!", LogType.All);
-	// 	} else if (txResponse.result.code === 5) {
-	// 		await addNewBorrower(
-	// 			[{ overseer: overseer, address: addressToLiquidate }],
-	// 			this.liquidate!,
-	// 			this.chainOperator,
-	// 		);
-	// 	}
-	// 	console.log(JSON.stringify(txResponse));
-	// }
-
 	/**
 	 *
 	 */

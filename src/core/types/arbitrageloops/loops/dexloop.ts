@@ -78,7 +78,6 @@ export class DexLoop implements DexLoopInterface {
 			return;
 		});
 		const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-
 		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
 			return new DexMempoolLoop(chainOperator, botConfig, logger, allPools, getPoolStates, getFlashArbMessages);
 		} else if (botConfig.useMempool && botConfig.skipConfig?.useSkip) {

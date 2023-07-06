@@ -65,6 +65,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
 		this.logger = logger;
+		this.ignoreAddresses = botConfig.ignoreAddresses ?? {};
 	}
 	/**
 	 *
