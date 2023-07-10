@@ -24,14 +24,17 @@ async function main() {
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 	//create the arbitrage loop based on input config
 	let loop;
-	if (botConfig.setupType === SetupType.DEX) {
-		loop = await DexLoop.createLoop(chainOperator, <DexConfig>botConfig, logger);
-		//print the created arbitrage loop
-		await logger.defaults.logDexLoop(loop);
-	} else if (botConfig.setupType === SetupType.LIQUIDATION) {
-		loop = await LiquidationLoop.createLoop(chainOperator, <LiquidationConfig>botConfig, logger);
-		//print the created arbitrage loop
-		await logger.defaults.logLiqLoop(loop);
+	switch (botConfig.setupType) {
+		case SetupType.DEX:
+			loop = await DexLoop.createLoop(chainOperator, <DexConfig>botConfig, logger);
+			//print the created arbitrage loop
+			await logger.defaults.logDexLoop(loop);
+			break;
+		case SetupType.LIQUIDATION:
+			loop = await LiquidationLoop.createLoop(chainOperator, <LiquidationConfig>botConfig, logger);
+			//print the created arbitrage loop
+			await logger.defaults.logLiqLoop(loop);
+			break;
 	}
 
 	let startupTime = Date.now();
