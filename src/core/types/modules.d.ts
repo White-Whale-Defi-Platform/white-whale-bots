@@ -65,10 +65,15 @@ declare namespace NodeJS {
 		 */
 		POOLS: string;
 		/**
+		 * A list of all known orderbook pairs (marketids), only relevant when SETUP_TYPE = dex.
+		 */
+		ORDERBOOKS: string;
+		/**
 		 * Set to "1" if the code should use mempool analysis to send transactions.
 		 *
 		 * This will decrease success rate but increase throughput.
 		 */
+
 		USE_MEMPOOL: string;
 		/**
 		 * The price of a GAS_UNIT on the specific chain, denominated by BASE_DENOM.
