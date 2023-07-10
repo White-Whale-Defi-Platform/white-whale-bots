@@ -1,7 +1,6 @@
-import { fromAscii, fromBase64, fromUtf8, toUtf8 } from "@cosmjs/encoding";
+import { fromAscii, fromBase64, fromUtf8 } from "@cosmjs/encoding";
 import { decodeTxRaw } from "@cosmjs/proto-signing";
-import { parseCoins } from "@cosmjs/stargate";
-import { MsgExecuteContractCompat as MsgExecuteContractCompatBase } from "@injectivelabs/chain-api/injective/wasmx/v1/tx_pb";
+import { MsgExecuteContract as MsgExecuteContractCompatBase } from "@injectivelabs/core-proto-ts/cjs/cosmwasm/wasm/v1/tx";
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
@@ -74,13 +73,13 @@ export function decodeMempool(
 
 				case "/injective.wasmx.v1.MsgExecuteContractCompat": {
 					const msgExecuteContractCompatBase: MsgExecuteContractCompatBase =
-						MsgExecuteContractCompatBase.deserializeBinary(message.value);
-					const funds = msgExecuteContractCompatBase.getFunds();
+						MsgExecuteContractCompatBase.decode(message.value);
+					const funds = msgExecuteContractCompatBase.funds;
 					msgExecuteContract = MsgExecuteContract.fromPartial({
-						contract: msgExecuteContractCompatBase.getContract(),
-						sender: msgExecuteContractCompatBase.getSender(),
-						msg: toUtf8(msgExecuteContractCompatBase.getMsg()),
-						funds: funds === "0" ? [] : parseCoins(funds),
+						contract: msgExecuteContractCompatBase.contract,
+						sender: msgExecuteContractCompatBase.sender,
+						msg: msgExecuteContractCompatBase.msg,
+						funds: funds,
 					});
 					if (isAllowedMempoolMsg(msgExecuteContract, ignoreAddresses, iteration)) {
 						decodedMessages.push({ message: msgExecuteContract, txBytes: txBytes });

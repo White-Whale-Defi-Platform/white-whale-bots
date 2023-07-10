@@ -1,81 +1,79 @@
+/* eslint-disable simple-import-sort/imports */
+
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
+import { getPaths, newGraph } from "../../../arbitrage/graph";
 import { inspect } from "util";
+import { OptimalTrade, trySomeArb } from "../../../arbitrage/arbitrage";
+import { ChainOperator } from "../../../chainOperator/chainoperator";
+import { Logger } from "../../../logging/logger";
+import { DexConfig } from "../../base/configs";
+import { LogType } from "../../base/logging";
+import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } from "../../base/mempool";
+import { Path } from "../../base/path";
+import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
+import { DexLoopInterface } from "../interfaces/dexloopInterface";
 
-import { OptimalTrade } from "../../arbitrage/arbitrage";
-import { ChainOperator } from "../../chainOperator/chainoperator";
-import { Logger } from "../../logging";
-import { BotConfig } from "../base/botConfig";
-import { LogType } from "../base/logging";
-import { decodeMempool, flushTxMemory, IgnoredAddresses, Mempool, MempoolTx } from "../base/mempool";
-import { Path } from "../base/path";
-import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
 /**
  *
  */
-export class MempoolLoop {
+export class DexMempoolLoop implements DexLoopInterface {
 	pools: Array<Pool>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
-	ignoreAddresses: IgnoredAddresses;
-	botConfig: BotConfig;
+	accountNumber = 0;
+	sequence = 0;
+	botConfig: DexConfig;
 	logger: Logger | undefined;
+	iterations = 0;
+	updateStateFunction: DexLoopInterface["updateStateFunction"];
+	messageFunction: DexLoopInterface["messageFunction"];
+	arbitrageFunction: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
 	// CACHE VALUES
 	totalBytes = 0;
 	mempool!: Mempool;
-	iterations = 0;
-
-	/**
-	 *
-	 */
-	arbitrageFunction: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined;
-	updateStateFunction: (chainOperator: ChainOperator, pools: Array<Pool>) => void;
-	messageFunction: (
-		arbTrade: OptimalTrade,
-		walletAddress: string,
-		flashloancontract: string,
-	) => [Array<EncodeObject>, number];
+	ignoreAddresses!: IgnoredAddresses;
 
 	/**
 	 *
 	 */
 	public constructor(
-		pools: Array<Pool>,
-		paths: Array<Path>,
-		arbitrage: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined,
-		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => void,
+		chainOperator: ChainOperator,
+		botConfig: DexConfig,
+		logger: Logger | undefined,
+		allPools: Array<Pool>,
+		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
 		messageFunction: (
 			arbTrade: OptimalTrade,
 			walletAddress: string,
 			flashloancontract: string,
 		) => [Array<EncodeObject>, number],
-		chainOperator: ChainOperator,
-		botConfig: BotConfig,
-		logger: Logger | undefined,
-		pathlib: Array<Path>,
-		ignoreAddresses: IgnoredAddresses,
 	) {
-		this.pools = pools;
+		const graph = newGraph(allPools);
+		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+		const filteredPools = removedUnusedPools(allPools, paths);
+		this.pools = filteredPools;
 		this.CDpaths = new Map<string, [number, number, number]>();
 		this.paths = paths;
-		this.arbitrageFunction = arbitrage;
+		this.pathlib = paths;
+		this.arbitrageFunction = trySomeArb;
 		this.updateStateFunction = updateState;
 		this.messageFunction = messageFunction;
 		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
 		this.logger = logger;
-		this.pathlib = pathlib;
-		this.ignoreAddresses = ignoreAddresses;
+		this.ignoreAddresses = botConfig.ignoreAddresses ?? {};
 	}
-
 	/**
 	 *
 	 */
 	public async step() {
 		this.iterations++;
+		await this.updateStateFunction(this.chainOperator, this.pools);
+
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
 		if (arbTrade) {
@@ -129,7 +127,6 @@ export class MempoolLoop {
 	 *
 	 */
 	async reset() {
-		this.updateStateFunction(this.chainOperator, this.pools);
 		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();

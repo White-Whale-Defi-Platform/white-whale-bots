@@ -1,18 +1,22 @@
-import { EncodeObject } from "@cosmjs/proto-signing";
 import { inspect } from "util";
 
-import { OptimalTrade } from "../../arbitrage/arbitrage";
-import { ChainOperator } from "../../chainOperator/chainoperator";
-import { Logger } from "../../logging";
-import { BotConfig } from "../base/botConfig";
-import { Mempool } from "../base/mempool";
-import { Path } from "../base/path";
-import { Pool } from "../base/pool";
+import * as chains from "../../../../chains";
+import { OptimalTrade, trySomeArb } from "../../../arbitrage/arbitrage";
+import { getPaths, newGraph } from "../../../arbitrage/graph";
+import { ChainOperator } from "../../../chainOperator/chainoperator";
+import { Logger } from "../../../logging";
+import { DexConfig } from "../../base/configs";
+import { LogType } from "../../base/logging";
+import { Path } from "../../base/path";
+import { Pool, removedUnusedPools } from "../../base/pool";
+import { DexLoopInterface } from "../interfaces/dexloopInterface";
+import { DexMempoolLoop } from "./dexMempoolloop";
+import { DexMempoolSkipLoop } from "./dexMempoolSkiploop";
 
 /**
  *
  */
-export class NoMempoolLoop {
+export class DexLoop implements DexLoopInterface {
 	pools: Array<Pool>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
 	pathlib: Array<Path>; //holds all known paths
@@ -20,56 +24,74 @@ export class NoMempoolLoop {
 	chainOperator: ChainOperator;
 	accountNumber = 0;
 	sequence = 0;
-	chainid = "";
-	botConfig: BotConfig;
+	botConfig: DexConfig;
 	logger: Logger | undefined;
-	// CACHE VALUES
-	totalBytes = 0;
-	mempool!: Mempool;
 	iterations = 0;
-
-	/**
-	 *
-	 */
-	arbitrageFunction: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined;
-	updateStateFunction: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>;
-	messageFunction: (
-		arbTrade: OptimalTrade,
-		walletAddress: string,
-		flashloancontract: string,
-	) => [Array<EncodeObject>, number];
+	updateStateFunction: DexLoopInterface["updateStateFunction"];
+	messageFunction: DexLoopInterface["messageFunction"];
+	arbitrageFunction: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
 
 	/**
 	 *
 	 */
 	public constructor(
-		pools: Array<Pool>,
-		paths: Array<Path>,
-		arbitrage: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined,
-		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
-		messageFunction: (
-			arbTrade: OptimalTrade,
-			walletAddress: string,
-			flashloancontract: string,
-		) => [Array<EncodeObject>, number],
 		chainOperator: ChainOperator,
-		botConfig: BotConfig,
+		botConfig: DexConfig,
 		logger: Logger | undefined,
-		pathlib: Array<Path>,
+		allPools: Array<Pool>,
+		updateState: DexLoopInterface["updateStateFunction"],
+		messageFunction: DexLoopInterface["messageFunction"],
 	) {
-		this.pools = pools;
+		const graph = newGraph(allPools);
+		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+		const filteredPools = removedUnusedPools(allPools, paths);
+		this.pools = filteredPools;
 		this.CDpaths = new Map<string, [number, number, number]>();
-
 		this.paths = paths;
-		this.arbitrageFunction = arbitrage;
+		this.pathlib = paths;
+		this.arbitrageFunction = trySomeArb;
 		this.updateStateFunction = updateState;
 		this.messageFunction = messageFunction;
 		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
 		this.logger = logger;
-		this.pathlib = pathlib;
 	}
+	/**
+	 *
+	 */
+	static async createLoop(
+		chainOperator: ChainOperator,
+		botConfig: DexConfig,
+		logger: Logger,
+	): Promise<DexLoopInterface> {
+		let getFlashArbMessages = chains.defaults.getFlashArbMessages;
+		let getPoolStates = chains.defaults.getPoolStates;
+		let initPools = chains.defaults.initPools;
 
+		await import("../../../../chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
+			if (chainSetups === undefined) {
+				await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
+			}
+			getFlashArbMessages = chainSetups.getFlashArbMessages;
+			getPoolStates = chainSetups.getPoolStates;
+			initPools = chainSetups.initPools;
+			return;
+		});
+		const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
+			return new DexMempoolLoop(chainOperator, botConfig, logger, allPools, getPoolStates, getFlashArbMessages);
+		} else if (botConfig.useMempool && botConfig.skipConfig?.useSkip) {
+			return new DexMempoolSkipLoop(
+				chainOperator,
+				botConfig,
+				logger,
+				allPools,
+				getPoolStates,
+				getFlashArbMessages,
+			);
+		}
+		return new DexLoop(chainOperator, botConfig, logger, allPools, getPoolStates, getFlashArbMessages);
+	}
 	/**
 	 *
 	 */
@@ -101,7 +123,7 @@ export class NoMempoolLoop {
 	/**
 	 *
 	 */
-	private async trade(arbTrade: OptimalTrade) {
+	public async trade(arbTrade: OptimalTrade) {
 		const publicAddress = this.chainOperator.client.publicAddress;
 		const [msgs, nrOfMessages] = this.messageFunction(
 			arbTrade,

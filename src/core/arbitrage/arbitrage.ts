@@ -1,5 +1,6 @@
 import { Asset } from "../types/base/asset";
-import { BotConfig } from "../types/base/botConfig";
+import { DexConfig, LiquidationConfig } from "../types/base/configs";
+import { AnchorOverseer } from "../types/base/overseer";
 import { Path } from "../types/base/path";
 import { getOptimalTrade } from "./optimizers/analyticalOptimizer";
 
@@ -11,7 +12,7 @@ export interface OptimalTrade {
 /**
  *
  */
-export function trySomeArb(paths: Array<Path>, botConfig: BotConfig): OptimalTrade | undefined {
+export function trySomeArb(paths: Array<Path>, botConfig: DexConfig): OptimalTrade | undefined {
 	const optimalTrade: OptimalTrade | undefined = getOptimalTrade(paths, botConfig.offerAssetInfo);
 
 	if (!optimalTrade) {
@@ -28,7 +29,23 @@ export function trySomeArb(paths: Array<Path>, botConfig: BotConfig): OptimalTra
 /**
  *
  */
-function isAboveThreshold(botConfig: BotConfig, optimalTrade: OptimalTrade): boolean {
+export function tryLiquidationArb(
+	overseers: Array<AnchorOverseer>,
+	botConfig: LiquidationConfig,
+): [AnchorOverseer, string] | undefined {
+	for (const overseer of overseers) {
+		for (const loan of Object.entries(overseer.loans)) {
+			if (loan[1].riskRatio >= 1) {
+				return [overseer, loan[0]];
+			}
+		}
+	}
+}
+
+/**
+ *
+ */
+function isAboveThreshold(botConfig: DexConfig, optimalTrade: OptimalTrade): boolean {
 	// We dont know the number of message required to execute the trade, so the profit threshold will be set to the most conservative value: nr_of_pools*2-1
 	const profitThreshold =
 		botConfig.profitThresholds.get((optimalTrade.path.pools.length - 1) * 2 + 1) ??

@@ -1,67 +1,39 @@
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { EncodeObject } from "@cosmjs/proto-signing";
-import { SkipBundleClient } from "@skip-mev/skipjs";
-import { WebClient } from "@slack/web-api";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { inspect } from "util";
 
-import { getSendMessage } from "../../../chains/defaults/messages/getSendMessage";
-import { OptimalTrade } from "../../arbitrage/arbitrage";
-import { ChainOperator } from "../../chainOperator/chainoperator";
-import { SkipResult } from "../../chainOperator/skipclients";
-import { Logger } from "../../logging";
-import { BotConfig } from "../base/botConfig";
-import { LogType } from "../base/logging";
-import { decodeMempool, IgnoredAddresses, MempoolTx } from "../base/mempool";
-import { Path } from "../base/path";
-import { applyMempoolMessagesOnPools, Pool } from "../base/pool";
-import { MempoolLoop } from "./mempoolLoop";
+import { getSendMessage } from "../../../../chains/defaults/messages/getSendMessage";
+import { OptimalTrade } from "../../../arbitrage/arbitrage";
+import { ChainOperator } from "../../../chainOperator/chainoperator";
+import { SkipResult } from "../../../chainOperator/skipclients";
+import { Logger } from "../../../logging";
+import { DexConfig } from "../../base/configs";
+import { LogType } from "../../base/logging";
+import { decodeMempool, MempoolTx } from "../../base/mempool";
+import { applyMempoolMessagesOnPools, Pool } from "../../base/pool";
+import { DexMempoolLoop } from "./dexMempoolloop";
 /**
  *
  */
-export class SkipLoop extends MempoolLoop {
-	skipClient: SkipBundleClient;
-	skipSigner: DirectSecp256k1HdWallet;
-	slackLogger: WebClient | undefined;
-	logger: Logger | undefined;
-
+export class DexMempoolSkipLoop extends DexMempoolLoop {
 	/**
 	 *
 	 */
 	public constructor(
-		pools: Array<Pool>,
-		paths: Array<Path>,
-		arbitrage: (paths: Array<Path>, botConfig: BotConfig) => OptimalTrade | undefined,
-		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => void,
+		chainOperator: ChainOperator,
+		botConfig: DexConfig,
+		logger: Logger | undefined,
+		allPools: Array<Pool>,
+		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
 		messageFunction: (
 			arbTrade: OptimalTrade,
 			walletAddress: string,
-			flashloanRouterAddress: string,
+			flashloancontract: string,
 		) => [Array<EncodeObject>, number],
-		chainOperator: ChainOperator,
-		botConfig: BotConfig,
-		skipClient: SkipBundleClient,
-		skipSigner: DirectSecp256k1HdWallet,
-		logger: Logger | undefined,
-
-		pathlib: Array<Path>,
-		ignoreAddresses: IgnoredAddresses,
 	) {
-		super(
-			pools,
-			paths,
-			arbitrage,
-			updateState,
-			messageFunction,
-			chainOperator,
-			botConfig,
-			logger,
-			pathlib,
-			ignoreAddresses,
-		);
-		(this.skipClient = skipClient), (this.skipSigner = skipSigner), (this.logger = logger);
+		super(chainOperator, botConfig, logger, allPools, updateState, messageFunction);
 	}
 
 	/**
@@ -72,7 +44,7 @@ export class SkipLoop extends MempoolLoop {
 		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 
 		if (arbTrade) {
-			await this.skipTrade(arbTrade);
+			await this.trade(arbTrade);
 			this.cdPaths(arbTrade.path);
 			return;
 		}
@@ -94,7 +66,6 @@ export class SkipLoop extends MempoolLoop {
 				this.botConfig.timeoutDuration,
 				this.iterations,
 			);
-
 			if (mempoolTxs.length === 0) {
 				continue;
 			} else {
@@ -102,7 +73,7 @@ export class SkipLoop extends MempoolLoop {
 					applyMempoolMessagesOnPools(this.pools, [mempoolTx]);
 					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
 					if (arbTrade) {
-						await this.skipTrade(arbTrade, mempoolTx);
+						await this.trade(arbTrade, mempoolTx);
 						this.cdPaths(arbTrade.path);
 						await this.chainOperator.reset();
 						return;
@@ -111,10 +82,11 @@ export class SkipLoop extends MempoolLoop {
 			}
 		}
 	}
+
 	/**
 	 *
 	 */
-	private async skipTrade(arbTrade: OptimalTrade, toArbTrade?: MempoolTx) {
+	public async trade(arbTrade: OptimalTrade, toArbTrade?: MempoolTx) {
 		if (
 			!this.botConfig.skipConfig?.useSkip ||
 			this.botConfig.skipConfig?.skipRpcUrl === undefined ||
