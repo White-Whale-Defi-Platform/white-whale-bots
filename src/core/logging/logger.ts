@@ -85,6 +85,8 @@ export class Logger {
 				const nrOfPaths = loop.paths.filter((path) => path.pools.length === pathlength).length;
 				setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
 			}
+			setupMessage += `**\nOrderbooks: ${loop.orderbooks}`;
+			setupMessage += `**\nOrderbook paths: ${loop.orderbookPaths.length}\n`;
 			setupMessage += "---".repeat(30);
 			await this._sendMessage(setupMessage, LogType.All);
 		},

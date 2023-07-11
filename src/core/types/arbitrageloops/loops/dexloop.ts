@@ -7,7 +7,8 @@ import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
-import { Path } from "../../base/path";
+import { Orderbook } from "../../base/orderbook";
+import { getOrderbookAmmPaths, OrderbookPath, Path } from "../../base/path";
 import { Pool, removedUnusedPools } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { DexMempoolLoop } from "./dexMempoolloop";
@@ -18,7 +19,9 @@ import { DexMempoolSkipLoop } from "./dexMempoolSkiploop";
  */
 export class DexLoop implements DexLoopInterface {
 	pools: Array<Pool>;
+	orderbooks: Array<Orderbook>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
+	orderbookPaths: Array<OrderbookPath>;
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
@@ -39,12 +42,17 @@ export class DexLoop implements DexLoopInterface {
 		botConfig: DexConfig,
 		logger: Logger | undefined,
 		allPools: Array<Pool>,
+		orderbooks: Array<Orderbook>,
 		updateState: DexLoopInterface["updateStateFunction"],
 		messageFunction: DexLoopInterface["messageFunction"],
 	) {
 		const graph = newGraph(allPools);
 		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 		const filteredPools = removedUnusedPools(allPools, paths);
+		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks);
+
+		this.orderbookPaths = orderbookPaths;
+		this.orderbooks = orderbooks;
 		this.pools = filteredPools;
 		this.CDpaths = new Map<string, [number, number, number]>();
 		this.paths = paths;
@@ -67,7 +75,7 @@ export class DexLoop implements DexLoopInterface {
 		let getFlashArbMessages = chains.defaults.getFlashArbMessages;
 		let getPoolStates = chains.defaults.getPoolStates;
 		let initPools = chains.defaults.initPools;
-
+		const initOrderbook = chains.injective.initOrderbooks;
 		await import("../../../../chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
 			if (chainSetups === undefined) {
 				await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
@@ -77,20 +85,36 @@ export class DexLoop implements DexLoopInterface {
 			initPools = chainSetups.initPools;
 			return;
 		});
+		const orderbooks: Array<Orderbook> = [];
+		if (botConfig.chainPrefix === "inj") {
+			const obs = await initOrderbook(chainOperator, botConfig);
+			if (obs) {
+				orderbooks.push(...obs);
+			}
+		}
 		const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
 		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
-			return new DexMempoolLoop(chainOperator, botConfig, logger, allPools, getPoolStates, getFlashArbMessages);
+			return new DexMempoolLoop(
+				chainOperator,
+				botConfig,
+				logger,
+				allPools,
+				orderbooks,
+				getPoolStates,
+				getFlashArbMessages,
+			);
 		} else if (botConfig.useMempool && botConfig.skipConfig?.useSkip) {
 			return new DexMempoolSkipLoop(
 				chainOperator,
 				botConfig,
 				logger,
 				allPools,
+				orderbooks,
 				getPoolStates,
 				getFlashArbMessages,
 			);
 		}
-		return new DexLoop(chainOperator, botConfig, logger, allPools, getPoolStates, getFlashArbMessages);
+		return new DexLoop(chainOperator, botConfig, logger, allPools, orderbooks, getPoolStates, getFlashArbMessages);
 	}
 	/**
 	 *

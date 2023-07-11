@@ -11,16 +11,19 @@ import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } from "../../base/mempool";
-import { Path } from "../../base/path";
+import { getOrderbookAmmPaths, OrderbookPath, Path } from "../../base/path";
 import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
+import { Orderbook } from "../../base/orderbook";
 
 /**
  *
  */
 export class DexMempoolLoop implements DexLoopInterface {
 	pools: Array<Pool>;
+	orderbooks: Array<Orderbook>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
+	orderbookPaths: Array<OrderbookPath>;
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
@@ -45,6 +48,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 		botConfig: DexConfig,
 		logger: Logger | undefined,
 		allPools: Array<Pool>,
+		orderbooks: Array<Orderbook>,
 		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
 		messageFunction: (
 			arbTrade: OptimalTrade,
@@ -55,7 +59,10 @@ export class DexMempoolLoop implements DexLoopInterface {
 		const graph = newGraph(allPools);
 		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 		const filteredPools = removedUnusedPools(allPools, paths);
+		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks);
+		this.orderbookPaths = orderbookPaths;
 		this.pools = filteredPools;
+		this.orderbooks = orderbooks;
 		this.CDpaths = new Map<string, [number, number, number]>();
 		this.paths = paths;
 		this.pathlib = paths;

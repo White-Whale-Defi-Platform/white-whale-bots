@@ -72,6 +72,24 @@ export class ChainOperator {
 	/**
 	 *
 	 */
+	// async queryOrderbooks(marketids: Array<string>) {
+	// 	return this.client.queryOrderbook(marketids);
+	// }
+	/**
+	 *
+	 */
+	async queryOrderbook(marketId: string) {
+		return this.client.queryOrderbook(marketId);
+	}
+	/**
+	 *
+	 */
+	async queryMarket(marketId: string) {
+		return this.client.queryMarket(marketId);
+	}
+	/**
+	 *
+	 */
 	async signAndBroadcast(
 		msgs: Array<EncodeObject>,
 		fee?: StdFee | "auto",

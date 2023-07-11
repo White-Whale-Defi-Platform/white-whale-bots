@@ -12,6 +12,7 @@ import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { decodeMempool, MempoolTx } from "../../base/mempool";
+import { Orderbook } from "../../base/orderbook";
 import { applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexMempoolLoop } from "./dexMempoolloop";
 /**
@@ -26,6 +27,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		botConfig: DexConfig,
 		logger: Logger | undefined,
 		allPools: Array<Pool>,
+		orderbooks: Array<Orderbook>,
 		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
 		messageFunction: (
 			arbTrade: OptimalTrade,
@@ -33,7 +35,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 			flashloancontract: string,
 		) => [Array<EncodeObject>, number],
 	) {
-		super(chainOperator, botConfig, logger, allPools, updateState, messageFunction);
+		super(chainOperator, botConfig, logger, allPools, orderbooks, updateState, messageFunction);
 	}
 
 	/**

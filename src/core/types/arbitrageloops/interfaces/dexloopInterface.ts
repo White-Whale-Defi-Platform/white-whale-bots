@@ -4,14 +4,17 @@ import { OptimalTrade } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
-import { Path } from "../../base/path";
+import { Orderbook } from "../../base/orderbook";
+import { OrderbookPath, Path } from "../../base/path";
 import { Pool } from "../../base/pool";
 /**
  *
  */
 export interface DexLoopInterface {
 	pools: Array<Pool>;
+	orderbooks: Array<Orderbook>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
+	orderbookPaths: Array<OrderbookPath>;
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;

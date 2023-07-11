@@ -55,7 +55,7 @@ export interface DexConfig extends BaseConfig {
 	mappingFactoryRouter: Array<{ factory: string; router: string }>;
 	offerAssetInfo: NativeAssetInfo;
 	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
-
+	orderbooks: Array<string>;
 	timeoutDuration: number;
 	useRpcUrlScraper?: boolean;
 }
@@ -222,6 +222,10 @@ function getDexConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): DexConfi
 		const addrs = JSON.parse(envs.IGNORE_ADDRESSES);
 		addrs.forEach((element: string) => (IGNORE_ADDRS[element] = { timeoutAt: 0, duration: timeoutDuration }));
 	}
+	let orderbooks;
+	if (envs.ORDERBOOKS) {
+		orderbooks = JSON.parse(envs.ORDERBOOKS);
+	}
 
 	return {
 		...baseConfig,
@@ -232,6 +236,7 @@ function getDexConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): DexConfi
 		mappingFactoryRouter: FACTORIES_TO_ROUTERS_MAPPING,
 		offerAssetInfo: OFFER_ASSET_INFO,
 		poolEnvs: POOLS_ENVS,
+		orderbooks: orderbooks ?? [],
 		timeoutDuration: timeoutDuration,
 		useRpcUrlScraper: envs.USE_RPC_URL_SCRAPER == "1" ? true : false,
 	};
