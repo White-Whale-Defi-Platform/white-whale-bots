@@ -29,13 +29,24 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		allPools: Array<Pool>,
 		orderbooks: Array<Orderbook>,
 		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
+
 		messageFunction: (
 			arbTrade: OptimalTrade,
 			walletAddress: string,
 			flashloancontract: string,
 		) => [Array<EncodeObject>, number],
+		updateOrderbookStates?: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>,
 	) {
-		super(chainOperator, botConfig, logger, allPools, orderbooks, updateState, messageFunction);
+		super(
+			chainOperator,
+			botConfig,
+			logger,
+			allPools,
+			orderbooks,
+			updateState,
+			messageFunction,
+			updateOrderbookStates,
+		);
 	}
 
 	/**

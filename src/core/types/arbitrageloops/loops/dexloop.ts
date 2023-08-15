@@ -31,7 +31,8 @@ export class DexLoop implements DexLoopInterface {
 	botConfig: DexConfig;
 	logger: Logger | undefined;
 	iterations = 0;
-	updateStateFunction: DexLoopInterface["updateStateFunction"];
+	updatePoolStates: DexLoopInterface["updatePoolStates"];
+	updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"];
 	messageFunction: DexLoopInterface["messageFunction"];
 	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
 	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
@@ -45,8 +46,9 @@ export class DexLoop implements DexLoopInterface {
 		logger: Logger | undefined,
 		allPools: Array<Pool>,
 		orderbooks: Array<Orderbook>,
-		updateState: DexLoopInterface["updateStateFunction"],
+		updatePoolStates: DexLoopInterface["updatePoolStates"],
 		messageFunction: DexLoopInterface["messageFunction"],
+		updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"],
 	) {
 		const graph = newGraph(allPools);
 		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
@@ -61,7 +63,8 @@ export class DexLoop implements DexLoopInterface {
 		this.pathlib = paths;
 		this.ammArb = tryAmmArb;
 		this.orderbookArb = tryOrderbookArb;
-		this.updateStateFunction = updateState;
+		this.updatePoolStates = updatePoolStates;
+		this.updateOrderbookStates = updateOrderbookStates;
 		this.messageFunction = messageFunction;
 		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
@@ -79,6 +82,7 @@ export class DexLoop implements DexLoopInterface {
 		let getPoolStates = chains.defaults.getPoolStates;
 		let initPools = chains.defaults.initPools;
 		const initOrderbook = chains.injective.initOrderbooks;
+		const getOrderbookState = chains.injective.getOrderbookState;
 		await import("../../../../chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
 			if (chainSetups === undefined) {
 				await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
@@ -89,7 +93,7 @@ export class DexLoop implements DexLoopInterface {
 			return;
 		});
 		const orderbooks: Array<Orderbook> = [];
-		if (botConfig.chainPrefix === "inj") {
+		if (botConfig.chainPrefix === "inj" && botConfig.orderbooks.length > 0) {
 			const obs = await initOrderbook(chainOperator, botConfig);
 			if (obs) {
 				orderbooks.push(...obs);
@@ -105,6 +109,7 @@ export class DexLoop implements DexLoopInterface {
 				orderbooks,
 				getPoolStates,
 				getFlashArbMessages,
+				getOrderbookState,
 			);
 		} else if (botConfig.useMempool && botConfig.skipConfig?.useSkip) {
 			return new DexMempoolSkipLoop(
@@ -115,9 +120,19 @@ export class DexLoop implements DexLoopInterface {
 				orderbooks,
 				getPoolStates,
 				getFlashArbMessages,
+				getOrderbookState,
 			);
 		}
-		return new DexLoop(chainOperator, botConfig, logger, allPools, orderbooks, getPoolStates, getFlashArbMessages);
+		return new DexLoop(
+			chainOperator,
+			botConfig,
+			logger,
+			allPools,
+			orderbooks,
+			getPoolStates,
+			getFlashArbMessages,
+			getOrderbookState,
+		);
 	}
 	/**
 	 *
@@ -135,6 +150,15 @@ export class DexLoop implements DexLoopInterface {
 			this.cdPaths(arbTrade.path);
 			await this.chainOperator.reset();
 		}
+		if (arbtradeOB) {
+			console.log(inspect(arbtradeOB.path.pool, { showHidden: true, depth: 2, colors: true }));
+			console.log(inspect(arbtradeOB.path.orderbook, { showHidden: true, depth: 2, colors: true }));
+			console.log(inspect(arbtradeOB.offerAsset, { showHidden: true, depth: 3, colors: true }));
+			console.log("expected profit: ", arbtradeOB.profit);
+			// await this.trade(arbtradeOB);
+			this.cdPaths(arbtradeOB.path);
+			await this.chainOperator.reset();
+		}
 
 		await delay(1500);
 	}
@@ -144,7 +168,10 @@ export class DexLoop implements DexLoopInterface {
 	 */
 	async reset() {
 		this.unCDPaths();
-		await this.updateStateFunction(this.chainOperator, this.pools);
+		await this.updatePoolStates(this.chainOperator, this.pools);
+		if (this.updateOrderbookStates) {
+			await this.updateOrderbookStates(this.chainOperator, this.orderbooks);
+		}
 	}
 
 	/**
@@ -167,7 +194,7 @@ export class DexLoop implements DexLoopInterface {
 	 * Updates the iteration count of elements in CDpaths if its in equalpath of param: path
 	 * Updates this.Path.
 	 */
-	public cdPaths(path: Path) {
+	public cdPaths(path: Path | OrderbookPath) {
 		//add equalpaths to the CDPath array
 		for (const equalpath of path.equalpaths) {
 			this.CDpaths.set(equalpath[0], [this.iterations, 5, equalpath[1]]);

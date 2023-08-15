@@ -33,7 +33,8 @@ export class DexMempoolLoop implements DexLoopInterface {
 	botConfig: DexConfig;
 	logger: Logger | undefined;
 	iterations = 0;
-	updateStateFunction: DexLoopInterface["updateStateFunction"];
+	updatePoolStates: DexLoopInterface["updatePoolStates"];
+	updateOrderbookStates?: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>;
 	messageFunction: DexLoopInterface["messageFunction"];
 	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
 	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
@@ -57,6 +58,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 			walletAddress: string,
 			flashloancontract: string,
 		) => [Array<EncodeObject>, number],
+		updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"],
 	) {
 		const graph = newGraph(allPools);
 		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
@@ -70,7 +72,8 @@ export class DexMempoolLoop implements DexLoopInterface {
 		this.pathlib = paths;
 		this.ammArb = tryAmmArb;
 		this.orderbookArb = tryOrderbookArb;
-		this.updateStateFunction = updateState;
+		this.updateOrderbookStates = updateOrderbookStates;
+		this.updatePoolStates = updateState;
 		this.messageFunction = messageFunction;
 		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
@@ -82,7 +85,10 @@ export class DexMempoolLoop implements DexLoopInterface {
 	 */
 	public async step() {
 		this.iterations++;
-		await this.updateStateFunction(this.chainOperator, this.pools);
+		await this.updatePoolStates(this.chainOperator, this.pools);
+		if (this.updateOrderbookStates) {
+			await this.updateOrderbookStates(this.chainOperator, this.orderbooks);
+		}
 
 		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 

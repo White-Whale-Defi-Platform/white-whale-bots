@@ -30,7 +30,8 @@ export interface DexLoopInterface {
 	 */
 	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
 	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
-	updateStateFunction: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>;
+	updatePoolStates: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>;
+	updateOrderbookStates?: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>;
 	messageFunction: (
 		arbTrade: OptimalTrade,
 		walletAddress: string,
