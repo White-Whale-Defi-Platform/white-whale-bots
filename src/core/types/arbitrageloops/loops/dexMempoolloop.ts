@@ -5,7 +5,7 @@ import { toHex } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
 import { getPaths, newGraph } from "../../../arbitrage/graph";
 import { inspect } from "util";
-import { OptimalTrade, trySomeArb } from "../../../arbitrage/arbitrage";
+import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
@@ -15,6 +15,7 @@ import { getOrderbookAmmPaths, OrderbookPath, Path } from "../../base/path";
 import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { Orderbook } from "../../base/orderbook";
+import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
 
 /**
  *
@@ -34,7 +35,8 @@ export class DexMempoolLoop implements DexLoopInterface {
 	iterations = 0;
 	updateStateFunction: DexLoopInterface["updateStateFunction"];
 	messageFunction: DexLoopInterface["messageFunction"];
-	arbitrageFunction: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
+	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
+	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
 	// CACHE VALUES
 	totalBytes = 0;
 	mempool!: Mempool;
@@ -66,7 +68,8 @@ export class DexMempoolLoop implements DexLoopInterface {
 		this.CDpaths = new Map<string, [number, number, number]>();
 		this.paths = paths;
 		this.pathlib = paths;
-		this.arbitrageFunction = trySomeArb;
+		this.ammArb = tryAmmArb;
+		this.orderbookArb = tryOrderbookArb;
 		this.updateStateFunction = updateState;
 		this.messageFunction = messageFunction;
 		this.chainOperator = chainOperator;
@@ -81,7 +84,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 		this.iterations++;
 		await this.updateStateFunction(this.chainOperator, this.pools);
 
-		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 
 		if (arbTrade) {
 			await this.trade(arbTrade);
@@ -114,7 +117,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 				applyMempoolMessagesOnPools(this.pools, mempoolTxs);
 			}
 
-			const arbTrade = this.arbitrageFunction(this.paths, this.botConfig);
+			const arbTrade = this.ammArb(this.paths, this.botConfig);
 
 			if (arbTrade) {
 				await this.trade(arbTrade);

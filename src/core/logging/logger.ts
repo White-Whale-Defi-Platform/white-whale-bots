@@ -85,7 +85,9 @@ export class Logger {
 				const nrOfPaths = loop.paths.filter((path) => path.pools.length === pathlength).length;
 				setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
 			}
-			setupMessage += `**\nOrderbooks: ${loop.orderbooks}`;
+			setupMessage += `**\nOrderbooks: ${loop.orderbooks.map(
+				(ob) => `\n[${ob.quoteAssetInfo.native_token.denom} - ${ob.baseAssetInfo.native_token.denom}]`,
+			)}`;
 			setupMessage += `**\nOrderbook paths: ${loop.orderbookPaths.length}\n`;
 			setupMessage += "---".repeat(30);
 			await this._sendMessage(setupMessage, LogType.All);

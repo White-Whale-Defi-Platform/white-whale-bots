@@ -1,4 +1,4 @@
-import { Asset, AssetInfo } from "./asset";
+import { Asset, NativeAssetInfo } from "./asset";
 
 export interface Order {
 	price: number;
@@ -7,8 +7,8 @@ export interface Order {
 }
 export interface Orderbook {
 	marketId: string; //contractaddress or marketid
-	baseAssetInfo: AssetInfo;
-	quoteAssetInfo: AssetInfo;
+	baseAssetInfo: NativeAssetInfo;
+	quoteAssetInfo: NativeAssetInfo;
 	baseAssetDecimals: number;
 	quoteAssetDecimals: number;
 	minQuantityIncrement: number;
@@ -24,7 +24,7 @@ export interface Orderbook {
  */
 export function OrderbookMarketSell(orderbook: Orderbook, offerAsset: Asset) {
 	//we are selling the base asset
-	let rest = +offerAsset.amount;
+	let rest = Math.floor(+offerAsset.amount);
 	let result = 0;
 	let buyIndex = 0;
 	while (rest > 0) {

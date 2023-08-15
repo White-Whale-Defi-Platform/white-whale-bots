@@ -43,7 +43,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 	 */
 	public async step(): Promise<void> {
 		this.iterations++;
-		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 
 		if (arbTrade) {
 			await this.trade(arbTrade);
@@ -73,7 +73,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 			} else {
 				for (const mempoolTx of mempoolTxs) {
 					applyMempoolMessagesOnPools(this.pools, [mempoolTx]);
-					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+					const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 					if (arbTrade) {
 						await this.trade(arbTrade, mempoolTx);
 						this.cdPaths(arbTrade.path);

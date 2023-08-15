@@ -1,8 +1,9 @@
 import { inspect } from "util";
 
 import * as chains from "../../../../chains";
-import { OptimalTrade, trySomeArb } from "../../../arbitrage/arbitrage";
+import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { getPaths, newGraph } from "../../../arbitrage/graph";
+import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
@@ -32,7 +33,8 @@ export class DexLoop implements DexLoopInterface {
 	iterations = 0;
 	updateStateFunction: DexLoopInterface["updateStateFunction"];
 	messageFunction: DexLoopInterface["messageFunction"];
-	arbitrageFunction: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
+	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
+	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
 
 	/**
 	 *
@@ -57,7 +59,8 @@ export class DexLoop implements DexLoopInterface {
 		this.CDpaths = new Map<string, [number, number, number]>();
 		this.paths = paths;
 		this.pathlib = paths;
-		this.arbitrageFunction = trySomeArb;
+		this.ammArb = tryAmmArb;
+		this.orderbookArb = tryOrderbookArb;
 		this.updateStateFunction = updateState;
 		this.messageFunction = messageFunction;
 		this.chainOperator = chainOperator;
@@ -122,8 +125,8 @@ export class DexLoop implements DexLoopInterface {
 	public async step() {
 		this.iterations++;
 
-		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
-
+		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
+		const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
 		if (arbTrade) {
 			console.log(inspect(arbTrade.path.pools, { showHidden: true, depth: 4, colors: true }));
 			console.log(inspect(arbTrade.offerAsset, { showHidden: true, depth: 3, colors: true }));

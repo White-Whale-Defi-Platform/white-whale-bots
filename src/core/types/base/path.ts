@@ -9,12 +9,24 @@ export interface Path {
 	identifier: [string, number];
 }
 
+export enum OrderSequence {
+	AmmFirst,
+	OrderbookFirst,
+}
+
 export interface OrderbookPath {
-	pools: [Orderbook, Pool] | [Pool, Orderbook];
+	pool: Pool;
+	orderbook: Orderbook;
+	orderSequence: OrderSequence;
 	equalpaths: Array<[string, number]>;
 	identifier: [string, number];
 }
-
+/**
+ *
+ */
+export function isOrderbookPath(x: any): x is OrderbookPath {
+	return x["orderbook" as keyof typeof x] !== undefined;
+}
 /**
  *
  */
@@ -30,12 +42,16 @@ export function getOrderbookAmmPaths(pools: Array<Pool>, orderbooks: Array<Order
 					isMatchingAssetInfos(pool.assets[0].info, orderbook.quoteAssetInfo))
 			) {
 				const path = identity<OrderbookPath>({
-					pools: [pool, orderbook],
+					pool: pool,
+					orderbook: orderbook,
+					orderSequence: OrderSequence.AmmFirst,
 					equalpaths: [],
 					identifier: [pool.LPratio + orderbook.marketId, idx],
 				});
 				const reversedpath = identity<OrderbookPath>({
-					pools: [orderbook, pool],
+					pool: pool,
+					orderbook: orderbook,
+					orderSequence: OrderSequence.OrderbookFirst,
 					equalpaths: [],
 					identifier: [orderbook.marketId + pool.LPratio, idx + 1],
 				});
