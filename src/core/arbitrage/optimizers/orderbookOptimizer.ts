@@ -50,7 +50,7 @@ export function getOptimalTrade(
 		}
 	}
 
-	return optimalOrderbookTrade;
+	return optimalProfit > 0 ? optimalOrderbookTrade : undefined;
 }
 
 /**
