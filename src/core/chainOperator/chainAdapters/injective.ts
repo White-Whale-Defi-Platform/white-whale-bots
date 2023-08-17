@@ -188,7 +188,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 					injectiveAddress: this._publicAddress,
 				};
 				const simRes = await this._signAndBroadcastClient.simulate(broadcasterOptions);
-				console.log("simulation succesful: \n", simRes);
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
 				return {
 					height: res.height,
