@@ -1,6 +1,7 @@
 import { inspect } from "util";
 
 import * as chains from "../../../../chains";
+import { getOrderbookArbMessages } from "../../../../chains/inj/messages/getOrderbookArbMessage";
 import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { getPaths, newGraph } from "../../../arbitrage/graph";
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
@@ -9,7 +10,7 @@ import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { Orderbook } from "../../base/orderbook";
-import { getOrderbookAmmPaths, OrderbookPath, Path } from "../../base/path";
+import { getOrderbookAmmPaths, OrderbookPath, OrderSequence, Path } from "../../base/path";
 import { Pool, removedUnusedPools } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { DexMempoolLoop } from "./dexMempoolloop";
@@ -152,10 +153,21 @@ export class DexLoop implements DexLoopInterface {
 		}
 		if (arbtradeOB) {
 			console.log(inspect(arbtradeOB.path.pool, { showHidden: true, depth: 2, colors: true }));
-			console.log(inspect(arbtradeOB.path.orderbook, { showHidden: true, depth: 2, colors: true }));
+			console.log(inspect(arbtradeOB.path.orderbook, { showHidden: true, depth: 1, colors: true }));
 			console.log(inspect(arbtradeOB.offerAsset, { showHidden: true, depth: 3, colors: true }));
 			console.log("expected profit: ", arbtradeOB.profit);
-			// await this.trade(arbtradeOB);
+
+			const msgs = getOrderbookArbMessages(arbtradeOB, this.chainOperator.client.publicAddress);
+			console.log(msgs[0], msgs[1]);
+			if (arbtradeOB.path.orderSequence === OrderSequence.AmmFirst) {
+				const txResponse = await this.chainOperator.signAndBroadcast(msgs);
+				console.log(txResponse);
+			} else {
+				const txResponse = await this.chainOperator.signAndBroadcast([msgs[0]]);
+				console.log(txResponse);
+				const txResponse2 = await this.chainOperator.signAndBroadcast([msgs[1]]);
+				console.log(txResponse2);
+			}
 			this.cdPaths(arbtradeOB.path);
 			await this.chainOperator.reset();
 		}

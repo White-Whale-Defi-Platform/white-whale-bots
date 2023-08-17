@@ -14,6 +14,7 @@ import {
 	createTransaction,
 	IndexerGrpcSpotApi,
 	MsgBroadcasterWithPk,
+	MsgCreateSpotMarketOrder,
 	MsgExecuteContract,
 	MsgSend,
 	OrderbookWithSequence,
@@ -274,7 +275,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 */
 	private prepair(messages: Array<EncodeObject>) {
 		try {
-			const encodedExecuteMsgs: Array<MsgExecuteContract | MsgSend> = [];
+			const encodedExecuteMsgs: Array<MsgExecuteContract | MsgSend | MsgCreateSpotMarketOrder> = [];
 			messages.map((msg, idx) => {
 				if (msg.typeUrl === "/cosmwasm.wasm.v1.MsgExecuteContract") {
 					const msgExecuteContract = <CosmJSMsgExecuteContract>msg.value;
@@ -323,6 +324,9 @@ class InjectiveAdapter implements ChainOperatorInterface {
 					});
 
 					encodedExecuteMsgs.push(msgSendInjective);
+				}
+				if (msg.typeUrl === "/injective.exchange.v1beta1.MsgCreateSpotMarketOrder") {
+					encodedExecuteMsgs.push(msg.value);
 				}
 			});
 			return encodedExecuteMsgs;

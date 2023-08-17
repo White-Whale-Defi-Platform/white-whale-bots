@@ -1,3 +1,4 @@
+import { toUtf8 } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
@@ -32,8 +33,8 @@ export function getSwapMessage(
 				amount: offerAsset.amount,
 			},
 			sender: walletAddress,
-			contractAddress: pool.address,
-			msg: msg,
+			contract: pool.address,
+			msg: toUtf8(JSON.stringify(msg)),
 		}),
 	};
 	return encodedMsgObject;
