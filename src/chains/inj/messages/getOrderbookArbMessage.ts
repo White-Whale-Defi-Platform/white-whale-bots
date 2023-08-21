@@ -44,7 +44,6 @@ export function getOrderbookArbMessages(arbTrade: OptimalOrderbookTrade, publicA
 		orderSize =
 			Math.floor(orderSize / arbTrade.path.orderbook.minQuantityIncrement) *
 			arbTrade.path.orderbook.minQuantityIncrement;
-		console.log(orderSize);
 
 		const offerAsset = {
 			amount: String(orderSize),
