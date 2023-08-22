@@ -1,6 +1,5 @@
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
-import { EncodeObject } from "@cosmjs/proto-signing";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { inspect } from "util";
 
@@ -30,11 +29,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		orderbooks: Array<Orderbook>,
 		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
 
-		messageFunction: (
-			arbTrade: OptimalTrade,
-			walletAddress: string,
-			flashloancontract: string,
-		) => [Array<EncodeObject>, number],
+		messageFactory: DexMempoolLoop["messageFactory"],
 		updateOrderbookStates?: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>,
 	) {
 		super(
@@ -44,7 +39,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 			allPools,
 			orderbooks,
 			updateState,
-			messageFunction,
+			messageFactory,
 			updateOrderbookStates,
 		);
 	}
@@ -121,27 +116,35 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 			this.chainOperator.client.publicAddress,
 			this.botConfig.skipConfig.skipBidWallet,
 		);
-		const [msgs, nrOfWasms] = this.messageFunction(
+		const messages = this.messageFactory(
 			arbTrade,
 			this.chainOperator.client.publicAddress,
 			this.botConfig.flashloanRouterAddress,
 		);
-		msgs.push(bidMsgEncoded);
+		if (!messages) {
+			console.error("error in creating messages", 1);
+			process.exit(1);
+		}
+		messages[0].push(bidMsgEncoded);
 
 		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
 		const TX_FEE =
-			this.botConfig.txFees.get(nrOfWasms) ??
+			this.botConfig.txFees.get(messages[1]) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 		console.log(inspect(TX_FEE, { depth: null }));
 
 		let res: SkipResult;
 		if (toArbTrade) {
 			const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
-			res = <SkipResult>await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE, undefined, txToArbRaw);
+			res = <SkipResult>(
+				await this.chainOperator.signAndBroadcastSkipBundle(messages[0], TX_FEE, undefined, txToArbRaw)
+			);
 			console.log("mempool transaction to backrun: ");
 			console.log(toHex(sha256(toArbTrade.txBytes)));
 		} else {
-			res = <SkipResult>await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE, undefined, undefined);
+			res = <SkipResult>(
+				await this.chainOperator.signAndBroadcastSkipBundle(messages[0], TX_FEE, undefined, undefined)
+			);
 		}
 		console.log(inspect(res, { depth: null }));
 

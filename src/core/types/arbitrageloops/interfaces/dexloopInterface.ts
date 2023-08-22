@@ -1,5 +1,4 @@
-import { EncodeObject } from "@cosmjs/proto-signing";
-
+import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
 import { OptimalTrade } from "../../../arbitrage/arbitrage";
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
@@ -32,11 +31,7 @@ export interface DexLoopInterface {
 	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
 	updatePoolStates: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>;
 	updateOrderbookStates?: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>;
-	messageFunction: (
-		arbTrade: OptimalTrade,
-		walletAddress: string,
-		flashloancontract: string,
-	) => [Array<EncodeObject>, number];
+	messageFactory: typeof messageFactory;
 	step: () => Promise<void>;
 	reset: () => Promise<void>;
 	clearIgnoreAddresses: () => void;

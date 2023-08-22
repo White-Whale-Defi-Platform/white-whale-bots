@@ -1,3 +1,4 @@
+import { EncodeObject } from "@cosmjs/proto-signing";
 import { BigNumberInBase } from "@injectivelabs/utils/dist/cjs/classes";
 
 import { OptimalOrderbookTrade } from "../../../core/arbitrage/optimizers/orderbookOptimizer";
@@ -10,7 +11,10 @@ import { getMarketSpotOrderMessage } from "./getSpotOrderMessage";
 /**
  *
  */
-export function getOrderbookArbMessages(arbTrade: OptimalOrderbookTrade, publicAddress: string) {
+export function getOrderbookArbMessages(
+	arbTrade: OptimalOrderbookTrade,
+	publicAddress: string,
+): [Array<EncodeObject>, number] {
 	if (arbTrade.path.orderSequence === OrderSequence.AmmFirst) {
 		//buy on the amm, transfer to trading account, sell the inj there, withdraw the usdt to injective account
 		const [outGivenIn0, outInfo0] = outGivenIn(arbTrade.path.pool, arbTrade.offerAsset);
@@ -26,7 +30,7 @@ export function getOrderbookArbMessages(arbTrade: OptimalOrderbookTrade, publicA
 
 		const msg1 = getMarketSpotOrderMessage(arbTrade, publicAddress, offerAsset1, 2);
 
-		return [msg0, msg1];
+		return [[msg0, msg1], 2];
 	} else {
 		const offerAsset1 = {
 			amount: String(arbTrade.outGivenIn),
@@ -51,6 +55,6 @@ export function getOrderbookArbMessages(arbTrade: OptimalOrderbookTrade, publicA
 		};
 		const msg1 = getSwapMessage(arbTrade.path.pool, offerAsset, publicAddress, belief_price);
 
-		return [msg0, msg1];
+		return [[msg0, msg1], 2];
 	}
 }

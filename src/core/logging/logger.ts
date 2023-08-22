@@ -1,10 +1,11 @@
 import { inspect } from "util";
 
+import { OptimalTrade } from "../arbitrage/arbitrage";
 import { OptimalOrderbookTrade } from "../arbitrage/optimizers/orderbookOptimizer";
 import { TxResponse } from "../chainOperator/chainOperatorInterface";
 import { DexLoopInterface } from "../types/arbitrageloops/interfaces/dexloopInterface";
 import { LiquidationLoop } from "../types/arbitrageloops/loops/liqMempoolLoop";
-import { NativeAssetInfo } from "../types/base/asset";
+import { isNativeAsset, NativeAssetInfo } from "../types/base/asset";
 import { BotConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";
 import { Loan } from "../types/base/overseer";
@@ -152,6 +153,32 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			}
 			tradeMsg += `**\nOffering: ${inspect(arbtradeOB.offerAsset, true, null, true)}`;
 			tradeMsg += `**\nExpected profit: ${arbtradeOB.profit}`;
+			if (txResponses) {
+				txResponses.forEach((txResponse: TxResponse) => {
+					tradeMsg += `\nHash: ${txResponse.transactionHash} Code: ${txResponse.code}`;
+				});
+			}
+			await this._sendMessage(tradeMsg, LogType.All);
+		},
+
+		/**
+		 *
+		 */
+		async logAmmTrade(arbTrade: OptimalTrade, txResponses?: Array<TxResponse>) {
+			let tradeMsg = "-".repeat(42) + "AMM Arb" + "-".repeat(41);
+			arbTrade.path.pools.forEach((pool) => {
+				tradeMsg += `\n**Pool: ${pool.address} with Assets: ${pool.assets[0].amount} ${
+					isNativeAsset(pool.assets[0].info)
+						? pool.assets[0].info.native_token.denom
+						: pool.assets[0].info.token.contract_addr
+				} / ${pool.assets[1].amount} ${
+					isNativeAsset(pool.assets[1].info)
+						? pool.assets[1].info.native_token.denom
+						: pool.assets[1].info.token.contract_addr
+				}`;
+			});
+			tradeMsg += `**\nOffering: ${inspect(arbTrade.offerAsset, { showHidden: true, depth: 3, colors: true })}`;
+			tradeMsg += `**\nExpected profit: ${arbTrade.profit}`;
 			if (txResponses) {
 				txResponses.forEach((txResponse: TxResponse) => {
 					tradeMsg += `\nHash: ${txResponse.transactionHash} Code: ${txResponse.code}`;

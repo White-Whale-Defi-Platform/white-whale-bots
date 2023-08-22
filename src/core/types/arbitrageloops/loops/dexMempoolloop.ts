@@ -2,14 +2,11 @@
 
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
-import { EncodeObject } from "@cosmjs/proto-signing";
 import { getPaths, newGraph } from "../../../arbitrage/graph";
-import { inspect } from "util";
 import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
-import { LogType } from "../../base/logging";
 import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } from "../../base/mempool";
 import { getOrderbookAmmPaths, OrderbookPath, Path } from "../../base/path";
 import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
@@ -35,7 +32,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 	iterations = 0;
 	updatePoolStates: DexLoopInterface["updatePoolStates"];
 	updateOrderbookStates?: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>;
-	messageFunction: DexLoopInterface["messageFunction"];
+	messageFactory: DexLoopInterface["messageFactory"];
 	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
 	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
 	// CACHE VALUES
@@ -53,11 +50,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 		allPools: Array<Pool>,
 		orderbooks: Array<Orderbook>,
 		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
-		messageFunction: (
-			arbTrade: OptimalTrade,
-			walletAddress: string,
-			flashloancontract: string,
-		) => [Array<EncodeObject>, number],
+		messageFactory: DexLoopInterface["messageFactory"],
 		updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"],
 	) {
 		const graph = newGraph(allPools);
@@ -74,7 +67,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 		this.orderbookArb = tryOrderbookArb;
 		this.updateOrderbookStates = updateOrderbookStates;
 		this.updatePoolStates = updateState;
-		this.messageFunction = messageFunction;
+		this.messageFactory = messageFactory;
 		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
 		this.logger = logger;
@@ -152,21 +145,25 @@ export class DexMempoolLoop implements DexLoopInterface {
 	 *
 	 */
 	public async trade(arbTrade: OptimalTrade) {
-		const [msgs, nrOfMessages] = this.messageFunction(
+		const messages = this.messageFactory(
 			arbTrade,
 			this.chainOperator.client.publicAddress,
 			this.botConfig.flashloanRouterAddress,
 		);
+		if (!messages) {
+			console.error("error in creating messages", 1);
+			process.exit(1);
+		}
 
 		// await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
 
 		const TX_FEE =
-			this.botConfig.txFees.get(nrOfMessages) ??
+			this.botConfig.txFees.get(messages[1]) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
-		console.log(inspect(TX_FEE));
-		const txResponse = await this.chainOperator.signAndBroadcast(msgs, TX_FEE);
 
-		await this.logger?.sendMessage(JSON.stringify(txResponse), LogType.Console);
+		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], TX_FEE);
+
+		await this.logger?.tradeLogging.logAmmTrade(arbTrade, [txResponse]);
 
 		if (txResponse.code === 0) {
 			this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
