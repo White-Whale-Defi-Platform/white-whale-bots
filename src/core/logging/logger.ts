@@ -1,8 +1,14 @@
+import { inspect } from "util";
+
+import { OptimalOrderbookTrade } from "../arbitrage/optimizers/orderbookOptimizer";
+import { TxResponse } from "../chainOperator/chainOperatorInterface";
 import { DexLoopInterface } from "../types/arbitrageloops/interfaces/dexloopInterface";
 import { LiquidationLoop } from "../types/arbitrageloops/loops/liqMempoolLoop";
+import { NativeAssetInfo } from "../types/base/asset";
 import { BotConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";
 import { Loan } from "../types/base/overseer";
+import { OrderSequence } from "../types/base/path";
 import { DiscordLogger } from "./discordLogger";
 import { SlackLogger } from "./slackLogger";
 import { TelegramLogger } from "./telegramLogger";
@@ -45,7 +51,8 @@ export class Logger {
 			);
 		}
 	}
-	public defaults = {
+
+	public loopLogging = {
 		/**
 		 *
 		 */
@@ -113,6 +120,44 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			setupMessage += `**\nTotal amount of outstanding value: ${totalLoan / 1e6}`;
 
 			await this._sendMessage(setupMessage, LogType.All);
+		},
+	};
+
+	public tradeLogging = {
+		/**
+		 *
+		 */
+		_sendMessage: async (message: string, type: LogType = LogType.All, code = -1) =>
+			this.sendMessage(message, type, code),
+
+		/**
+		 *
+		 */
+		async logOrderbookTrade(arbtradeOB: OptimalOrderbookTrade, txResponses?: Array<TxResponse>) {
+			let tradeMsg = "-".repeat(39) + "Orderbook Arb" + "-".repeat(38);
+			if (arbtradeOB.path.orderSequence === OrderSequence.AmmFirst) {
+				tradeMsg += `**\nPool: ${arbtradeOB.path.pool.address}: ${
+					(<NativeAssetInfo>arbtradeOB.path.pool.assets[0].info).native_token.denom
+				}/${(<NativeAssetInfo>arbtradeOB.path.pool.assets[1].info).native_token.denom}`;
+				tradeMsg += `**\nOrderbook: ${
+					(<NativeAssetInfo>arbtradeOB.path.orderbook.baseAssetInfo).native_token.denom
+				} / USDT`;
+			} else {
+				tradeMsg += `**\nOrderbook: ${
+					(<NativeAssetInfo>arbtradeOB.path.orderbook.baseAssetInfo).native_token.denom
+				} / USDT`;
+				tradeMsg += `**\nPool: ${arbtradeOB.path.pool.address}: ${
+					(<NativeAssetInfo>arbtradeOB.path.pool.assets[0].info).native_token.denom
+				}/${(<NativeAssetInfo>arbtradeOB.path.pool.assets[1].info).native_token.denom}`;
+			}
+			tradeMsg += `**\nOffering: ${inspect(arbtradeOB.offerAsset, true, null, true)}`;
+			tradeMsg += `**\nExpected profit: ${arbtradeOB.profit}`;
+			if (txResponses) {
+				txResponses.forEach((txResponse: TxResponse) => {
+					tradeMsg += `\nHash: ${txResponse.transactionHash} Code: ${txResponse.code}`;
+				});
+			}
+			await this._sendMessage(tradeMsg, LogType.All);
 		},
 	};
 	/**

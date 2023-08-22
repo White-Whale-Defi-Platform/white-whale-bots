@@ -7,7 +7,6 @@ import { getPaths, newGraph } from "../../../arbitrage/graph";
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
-import { NativeAssetInfo } from "../../base/asset";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { Orderbook } from "../../base/orderbook";
@@ -153,43 +152,15 @@ export class DexLoop implements DexLoopInterface {
 			await this.chainOperator.reset();
 		}
 		if (arbtradeOB) {
-			console.log("-".repeat(39), "Orderbook Arb", "-".repeat(38));
-			if (arbtradeOB.path.orderSequence === OrderSequence.AmmFirst) {
-				console.log(
-					`Pool: ${arbtradeOB.path.pool.address}: ${
-						(<NativeAssetInfo>arbtradeOB.path.pool.assets[0].info).native_token.denom
-					}/${(<NativeAssetInfo>arbtradeOB.path.pool.assets[1].info).native_token.denom}`,
-				);
-				console.log(
-					`Orderbook: ${
-						(<NativeAssetInfo>arbtradeOB.path.orderbook.baseAssetInfo).native_token.denom
-					} / USDT`,
-				);
-			} else {
-				console.log(
-					`Orderbook: ${
-						(<NativeAssetInfo>arbtradeOB.path.orderbook.baseAssetInfo).native_token.denom
-					} / USDT`,
-				);
-				console.log(
-					`Pool: ${arbtradeOB.path.pool.address}: ${
-						(<NativeAssetInfo>arbtradeOB.path.pool.assets[0].info).native_token.denom
-					}/${(<NativeAssetInfo>arbtradeOB.path.pool.assets[1].info).native_token.denom}`,
-				);
-			}
-			console.log(`Offering: ${inspect(arbtradeOB.offerAsset, true, null, true)}`);
-			console.log("Expected profit: ", arbtradeOB.profit);
-
 			const msgs = getOrderbookArbMessages(arbtradeOB, this.chainOperator.client.publicAddress);
 			if (arbtradeOB.path.orderSequence === OrderSequence.AmmFirst) {
 				const txResponse = await this.chainOperator.signAndBroadcast(msgs);
-				console.log(txResponse);
+				await this.logger?.tradeLogging.logOrderbookTrade(arbtradeOB, [txResponse]);
 			} else {
 				const txResponse = await this.chainOperator.signAndBroadcast([msgs[0]]);
-				console.log(txResponse);
 				await delay(2000);
 				const txResponse2 = await this.chainOperator.signAndBroadcast([msgs[1]]);
-				console.log(txResponse2);
+				await this.logger?.tradeLogging.logOrderbookTrade(arbtradeOB, [txResponse, txResponse2]);
 			}
 			this.cdPaths(arbtradeOB.path);
 			await this.chainOperator.reset();

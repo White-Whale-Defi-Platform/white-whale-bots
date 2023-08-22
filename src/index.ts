@@ -19,7 +19,7 @@ async function main() {
 	const logger = new Logger(botConfig);
 
 	// print the config
-	await logger.defaults.logConfig(botConfig);
+	await logger.loopLogging.logConfig(botConfig);
 	//spawn chainOperator for interaction with blockchains
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 	//create the arbitrage loop based on input config
@@ -28,12 +28,12 @@ async function main() {
 		case SetupType.DEX:
 			loop = await DexLoop.createLoop(chainOperator, <DexConfig>botConfig, logger);
 			//print the created arbitrage loop
-			await logger.defaults.logDexLoop(loop);
+			await logger.loopLogging.logDexLoop(loop);
 			break;
 		case SetupType.LIQUIDATION:
 			loop = await LiquidationLoop.createLoop(chainOperator, <LiquidationConfig>botConfig, logger);
 			//print the created arbitrage loop
-			await logger.defaults.logLiqLoop(loop);
+			await logger.loopLogging.logLiqLoop(loop);
 			break;
 	}
 
