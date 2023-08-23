@@ -49,7 +49,6 @@ export function getOptimalTrade(
 			optimalProfit = optimalProfitPath;
 		}
 	}
-
 	return optimalProfit > 0 ? optimalOrderbookTrade : undefined;
 }
 
@@ -60,61 +59,53 @@ function getOptimalTradeForPath(
 	path: OrderbookPath,
 	offerAssetInfo: AssetInfo,
 ): [number, Asset, number, number, number] {
-	let tradesizes = [...Array(800).keys()];
+	let tradesizes = [...Array(900).keys()];
 	tradesizes = tradesizes.map((x) => x * 1e6);
+
+	let leftIndex = 0;
+	let rightIndex = tradesizes.length - 1;
+	let guessIndex = 0;
+	while (leftIndex < rightIndex) {
+		guessIndex = Math.floor((leftIndex + rightIndex) / 2);
+		if (
+			getProfitForTradesize(path, tradesizes[guessIndex], offerAssetInfo)[0] <
+			getProfitForTradesize(path, tradesizes[guessIndex + 1], offerAssetInfo)[0]
+		) {
+			leftIndex = guessIndex + 1;
+		} else if (
+			getProfitForTradesize(path, tradesizes[guessIndex], offerAssetInfo)[0] >
+			getProfitForTradesize(path, tradesizes[guessIndex + 1], offerAssetInfo)[0]
+		) {
+			rightIndex = guessIndex;
+		}
+	}
+	return getProfitForTradesize(path, tradesizes[guessIndex], offerAssetInfo);
+}
+
+/**
+ * Calculates profit for a given Path and Tradesize.
+ * @param tradesize Tradesize to check profit for.
+ * @param path OrderbookPath to check the profit for.
+ * @returns Array containing `[profit, received assets, worst price orderbook, average price of the trade]`.
+ */
+function getProfitForTradesize(
+	path: OrderbookPath,
+	tradesize: number,
+	offerAssetInfo: AssetInfo,
+): [number, Asset, number, number, number] {
 	if (path.orderSequence === OrderSequence.AmmFirst) {
-		let optimalTradesize = 0;
-		let optimalProfit = 0;
-		let optimalOfferAsset = { amount: "0", info: offerAssetInfo };
-		let optimalWorstPrice = 0;
-		let optimalAveragePrice = 0;
-		let optimalOutGivenIn = 0;
-		for (const ts of tradesizes) {
-			if (ts === 0) {
-				continue;
-			}
-			const offerAsset: Asset = { amount: String(ts), info: offerAssetInfo };
-			const [outGivenIn0, outInfo0] = outGivenIn(path.pool, offerAsset);
-			// console.log("amm price received: ", ts / outGivenIn0, "tradesize: ", ts, "assets received: ", outGivenIn0);
-			const offerAsset1: Asset = { amount: String(outGivenIn0), info: outInfo0 };
-			const [outGivenIn1, worstPrice, averagePrice] = OrderbookMarketSell(path.orderbook, offerAsset1);
-			// console.log("ob price received: ", price, "usdt received: ", outGivenIn1);
-			// console.log("profit: ", outGivenIn1 - ts);
-			if (outGivenIn1 - ts > optimalProfit) {
-				(optimalTradesize = ts),
-					(optimalProfit = outGivenIn1 - ts),
-					(optimalOfferAsset = offerAsset),
-					(optimalWorstPrice = worstPrice),
-					(optimalAveragePrice = averagePrice);
-				optimalOutGivenIn = outGivenIn1;
-			}
-		}
-		return [optimalProfit, optimalOfferAsset, optimalWorstPrice, optimalAveragePrice, optimalOutGivenIn];
+		const offerAsset: Asset = { amount: String(tradesize), info: offerAssetInfo };
+		const [outGivenIn0, outInfo0] = outGivenIn(path.pool, offerAsset);
+		// console.log("amm price received: ", ts / outGivenIn0, "tradesize: ", ts, "assets received: ", outGivenIn0);
+		const offerAsset1: Asset = { amount: String(outGivenIn0), info: outInfo0 };
+		const [outGivenIn1, worstPrice, averagePrice] = OrderbookMarketSell(path.orderbook, offerAsset1);
+		return [outGivenIn1 - +offerAsset.amount, offerAsset, worstPrice, averagePrice, outGivenIn1];
 	} else {
-		let optimalTradesize = 0;
-		let optimalProfit = 0;
-		let optimalOfferAsset = { amount: "0", info: offerAssetInfo };
-		let optimalWorstPrice = 0;
-		let optimalAveragePrice = 0;
-		let optimalOutGivenIn = 0;
-		for (const ts of tradesizes) {
-			if (ts === 0) {
-				continue;
-			}
-			const offerAsset: Asset = { amount: String(ts), info: path.orderbook.quoteAssetInfo };
-			const [outGivenIn0, worstPrice, averagePrice] = OrderbookMarketBuy(path.orderbook, offerAsset);
-			const outInfo0 = path.orderbook.baseAssetInfo;
-			const offerAsset1 = { amount: String(outGivenIn0), info: outInfo0 };
-			const [outGivenIn1, outInfo1] = outGivenIn(path.pool, offerAsset1);
-			if (outGivenIn1 - ts > optimalProfit) {
-				(optimalTradesize = ts),
-					(optimalProfit = outGivenIn1 - ts),
-					(optimalOfferAsset = offerAsset),
-					(optimalWorstPrice = worstPrice),
-					(optimalAveragePrice = averagePrice),
-					(optimalOutGivenIn = outGivenIn0);
-			}
-		}
-		return [optimalProfit, optimalOfferAsset, optimalWorstPrice, optimalAveragePrice, optimalOutGivenIn];
+		const offerAsset: Asset = { amount: String(tradesize), info: path.orderbook.quoteAssetInfo };
+		const [outGivenIn0, worstPrice, averagePrice] = OrderbookMarketBuy(path.orderbook, offerAsset);
+		const outInfo0 = path.orderbook.baseAssetInfo;
+		const offerAsset1 = { amount: String(outGivenIn0), info: outInfo0 };
+		const [outGivenIn1, outInfo1] = outGivenIn(path.pool, offerAsset1);
+		return [outGivenIn1 - +offerAsset.amount, offerAsset, worstPrice, averagePrice, outGivenIn0];
 	}
 }
