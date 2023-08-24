@@ -1,3 +1,5 @@
+import { inspect } from "util";
+
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
 import {
 	Asset,
@@ -33,6 +35,7 @@ interface PoolState {
 export async function getPoolStates(chainOperator: ChainOperator, pools: Array<Pool>) {
 	await Promise.all(
 		pools.map(async (pool) => {
+			console.log(pool);
 			if (pool.dexname === AmmDexName.junoswap) {
 				const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(pool.address, { info: {} });
 
@@ -69,6 +72,7 @@ export async function initPools(
 		let dexname: AmmDexName;
 		let totalShare: string;
 		try {
+			console.log(inspect(poolAddress, true, null, true));
 			const poolState = <PoolState>await chainOperator.queryContractSmart(poolAddress.pool, { pool: {} });
 			[assets, dexname, totalShare] = processPoolStateAssets(poolState);
 		} catch (error) {

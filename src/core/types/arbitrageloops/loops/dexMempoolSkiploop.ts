@@ -81,7 +81,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 					applyMempoolMessagesOnPools(this.pools, [mempoolTx]);
 					const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 					if (arbTrade) {
-						await this.trade(arbTrade, mempoolTx);
+						await this.skipTrade(arbTrade, mempoolTx);
 						this.cdPaths(arbTrade.path);
 						await this.chainOperator.reset();
 						return;
@@ -94,7 +94,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 	/**
 	 *
 	 */
-	public async trade(arbTrade: OptimalTrade, toArbTrade?: MempoolTx) {
+	public async skipTrade(arbTrade: OptimalTrade, toArbTrade?: MempoolTx) {
 		if (
 			!this.botConfig.skipConfig?.useSkip ||
 			this.botConfig.skipConfig?.skipRpcUrl === undefined ||

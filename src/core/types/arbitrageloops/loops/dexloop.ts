@@ -141,27 +141,24 @@ export class DexLoop implements DexLoopInterface {
 
 		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 		const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
-		if (arbTrade || arbtradeOB) {
-			if (arbTrade && arbtradeOB) {
-				if (arbTrade.profit > arbtradeOB.profit) {
-					await this.trade(arbTrade);
-				} else if (arbtradeOB.profit >= arbTrade.profit) {
-					await this.trade(arbtradeOB);
-				}
-				this.cdPaths(arbTrade.path);
-				this.cdPaths(arbtradeOB.path);
-			} else if (arbTrade) {
+
+		if (arbTrade && arbtradeOB) {
+			if (arbTrade.profit > arbtradeOB.profit) {
 				await this.trade(arbTrade);
 				this.cdPaths(arbTrade.path);
-			} else if (arbtradeOB) {
+			} else if (arbtradeOB.profit >= arbTrade.profit) {
 				await this.trade(arbtradeOB);
 				this.cdPaths(arbtradeOB.path);
 			}
-
-			await this.chainOperator.reset();
+		} else if (arbTrade) {
+			await this.trade(arbTrade);
+			this.cdPaths(arbTrade.path);
+		} else if (arbtradeOB) {
+			await this.trade(arbtradeOB);
+			this.cdPaths(arbtradeOB.path);
 		}
 
-		await delay(1500);
+		await this.chainOperator.reset();
 	}
 
 	/**
