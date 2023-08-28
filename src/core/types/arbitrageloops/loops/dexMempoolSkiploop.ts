@@ -52,7 +52,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 
 		if (arbTrade) {
-			await this.trade(arbTrade);
+			await this.trade(arbTrade, undefined);
 			this.cdPaths(arbTrade.path);
 			return;
 		}
@@ -158,7 +158,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		}
 		if (this.botConfig.skipConfig.tryWithoutSkip && res.result.code === 4) {
 			await this.logger?.sendMessage("no skip validator up, trying default broadcast", LogType.Console);
-			await this.trade(arbTrade);
+			await this.trade(arbTrade, undefined);
 		}
 
 		if (res.result.result_check_txs != undefined) {

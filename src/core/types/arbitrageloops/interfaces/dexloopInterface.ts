@@ -1,5 +1,7 @@
+import { getPoolStates } from "../../../../chains/defaults";
 import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
-import { OptimalTrade } from "../../../arbitrage/arbitrage";
+import { getOrderbookState } from "../../../../chains/inj";
+import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
@@ -24,15 +26,32 @@ export interface DexLoopInterface {
 	logger: Logger | undefined;
 	iterations: number;
 
-	/**
-	 *
+	/*
+	 * Optimizers to use during loop runtime
 	 */
-	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
-	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
-	updatePoolStates: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>;
-	updateOrderbookStates?: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>;
-	messageFactory: typeof messageFactory;
-	step: () => Promise<void>;
-	reset: () => Promise<void>;
-	clearIgnoreAddresses: () => void;
+	ammArb: typeof tryAmmArb | undefined; //Optimizer to calculate AMM arbitrage opportunities
+	orderbookArb: typeof tryOrderbookArb | undefined; //Optimizer to calculate Orderbook <> AMM arbitrage opportunities
+
+	/*
+	 * State updaters to use during loop runtime
+	 */
+	updatePoolStates: typeof getPoolStates; //state updater for AMM pools
+	updateOrderbookStates?: typeof getOrderbookState; //state updated for Orderbooks
+
+	/*
+	 * Message factories to translate `OptimalTrades` to Cosmos SDK messages
+	 */
+	messageFactory: typeof messageFactory; //factory to transform `OptimalTrades` into messages
+
+	/*
+	 * Additional required functions for DEX loops
+	 */
+	clearIgnoreAddresses: () => void; //delete timedout wallet addresses
+	reset: () => Promise<void>; //reset all loop states
+	step: () => Promise<void>; //iteration step to run continuously
+
+	/*
+	 * Trade Functions
+	 */
+	trade: (arbTrade: OptimalTrade | undefined, arbTradeOB: OptimalOrderbookTrade | undefined) => void; //function to execute messages in a transaction on-chain
 }

@@ -8,7 +8,7 @@ import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
 import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } from "../../base/mempool";
-import { getOrderbookAmmPaths, OrderbookPath, Path } from "../../base/path";
+import { getOrderbookAmmPaths, OrderbookPath, OrderSequence, Path } from "../../base/path";
 import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { Orderbook } from "../../base/orderbook";
@@ -120,7 +120,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 			const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
 
 			if (arbTrade || arbtradeOB) {
-				await this.trade(arbTrade);
+				await this.trade(arbTrade, arbtradeOB);
 				console.log("mempool transactions to backrun:");
 				mempoolTxs.map((mpt) => {
 					console.log(toHex(sha256(mpt.txBytes)));
@@ -144,7 +144,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 	/**
 	 *
 	 */
-	public async trade(arbTrade?: OptimalTrade, arbTradeOB?: OptimalOrderbookTrade) {
+	public async trade(arbTrade: OptimalTrade | undefined, arbTradeOB: OptimalOrderbookTrade | undefined) {
 		if (arbTrade && arbTradeOB) {
 			if (arbTrade.profit > arbTradeOB.profit) {
 				await this.tradeAmm(arbTrade);
@@ -178,9 +178,18 @@ export class DexMempoolLoop implements DexLoopInterface {
 			this.botConfig.txFees.get(messages[1]) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
-		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], TX_FEE);
-
-		await this.logger?.tradeLogging.logOrderbookTrade(arbTradeOB, [txResponse]);
+		if (arbTradeOB.path.orderSequence === OrderSequence.AmmFirst) {
+			const txResponse = await this.chainOperator.signAndBroadcast(messages[0], TX_FEE);
+			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
+		} else {
+			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], TX_FEE);
+			await delay(2000);
+			const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]], TX_FEE);
+			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
+				txResponse,
+				txResponse2,
+			]);
+		}
 	}
 
 	/**
