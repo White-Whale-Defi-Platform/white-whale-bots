@@ -248,6 +248,16 @@ export class DexLoop implements DexLoopInterface {
 			}
 		});
 		this.paths = out;
+
+		const outOB = new Array<OrderbookPath>();
+		//remove all equal paths from this.paths if this.paths'identifier overlaps with one in equalpaths
+		this.orderbookPaths.forEach((activePath) => {
+			//if our updated cdpaths contains the path still active, make sure to remove it from the active paths
+			if (!this.CDpaths.get(activePath.identifier[0])) {
+				outOB.push(activePath);
+			}
+		});
+		this.orderbookPaths = outOB;
 	}
 
 	/** Removes the CD Paths if CD iteration number of path + Cooldownblocks <= this.iterations

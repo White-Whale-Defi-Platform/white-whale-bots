@@ -183,7 +183,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
 		} else {
 			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], TX_FEE);
-			await delay(2000);
+			await delay(3000);
 			const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]], TX_FEE);
 			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
 				txResponse,
@@ -221,10 +221,10 @@ export class DexMempoolLoop implements DexLoopInterface {
 	public cdPaths(path: Path | OrderbookPath) {
 		//add equalpaths to the CDPath array
 		for (const equalpath of path.equalpaths) {
-			this.CDpaths.set(equalpath[0], [this.iterations, 5, equalpath[1]]);
+			this.CDpaths.set(equalpath[0], [this.iterations, 30, equalpath[1]]);
 		}
 		//add self to the CDPath array
-		this.CDpaths.set(path.identifier[0], [this.iterations, 10, path.identifier[1]]);
+		this.CDpaths.set(path.identifier[0], [this.iterations, 60, path.identifier[1]]);
 
 		const out = new Array<Path>();
 		//remove all equal paths from this.paths if this.paths'identifier overlaps with one in equalpaths
@@ -235,6 +235,16 @@ export class DexMempoolLoop implements DexLoopInterface {
 			}
 		});
 		this.paths = out;
+
+		const outOB = new Array<OrderbookPath>();
+		//remove all equal paths from this.paths if this.paths'identifier overlaps with one in equalpaths
+		this.orderbookPaths.forEach((activePath) => {
+			//if our updated cdpaths contains the path still active, make sure to remove it from the active paths
+			if (!this.CDpaths.get(activePath.identifier[0])) {
+				outOB.push(activePath);
+			}
+		});
+		this.orderbookPaths = outOB;
 	}
 
 	/**.
