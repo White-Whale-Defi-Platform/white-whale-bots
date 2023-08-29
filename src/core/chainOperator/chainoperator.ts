@@ -48,7 +48,7 @@ export class ChainOperator {
 			return await this.client.queryContractSmart(address, queryMsg);
 		} catch (e: any) {
 			//custom error for initPools JunoSwapPoolState
-			if (e.message.includes("Query failed with (18):")) {
+			if (e.message.includes("unknown variant `pool`,")) {
 				throw new Error(e.message);
 			}
 			console.log(e);
