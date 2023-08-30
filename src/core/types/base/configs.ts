@@ -82,7 +82,9 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 		return botConfig;
 		//do something
 	} else if (bc.setupType === SetupType.IBC) {
-		return bc;
+		validateDexEnvs(envs);
+		const botConfig: DexConfig = getDexConfig(envs, bc);
+		return botConfig
 		//do something
 	} else {
 		return bc;
