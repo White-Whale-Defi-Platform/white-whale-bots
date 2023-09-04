@@ -85,7 +85,10 @@ export function isMatchingAssetInfos(a: AssetInfo, b: AssetInfo) {
  *
  */
 export function toChainAsset(input: Asset): Asset {
-	if (isNativeAsset(input.info) && input.info.native_token.denom === "inj") {
+	if (
+		isNativeAsset(input.info) &&
+		["inj", "peggy0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"].includes(input.info.native_token.denom)
+	) {
 		return {
 			amount: new BigNumber(+input.amount).multipliedBy(new BigNumber(10).pow(12)).toFixed(),
 			info: input.info,
@@ -101,7 +104,10 @@ export function toChainAsset(input: Asset): Asset {
  *
  */
 export function fromChainAsset(input: Asset): Asset {
-	if (isNativeAsset(input.info) && input.info.native_token.denom === "inj") {
+	if (
+		isNativeAsset(input.info) &&
+		["inj", "peggy0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"].includes(input.info.native_token.denom)
+	) {
 		return {
 			amount: new BigNumber(+input.amount).dividedBy(new BigNumber(10).pow(12)).toFixed(6),
 			info: input.info,
@@ -129,7 +135,10 @@ export function toChainPrice(input: Asset, output: Asset): string {
 	const outputChain = toChainAsset(output);
 	if (isMatchingAssetInfos(inputChain.info, outputChain.info)) {
 		return new BigNumber(inputChain.amount).dividedBy(outputChain.amount).toFixed(6);
-	} else if (isNativeAsset(outputChain.info) && outputChain.info.native_token.denom === "inj") {
+	} else if (
+		isNativeAsset(outputChain.info) &&
+		["inj", "peggy0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"].includes(outputChain.info.native_token.denom)
+	) {
 		return new BigNumber(inputChain.amount).dividedBy(outputChain.amount).toFixed(18);
 	} else {
 		return new BigNumber(inputChain.amount).dividedBy(outputChain.amount).toFixed(6);
