@@ -1,6 +1,7 @@
 import { StdFee } from "@cosmjs/stargate";
 import axios from "axios";
 import { assert } from "console";
+import { DotenvParseOutput } from "dotenv";
 
 import { NativeAssetInfo } from "./asset";
 import { IgnoredAddresses } from "./mempool";
@@ -68,7 +69,7 @@ export type BotConfig = DexConfig | LiquidationConfig | BaseConfig;
 /**
  *
  */
-export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> {
+export async function setBotConfig(envs: DotenvParseOutput): Promise<BotConfig> {
 	validateBaseEnvs(envs);
 	const bc: BaseConfig = await getBaseConfig(envs);
 
@@ -84,7 +85,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	} else if (bc.setupType === SetupType.IBC) {
 		validateDexEnvs(envs);
 		const botConfig: DexConfig = getDexConfig(envs, bc);
-		return botConfig
+		return botConfig;
 		//do something
 	} else {
 		return bc;
@@ -94,7 +95,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 /**
  *
  */
-async function getBaseConfig(envs: NodeJS.ProcessEnv): Promise<BaseConfig> {
+async function getBaseConfig(envs: DotenvParseOutput): Promise<BaseConfig> {
 	let setupType: SetupType;
 	switch (envs.SETUP_TYPE.toLocaleLowerCase()) {
 		case "dex":
@@ -196,13 +197,13 @@ async function getBaseConfig(envs: NodeJS.ProcessEnv): Promise<BaseConfig> {
 /**
  *
  */
-function getLiquidationConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): LiquidationConfig {
+function getLiquidationConfig(envs: DotenvParseOutput, baseConfig: BaseConfig): LiquidationConfig {
 	return { overseerAddresses: JSON.parse(envs.OVERSEER_ADDRESSES), ...baseConfig };
 }
 /**
  *
  */
-function getDexConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): DexConfig {
+function getDexConfig(envs: DotenvParseOutput, baseConfig: BaseConfig): DexConfig {
 	let pools = envs.POOLS.trim()
 		.replace(/\n|\r|\t/g, "")
 		.replace(/,\s*$/, "");
@@ -246,7 +247,7 @@ function getDexConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): DexConfi
 /**
  *
  */
-function validateBaseEnvs(envs: NodeJS.ProcessEnv) {
+function validateBaseEnvs(envs: DotenvParseOutput) {
 	assert(envs.SETUP_TYPE, `Please set the "SETUP_TYPE" in the env or .env file`);
 	assert(envs.WALLET_MNEMONIC, `Please set "WALLET_MNEMONIC" in env, or ".env" file`);
 	assert(envs.BASE_DENOM, `Please set "BASE_DENOM" in env or ".env" file`);
@@ -259,14 +260,14 @@ function validateBaseEnvs(envs: NodeJS.ProcessEnv) {
 /**
  *
  */
-function validateLiquidationEnvs(envs: NodeJS.ProcessEnv) {
+function validateLiquidationEnvs(envs: DotenvParseOutput) {
 	assert(envs.OVERSEER_ADDRESSES, `Please set the "OVERSEER_ADDRESSES" in the env or .env file`);
 }
 
 /**
  *
  */
-function validateDexEnvs(envs: NodeJS.ProcessEnv) {
+function validateDexEnvs(envs: DotenvParseOutput) {
 	assert(envs.FLASHLOAN_ROUTER_ADDRESS, `Please set the "FLASHLOAN_ROUTER_ADDRESS" in the env or .env file`);
 	assert(envs.FLASHLOAN_FEE, `Please set the "FLASHLOAN_FEE" in the env or .env file`);
 	assert(envs.MAX_PATH_HOPS, `Please set the "MAX_PATH_HOPS" in the env or .env file`);
@@ -277,7 +278,7 @@ function validateDexEnvs(envs: NodeJS.ProcessEnv) {
 /**
  *
  */
-function validateSkipEnvs(envs: NodeJS.ProcessEnv) {
+function validateSkipEnvs(envs: DotenvParseOutput) {
 	assert(envs.SKIP_URL, `Please set SKIP_URL in env or ".env" file`);
 	assert(envs.SKIP_BID_WALLET, `Please set SKIP_BID_WALLET in env or ".env" file`);
 	assert(envs.SKIP_BID_RATE, `Please set SKIP_BID_RATE in env or ".env" file`);
