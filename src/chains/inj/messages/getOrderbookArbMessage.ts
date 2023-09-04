@@ -1,5 +1,4 @@
 import { EncodeObject } from "@cosmjs/proto-signing";
-import { BigNumberInBase } from "@injectivelabs/utils/dist/cjs/classes";
 
 import { OptimalOrderbookTrade } from "../../../core/arbitrage/optimizers/orderbookOptimizer";
 import { toChainAsset, toChainPrice } from "../../../core/types/base/asset";
@@ -38,21 +37,23 @@ export function getOrderbookArbMessages(
 		};
 		const msg0 = getMarketSpotOrderMessage(arbTrade, publicAddress, offerAsset1, 1);
 
-		const decimals = arbTrade.path.orderbook.baseAssetDecimals - arbTrade.path.orderbook.quoteAssetDecimals;
-
-		let orderSize = +new BigNumberInBase(arbTrade.outGivenIn).toWei(decimals).toFixed();
-
-		const belief_price = String(
-			Math.round((orderSize / arbTrade.outGivenIn) * 100000 * (10 ^ decimals)) / 100000 / (10 ^ decimals),
-		);
-		orderSize =
-			Math.floor(orderSize / arbTrade.path.orderbook.minQuantityIncrement) *
-			arbTrade.path.orderbook.minQuantityIncrement;
-
-		const offerAsset = {
-			amount: String(orderSize),
+		const [outGivenIn1, outInfo1] = outGivenIn(arbTrade.path.pool, {
+			amount: String(arbTrade.outGivenIn),
 			info: offerAsset1.info,
-		};
+		});
+
+		const belief_price = toChainPrice(
+			{
+				amount: String(arbTrade.outGivenIn),
+				info: offerAsset1.info,
+			},
+			{ amount: String(outGivenIn1), info: outInfo1 },
+		);
+		const offerAsset = toChainAsset({
+			amount: String(arbTrade.outGivenIn),
+			info: offerAsset1.info,
+		});
+
 		const msg1 = getSwapMessage(arbTrade.path.pool, offerAsset, publicAddress, belief_price);
 
 		return [[msg0, msg1], 2];
