@@ -1,6 +1,6 @@
 import { JsonObject } from "@cosmjs/cosmwasm-stargate";
 import { stringToPath } from "@cosmjs/crypto/build/slip10";
-import { fromBase64, fromUtf8 } from "@cosmjs/encoding";
+import { fromUtf8 } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { StdFee } from "@cosmjs/stargate";
@@ -14,10 +14,13 @@ import {
 	createTransaction,
 	IndexerGrpcSpotApi,
 	MsgBroadcasterWithPk,
+	MsgCreateSpotMarketOrder,
 	MsgExecuteContract,
 	MsgSend,
+	OrderbookWithSequence,
 	PrivateKey,
 	PublicKey,
+	SpotMarket,
 } from "@injectivelabs/sdk-ts";
 import { ChainId } from "@injectivelabs/ts-types";
 import { SkipBundleClient } from "@skip-mev/skipjs";
@@ -135,7 +138,8 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			address,
 			Buffer.from(JSON.stringify(queryMsg)).toString("base64"),
 		);
-		const jsonResult = JSON.parse(fromUtf8(fromBase64(String(queryResult.data))));
+
+		const jsonResult = JSON.parse(fromUtf8(queryResult.data));
 		return jsonResult;
 	}
 	/**
@@ -144,6 +148,18 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	async queryMempool(): Promise<Mempool> {
 		const mempoolResult = await this._httpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
 		return mempoolResult.result;
+	}
+	/**
+	 *
+	 */
+	async queryOrderbook(marketId: string): Promise<OrderbookWithSequence> {
+		return await this._spotQueryClient.fetchOrderbookV2(marketId);
+	}
+	/**
+	 *
+	 */
+	async queryMarket(marketId: string): Promise<SpotMarket> {
+		return await this._spotQueryClient.fetchMarket(marketId);
 	}
 
 	/**
@@ -172,7 +188,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 					injectiveAddress: this._publicAddress,
 				};
 				const simRes = await this._signAndBroadcastClient.simulate(broadcasterOptions);
-				console.log("simulation succesful: \n", simRes);
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
 				return {
 					height: res.height,
@@ -259,7 +274,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 */
 	private prepair(messages: Array<EncodeObject>) {
 		try {
-			const encodedExecuteMsgs: Array<MsgExecuteContract | MsgSend> = [];
+			const encodedExecuteMsgs: Array<MsgExecuteContract | MsgSend | MsgCreateSpotMarketOrder> = [];
 			messages.map((msg, idx) => {
 				if (msg.typeUrl === "/cosmwasm.wasm.v1.MsgExecuteContract") {
 					const msgExecuteContract = <CosmJSMsgExecuteContract>msg.value;
@@ -308,6 +323,9 @@ class InjectiveAdapter implements ChainOperatorInterface {
 					});
 
 					encodedExecuteMsgs.push(msgSendInjective);
+				}
+				if (msg.typeUrl === "/injective.exchange.v1beta1.MsgCreateSpotMarketOrder") {
+					encodedExecuteMsgs.push(msg.value);
 				}
 			});
 			return encodedExecuteMsgs;

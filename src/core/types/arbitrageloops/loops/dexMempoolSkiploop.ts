@@ -1,6 +1,5 @@
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
-import { EncodeObject } from "@cosmjs/proto-signing";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { inspect } from "util";
 
@@ -12,6 +11,7 @@ import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { decodeMempool, MempoolTx } from "../../base/mempool";
+import { Orderbook } from "../../base/orderbook";
 import { applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexMempoolLoop } from "./dexMempoolloop";
 /**
@@ -26,14 +26,22 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		botConfig: DexConfig,
 		logger: Logger | undefined,
 		allPools: Array<Pool>,
+		orderbooks: Array<Orderbook>,
 		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
-		messageFunction: (
-			arbTrade: OptimalTrade,
-			walletAddress: string,
-			flashloancontract: string,
-		) => [Array<EncodeObject>, number],
+
+		messageFactory: DexMempoolLoop["messageFactory"],
+		updateOrderbookStates?: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>,
 	) {
-		super(chainOperator, botConfig, logger, allPools, updateState, messageFunction);
+		super(
+			chainOperator,
+			botConfig,
+			logger,
+			allPools,
+			orderbooks,
+			updateState,
+			messageFactory,
+			updateOrderbookStates,
+		);
 	}
 
 	/**
@@ -41,10 +49,10 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 	 */
 	public async step(): Promise<void> {
 		this.iterations++;
-		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 
 		if (arbTrade) {
-			await this.trade(arbTrade);
+			await this.trade(arbTrade, undefined);
 			this.cdPaths(arbTrade.path);
 			return;
 		}
@@ -71,9 +79,9 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 			} else {
 				for (const mempoolTx of mempoolTxs) {
 					applyMempoolMessagesOnPools(this.pools, [mempoolTx]);
-					const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+					const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 					if (arbTrade) {
-						await this.trade(arbTrade, mempoolTx);
+						await this.skipTrade(arbTrade, mempoolTx);
 						this.cdPaths(arbTrade.path);
 						await this.chainOperator.reset();
 						return;
@@ -86,7 +94,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 	/**
 	 *
 	 */
-	public async trade(arbTrade: OptimalTrade, toArbTrade?: MempoolTx) {
+	public async skipTrade(arbTrade: OptimalTrade, toArbTrade?: MempoolTx) {
 		if (
 			!this.botConfig.skipConfig?.useSkip ||
 			this.botConfig.skipConfig?.skipRpcUrl === undefined ||
@@ -108,27 +116,35 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 			this.chainOperator.client.publicAddress,
 			this.botConfig.skipConfig.skipBidWallet,
 		);
-		const [msgs, nrOfWasms] = this.messageFunction(
+		const messages = this.messageFactory(
 			arbTrade,
 			this.chainOperator.client.publicAddress,
 			this.botConfig.flashloanRouterAddress,
 		);
-		msgs.push(bidMsgEncoded);
+		if (!messages) {
+			console.error("error in creating messages", 1);
+			process.exit(1);
+		}
+		messages[0].push(bidMsgEncoded);
 
 		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
 		const TX_FEE =
-			this.botConfig.txFees.get(nrOfWasms) ??
+			this.botConfig.txFees.get(messages[1]) ??
 			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 		console.log(inspect(TX_FEE, { depth: null }));
 
 		let res: SkipResult;
 		if (toArbTrade) {
 			const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
-			res = <SkipResult>await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE, undefined, txToArbRaw);
+			res = <SkipResult>(
+				await this.chainOperator.signAndBroadcastSkipBundle(messages[0], TX_FEE, undefined, txToArbRaw)
+			);
 			console.log("mempool transaction to backrun: ");
 			console.log(toHex(sha256(toArbTrade.txBytes)));
 		} else {
-			res = <SkipResult>await this.chainOperator.signAndBroadcastSkipBundle(msgs, TX_FEE, undefined, undefined);
+			res = <SkipResult>(
+				await this.chainOperator.signAndBroadcastSkipBundle(messages[0], TX_FEE, undefined, undefined)
+			);
 		}
 		console.log(inspect(res, { depth: null }));
 
@@ -142,7 +158,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		}
 		if (this.botConfig.skipConfig.tryWithoutSkip && res.result.code === 4) {
 			await this.logger?.sendMessage("no skip validator up, trying default broadcast", LogType.Console);
-			await this.trade(arbTrade);
+			await this.trade(arbTrade, undefined);
 		}
 
 		if (res.result.result_check_txs != undefined) {

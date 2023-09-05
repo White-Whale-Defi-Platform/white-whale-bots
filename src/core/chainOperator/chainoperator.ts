@@ -48,7 +48,7 @@ export class ChainOperator {
 			return await this.client.queryContractSmart(address, queryMsg);
 		} catch (e: any) {
 			//custom error for initPools JunoSwapPoolState
-			if (e.message.includes("Query failed with (18):")) {
+			if (e.message.includes("unknown variant `pool`,")) {
 				throw new Error(e.message);
 			}
 			console.log(e);
@@ -68,6 +68,24 @@ export class ChainOperator {
 			await this.client.getNewClients();
 			return await this.client.queryMempool();
 		}
+	}
+	/**
+	 *
+	 */
+	// async queryOrderbooks(marketids: Array<string>) {
+	// 	return this.client.queryOrderbook(marketids);
+	// }
+	/**
+	 *
+	 */
+	async queryOrderbook(marketId: string) {
+		return this.client.queryOrderbook(marketId);
+	}
+	/**
+	 *
+	 */
+	async queryMarket(marketId: string) {
+		return this.client.queryMarket(marketId);
 	}
 	/**
 	 *

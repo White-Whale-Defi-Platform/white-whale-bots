@@ -2,25 +2,26 @@
 
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
-import { EncodeObject } from "@cosmjs/proto-signing";
 import { getPaths, newGraph } from "../../../arbitrage/graph";
-import { inspect } from "util";
-import { OptimalTrade, trySomeArb } from "../../../arbitrage/arbitrage";
+import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
-import { LogType } from "../../base/logging";
 import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } from "../../base/mempool";
-import { Path } from "../../base/path";
+import { getOrderbookAmmPaths, OrderbookPath, OrderSequence, Path } from "../../base/path";
 import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
+import { Orderbook } from "../../base/orderbook";
+import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
 
 /**
  *
  */
 export class DexMempoolLoop implements DexLoopInterface {
 	pools: Array<Pool>;
+	orderbooks: Array<Orderbook>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
+	orderbookPaths: Array<OrderbookPath>;
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
@@ -29,9 +30,11 @@ export class DexMempoolLoop implements DexLoopInterface {
 	botConfig: DexConfig;
 	logger: Logger | undefined;
 	iterations = 0;
-	updateStateFunction: DexLoopInterface["updateStateFunction"];
-	messageFunction: DexLoopInterface["messageFunction"];
-	arbitrageFunction: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
+	updatePoolStates: DexLoopInterface["updatePoolStates"];
+	updateOrderbookStates?: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>;
+	messageFactory: DexLoopInterface["messageFactory"];
+	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
+	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
 	// CACHE VALUES
 	totalBytes = 0;
 	mempool!: Mempool;
@@ -45,23 +48,26 @@ export class DexMempoolLoop implements DexLoopInterface {
 		botConfig: DexConfig,
 		logger: Logger | undefined,
 		allPools: Array<Pool>,
+		orderbooks: Array<Orderbook>,
 		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
-		messageFunction: (
-			arbTrade: OptimalTrade,
-			walletAddress: string,
-			flashloancontract: string,
-		) => [Array<EncodeObject>, number],
+		messageFactory: DexLoopInterface["messageFactory"],
+		updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"],
 	) {
 		const graph = newGraph(allPools);
 		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 		const filteredPools = removedUnusedPools(allPools, paths);
+		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks);
+		this.orderbookPaths = orderbookPaths;
 		this.pools = filteredPools;
+		this.orderbooks = orderbooks;
 		this.CDpaths = new Map<string, [number, number, number]>();
 		this.paths = paths;
 		this.pathlib = paths;
-		this.arbitrageFunction = trySomeArb;
-		this.updateStateFunction = updateState;
-		this.messageFunction = messageFunction;
+		this.ammArb = tryAmmArb;
+		this.orderbookArb = tryOrderbookArb;
+		this.updateOrderbookStates = updateOrderbookStates;
+		this.updatePoolStates = updateState;
+		this.messageFactory = messageFactory;
 		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
 		this.logger = logger;
@@ -72,13 +78,16 @@ export class DexMempoolLoop implements DexLoopInterface {
 	 */
 	public async step() {
 		this.iterations++;
-		await this.updateStateFunction(this.chainOperator, this.pools);
+		await this.updatePoolStates(this.chainOperator, this.pools);
+		if (this.updateOrderbookStates) {
+			await this.updateOrderbookStates(this.chainOperator, this.orderbooks);
+		}
 
-		const arbTrade: OptimalTrade | undefined = this.arbitrageFunction(this.paths, this.botConfig);
+		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
+		const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
 
-		if (arbTrade) {
-			await this.trade(arbTrade);
-			this.cdPaths(arbTrade.path);
+		if (arbTrade || arbtradeOB) {
+			await this.trade(arbTrade, arbtradeOB);
 			return;
 		}
 
@@ -107,16 +116,15 @@ export class DexMempoolLoop implements DexLoopInterface {
 				applyMempoolMessagesOnPools(this.pools, mempoolTxs);
 			}
 
-			const arbTrade = this.arbitrageFunction(this.paths, this.botConfig);
+			const arbTrade = this.ammArb(this.paths, this.botConfig);
+			const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
 
-			if (arbTrade) {
-				await this.trade(arbTrade);
+			if (arbTrade || arbtradeOB) {
+				await this.trade(arbTrade, arbtradeOB);
 				console.log("mempool transactions to backrun:");
 				mempoolTxs.map((mpt) => {
 					console.log(toHex(sha256(mpt.txBytes)));
 				});
-				this.cdPaths(arbTrade.path);
-				await this.chainOperator.reset();
 				break;
 			}
 		}
@@ -127,6 +135,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 	 *
 	 */
 	async reset() {
+		await this.chainOperator.reset();
 		this.unCDPaths();
 		this.totalBytes = 0;
 		flushTxMemory();
@@ -135,41 +144,87 @@ export class DexMempoolLoop implements DexLoopInterface {
 	/**
 	 *
 	 */
-	public async trade(arbTrade: OptimalTrade) {
-		const [msgs, nrOfMessages] = this.messageFunction(
+	public async trade(arbTrade: OptimalTrade | undefined, arbTradeOB: OptimalOrderbookTrade | undefined) {
+		if (arbTrade && arbTradeOB) {
+			if (arbTrade.profit > arbTradeOB.profit) {
+				await this.tradeAmm(arbTrade);
+				this.cdPaths(arbTrade.path);
+			} else if (arbTrade.profit <= arbTradeOB.profit) {
+				await this.tradeOrderbook(arbTradeOB);
+				this.cdPaths(arbTradeOB.path);
+			}
+		} else if (arbTrade) {
+			await this.tradeAmm(arbTrade);
+			this.cdPaths(arbTrade.path);
+		} else if (arbTradeOB) {
+			await this.tradeOrderbook(arbTradeOB);
+			this.cdPaths(arbTradeOB.path);
+		}
+
+		await delay(6000);
+		// await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
+	}
+
+	/**
+	 *
+	 */
+	private async tradeOrderbook(arbTradeOB: OptimalOrderbookTrade) {
+		const messages = this.messageFactory(arbTradeOB, this.chainOperator.client.publicAddress, undefined);
+		if (!messages) {
+			console.error("error in creating messages", 1);
+			process.exit(1);
+		}
+		const TX_FEE =
+			this.botConfig.txFees.get(messages[1]) ??
+			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
+
+		if (arbTradeOB.path.orderSequence === OrderSequence.AmmFirst) {
+			const txResponse = await this.chainOperator.signAndBroadcast(messages[0], TX_FEE);
+			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
+		} else {
+			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], TX_FEE);
+			await delay(3000);
+			const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]], TX_FEE);
+			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
+				txResponse,
+				txResponse2,
+			]);
+		}
+	}
+
+	/**
+	 *
+	 */
+	private async tradeAmm(arbTrade: OptimalTrade) {
+		const messages = this.messageFactory(
 			arbTrade,
 			this.chainOperator.client.publicAddress,
 			this.botConfig.flashloanRouterAddress,
 		);
-
-		// await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
-
-		const TX_FEE =
-			this.botConfig.txFees.get(nrOfMessages) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
-		console.log(inspect(TX_FEE));
-		const txResponse = await this.chainOperator.signAndBroadcast(msgs, TX_FEE);
-
-		await this.logger?.sendMessage(JSON.stringify(txResponse), LogType.Console);
-
-		if (txResponse.code === 0) {
-			this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
+		if (!messages) {
+			console.error("error in creating messages", 1);
+			process.exit(1);
 		}
-		await delay(5000);
-	}
+		const TX_FEE =
+			this.botConfig.txFees.get(messages[1]) ??
+			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
+		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], TX_FEE);
+
+		await this.logger?.tradeLogging.logAmmTrade(arbTrade, [txResponse]);
+	}
 	/**
 	 * Put path on Cooldown, add to CDPaths with iteration number as block.
 	 * Updates the iteration count of elements in CDpaths if its in equalpath of param: path
 	 * Updates this.Path.
 	 */
-	public cdPaths(path: Path) {
+	public cdPaths(path: Path | OrderbookPath) {
 		//add equalpaths to the CDPath array
 		for (const equalpath of path.equalpaths) {
-			this.CDpaths.set(equalpath[0], [this.iterations, 5, equalpath[1]]);
+			this.CDpaths.set(equalpath[0], [this.iterations, 30, equalpath[1]]);
 		}
 		//add self to the CDPath array
-		this.CDpaths.set(path.identifier[0], [this.iterations, 10, path.identifier[1]]);
+		this.CDpaths.set(path.identifier[0], [this.iterations, 60, path.identifier[1]]);
 
 		const out = new Array<Path>();
 		//remove all equal paths from this.paths if this.paths'identifier overlaps with one in equalpaths
@@ -180,6 +235,16 @@ export class DexMempoolLoop implements DexLoopInterface {
 			}
 		});
 		this.paths = out;
+
+		const outOB = new Array<OrderbookPath>();
+		//remove all equal paths from this.paths if this.paths'identifier overlaps with one in equalpaths
+		this.orderbookPaths.forEach((activePath) => {
+			//if our updated cdpaths contains the path still active, make sure to remove it from the active paths
+			if (!this.CDpaths.get(activePath.identifier[0])) {
+				outOB.push(activePath);
+			}
+		});
+		this.orderbookPaths = outOB;
 	}
 
 	/**.
