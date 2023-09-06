@@ -25,7 +25,8 @@ export async function getPoolsFromFactory(
 				res = await chainOperator.queryContractSmart(factorymap.factory, {
 					pairs: { limit: 30 },
 				});
-			} catch {
+			} catch (e) {
+				console.log(e);
 				console.log("RPC err on getPoolsfromFactory ... switching RPC");
 				await chainOperator.client.getNewClients();
 				await getPoolsFromFactory(chainOperator, factoryMapping);

@@ -1,8 +1,8 @@
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
 import {
 	Asset,
+	fromChainAsset,
 	isJunoSwapNativeAssetInfo,
-	isNativeAsset,
 	isWyndDaoNativeAsset,
 	isWyndDaoTokenAsset,
 	JunoSwapAssetInfo,
@@ -114,18 +114,7 @@ function processPoolStateAssets(poolState: PoolState): [Array<Asset>, AmmDexName
 			});
 			type = AmmDexName.wyndex;
 		} else {
-			if (isNativeAsset(assetState.info)) {
-				if (assetState.info.native_token.denom === "inj") {
-					assets.push({
-						amount: String(+assetState.amount / 1e12),
-						info: assetState.info,
-					});
-				} else {
-					assets.push(assetState);
-				}
-			} else {
-				assets.push(assetState);
-			}
+			assets.push(fromChainAsset(assetState));
 		}
 	}
 	return [assets, type, poolState.total_share];

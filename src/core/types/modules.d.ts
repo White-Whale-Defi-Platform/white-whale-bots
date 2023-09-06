@@ -1,6 +1,10 @@
 declare namespace NodeJS {
 	export interface ProcessEnv {
 		/**
+		 * Denotes the type of bot that will be started: "dex", "liquidations" or "ibc".
+		 */
+		SETUP_TYPE: string;
+		/**
 		 * The mnemonic associated with the wallet for performing arbitrage transactions.
 		 */
 		WALLET_MNEMONIC: string;
@@ -25,6 +29,14 @@ declare namespace NodeJS {
 		 * The http endpoint to the RPC.
 		 */
 		RPC_URL: string;
+		/**
+		 * GRPC URL, used only for Injective chain. If not provided will use default from injective sdk.
+		 */
+		GRPC_URL: string;
+		/**
+		 * REST URL, used only for Injective chain. If not provided will use default from injective sdk.
+		 */
+		REST_URL: string;
 		/**
 		 * Whether or not to use cosmos chainregistry for finding public endpoints and using them
 		 * if necessary.
@@ -53,10 +65,15 @@ declare namespace NodeJS {
 		 */
 		POOLS: string;
 		/**
+		 * A list of all known orderbook pairs (marketids), only relevant when SETUP_TYPE = dex.
+		 */
+		ORDERBOOKS: string;
+		/**
 		 * Set to "1" if the code should use mempool analysis to send transactions.
 		 *
 		 * This will decrease success rate but increase throughput.
 		 */
+
 		USE_MEMPOOL: string;
 		/**
 		 * The price of a GAS_UNIT on the specific chain, denominated by BASE_DENOM.
@@ -107,6 +124,10 @@ declare namespace NodeJS {
 		 */
 		EXTERNAL_EXEMPT_CODES: string | undefined;
 		/**
+		 * Overseer Liquidation Contracts.
+		 */
+		OVERSEER_ADDRESSES: string;
+		/**
 		 * Denotes whether we use skip for submitting transaction bundles.
 		 */
 		USE_SKIP: string | undefined;
@@ -122,5 +143,17 @@ declare namespace NodeJS {
 		 * The ratio of the profit to send as a bid.
 		 */
 		SKIP_BID_RATE: string | undefined;
+		/**
+		 * Try sending a regular TX if the next validator is not using Skip.
+		 */
+		TRY_WITHOUT_SKIP: string | undefined;
+		/**
+		 * Addresses of Transaction-Spammer that should be ignored.
+		 */
+		IGNORE_ADDRESSES: string | undefined;
+		/**
+		 * Timeout added addresses for this amount of blocks.
+		 */
+		TIMEOUT_DURATION: string | undefined;
 	}
 }

@@ -4,7 +4,7 @@ import { StdFee } from "@cosmjs/stargate";
 import { Network } from "@injectivelabs/networks";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
-import { BotConfig } from "../types/base/botConfig";
+import { BotConfig } from "../types/base/configs";
 import CosmjsAdapter from "./chainAdapters/cosmjs";
 import InjectiveAdapter from "./chainAdapters/injective";
 import { TxResponse } from "./chainOperatorInterface";
@@ -27,10 +27,10 @@ export class ChainOperator {
 	 */
 	static async connectWithSigner(botConfig: BotConfig): Promise<ChainOperator> {
 		if (botConfig.chainPrefix.includes("inj")) {
-			const injectiveClient = new InjectiveAdapter(botConfig, Network.MainnetK8s);
+			const injectiveClient = new InjectiveAdapter(botConfig, Network.Mainnet);
 			await injectiveClient.init(botConfig);
 			return new Promise((resolve, reject) => {
-				resolve(new ChainOperator(injectiveClient, Network.MainnetK8s));
+				resolve(new ChainOperator(injectiveClient, Network.Mainnet));
 			});
 		}
 
@@ -44,8 +44,17 @@ export class ChainOperator {
 	 *
 	 */
 	async queryContractSmart(address: string, queryMsg: Record<string, unknown>): Promise<JsonObject> {
-		//Error handled in getPoolState.
-		return await this.client.queryContractSmart(address, queryMsg);
+		try {
+			return await this.client.queryContractSmart(address, queryMsg);
+		} catch (e: any) {
+			//custom error for initPools JunoSwapPoolState
+			if (e.message.includes("unknown variant `pool`,")) {
+				throw new Error(e.message);
+			}
+			console.log(e);
+			await this.client.getNewClients();
+			await this.client.queryContractSmart(address, queryMsg);
+		}
 	}
 
 	/**
@@ -59,6 +68,31 @@ export class ChainOperator {
 			await this.client.getNewClients();
 			return await this.client.queryMempool();
 		}
+	}
+	/**
+	 *
+	 */
+	// async queryOrderbooks(marketids: Array<string>) {
+	// 	return this.client.queryOrderbook(marketids);
+	// }
+	/**
+	 *
+	 */
+	async queryOrderbook(marketId: string) {
+		return this.client.queryOrderbook(marketId);
+	}
+
+	/**
+	 *
+	 */
+	async queryOrderbooks(marketIds: Array<string>) {
+		return this.client.queryOrderbooks(marketIds);
+	}
+	/**
+	 *
+	 */
+	async queryMarket(marketId: string) {
+		return this.client.queryMarket(marketId);
 	}
 	/**
 	 *

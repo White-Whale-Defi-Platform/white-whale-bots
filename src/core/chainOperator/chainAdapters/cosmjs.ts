@@ -8,7 +8,7 @@ import { HttpBatchClient, HttpClient } from "@cosmjs/tendermint-rpc/build/rpccli
 import { SkipBundleClient } from "@skip-mev/skipjs";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
-import { BotConfig } from "../../types/base/botConfig";
+import { BotConfig } from "../../types/base/configs";
 import { Mempool } from "../../types/base/mempool";
 import { ChainOperatorInterface, TxResponse } from "../chainOperatorInterface";
 
@@ -105,7 +105,6 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		this._tmClient = await Tendermint34Client.create(this._httpClient);
 		this._wasmQueryClient = QueryClient.withExtensions(this._tmClient, setupWasmExtension, setupAuthExtension);
 		this._signingCWClient = await SigningCosmWasmClient.connectWithSigner(rpcUrl, this._signer, {
-			prefix: this._chainPrefix,
 			gasPrice: GasPrice.fromString(this._gasPrice + this._denom),
 		});
 	}
@@ -222,7 +221,25 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		console.log("Continue...");
 		this._currRpcUrl = out;
 	}
+	/**
+	 *
+	 */
+	public async queryOrderbook() {
+		console.log("orderbook query not yet implemented for cosmjs");
+	}
 
+	/**
+	 *
+	 */
+	public async queryOrderbooks(marketIds: Array<string>) {
+		console.log("orderbook query not yet implemented for cosmjs");
+	}
+	/**
+	 *
+	 */
+	async queryMarket(marketId: string) {
+		console.log("market query not yet implemented for cosmjs");
+	}
 	/**
 	 *
 	 */
