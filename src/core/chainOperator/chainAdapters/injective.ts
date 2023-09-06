@@ -155,6 +155,19 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	async queryOrderbook(marketId: string): Promise<OrderbookWithSequence> {
 		return await this._spotQueryClient.fetchOrderbookV2(marketId);
 	}
+
+	/**
+	 *
+	 */
+	async queryOrderbooks(marketIds: Array<string>): Promise<
+		Array<{
+			marketId: string;
+			orderbook: OrderbookWithSequence;
+		}>
+	> {
+		return await this._spotQueryClient.fetchOrderbooksV2(marketIds);
+	}
+
 	/**
 	 *
 	 */

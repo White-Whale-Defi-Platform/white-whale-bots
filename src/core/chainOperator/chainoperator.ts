@@ -81,6 +81,13 @@ export class ChainOperator {
 	async queryOrderbook(marketId: string) {
 		return this.client.queryOrderbook(marketId);
 	}
+
+	/**
+	 *
+	 */
+	async queryOrderbooks(marketIds: Array<string>) {
+		return this.client.queryOrderbooks(marketIds);
+	}
 	/**
 	 *
 	 */
