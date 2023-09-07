@@ -6,27 +6,39 @@ import { Logger } from "./core/logging";
 import { DexLoop } from "./core/types/arbitrageloops/loops/dexloop";
 import { IBCLoop } from "./core/types/arbitrageloops/loops/ibcloop";
 import { LiquidationLoop } from "./core/types/arbitrageloops/loops/liqMempoolLoop";
-import { BotConfig, DexConfig, LiquidationConfig, setBotConfig, SetupType } from "./core/types/base/configs";
+import { BotConfig, ChainConfig, setBotConfig, setChainConfig, SetupType } from "./core/types/base/configs";
 
 /**
  * Runs the main program.
  */
 async function main() {
-	const chainConfigs: Array<BotConfig> = [];
+	//read bot configuration files//
+	const botConfigOutput = dotenv.config({ path: "./src/envs/bot/botsetup.env" });
+	if (!botConfigOutput.parsed) {
+		console.error("Cannot read botconfig env file", 1);
+		process.exit(1);
+	}
+	const botConfig: BotConfig = await setBotConfig(botConfigOutput.parsed);
+	await delay(1000);
+	/*******************************/
+
+	//read chain configuration files//
+	const chainConfigs: Array<ChainConfig> = [];
 	fs.readdirSync("./src/envs", { encoding: null, withFileTypes: true }).forEach(async (file) => {
 		const dotenvResponse = dotenv.config({ path: "./src/envs/" + file.name });
 		if (dotenvResponse.parsed) {
-			chainConfigs.push(await setBotConfig(dotenvResponse.parsed));
+			chainConfigs.push(await setChainConfig(dotenvResponse.parsed, botConfig));
 		}
 	});
 	await delay(1000);
+	/********************************/
 
-	//create a logger based on the config
-	const logger = new Logger(chainConfigs[0]);
+	//setup logging//
+	const logger = new Logger(botConfig);
+	await logger.loopLogging.logConfig(botConfig);
+	/*******************************/
 
-	// print the config
-	await logger.loopLogging.logConfig(chainConfigs[0]);
-	//spawn chainOperator for interaction with blockchains
+	//spawn chainOperator for chain interaction for each chainconfig//
 	let chainOperator: any;
 	if (chainConfigs.length > 1) {
 		chainConfigs.forEach(async (config: any) => {
@@ -35,6 +47,8 @@ async function main() {
 	} else {
 		chainOperator = await ChainOperator.connectWithSigner(chainConfigs[0]);
 	}
+	/*******************************/
+
 	//create the arbitrage loop based on input config
 	let loop;
 	switch (configs[0].setupType) {

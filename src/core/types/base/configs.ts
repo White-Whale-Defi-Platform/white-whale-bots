@@ -27,75 +27,66 @@ export enum SetupType {
 	LIQUIDATION = "LIQUIDATION",
 	IBC = "IBC",
 }
-export interface BaseConfig {
+export interface ChainConfig {
+	flashloanRouterAddress: string;
+	flashloanFee: number;
+	offerAssetInfo: NativeAssetInfo;
+	ignoreAddresses?: IgnoredAddresses;
+	mappingFactoryRouter: Array<{ factory: string; router: string }>;
+	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
+	orderbooks: Array<string>;
 	baseDenom: string;
 	chainPrefix: string;
 	gasDenom: string;
-	gasPrice: string;
-	// Logger specific config.
-	loggerConfig: LoggerConfig;
 	mnemonic: string;
-	profitThresholds: Map<number, number>;
+	gasPrice: string;
 	rpcUrls: Array<string>;
 	grpcUrl?: string;
 	restUrl?: string;
-	setupType: SetupType;
-	signOfLife: number;
+	txFees: Map<number, StdFee>;
 	// Skip specific (optionally)
 	skipConfig?: SkipConfig;
-	txFees: Map<number, StdFee>;
+	profitThresholds: Map<number, number>;
+	timeoutDuration: number;
+}
+
+export interface BotConfig {
+	setupType: SetupType;
+	signOfLife: number;
+	loggerConfig: LoggerConfig;
+	maxPathPools: number;
+	useRpcUrlScraper: boolean;
 	useMempool: boolean;
 }
 
-export interface DexConfig extends BaseConfig {
-	flashloanRouterAddress: string;
-	flashloanFee: number;
-
-	ignoreAddresses?: IgnoredAddresses;
-	maxPathPools: number;
-	mappingFactoryRouter: Array<{ factory: string; router: string }>;
-	offerAssetInfo: NativeAssetInfo;
-	poolEnvs: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>;
-	orderbooks: Array<string>;
-	timeoutDuration: number;
-	useRpcUrlScraper?: boolean;
-}
-
-export interface LiquidationConfig extends BaseConfig {
+export interface LiquidationChainConfig extends ChainConfig {
 	overseerAddresses: Array<string>;
 }
-
-export type BotConfig = DexConfig | LiquidationConfig | BaseConfig;
 /**
  *
  */
 export async function setBotConfig(envs: DotenvParseOutput): Promise<BotConfig> {
-	validateBaseEnvs(envs);
-	const bc: BaseConfig = await getBaseConfig(envs);
+	validateBotConfigEnvs(envs);
+	const bc: BotConfig = await getBotConfig(envs);
+	return bc;
+}
 
+/**
+ *
+ */
+export async function setChainConfig(envs: DotenvParseOutput, bc: BotConfig): Promise<ChainConfig> {
+	const chainConfig = await getChainConfig(envs, bc);
 	if (bc.setupType === SetupType.LIQUIDATION) {
-		validateLiquidationEnvs(envs);
-		const botConfig: LiquidationConfig = getLiquidationConfig(envs, bc);
-		return botConfig;
-	} else if (bc.setupType === SetupType.DEX) {
-		validateDexEnvs(envs);
-		const botConfig: DexConfig = getDexConfig(envs, bc);
-		return botConfig;
-		//do something
-	} else if (bc.setupType === SetupType.IBC) {
-		validateDexEnvs(envs);
-		const botConfig: DexConfig = getDexConfig(envs, bc);
-		return botConfig;
-		//do something
+		return getLiquidationConfig(envs, chainConfig);
 	} else {
-		return bc;
+		return chainConfig;
 	}
 }
 
 /**
  *
  */
-async function getBaseConfig(envs: DotenvParseOutput): Promise<BaseConfig> {
+async function getBotConfig(envs: DotenvParseOutput): Promise<BotConfig> {
 	let setupType: SetupType;
 	switch (envs.SETUP_TYPE.toLocaleLowerCase()) {
 		case "dex":
@@ -111,33 +102,6 @@ async function getBaseConfig(envs: DotenvParseOutput): Promise<BaseConfig> {
 			console.error("Please set the SETUP_TYPE in the env file");
 			process.exit(1);
 	}
-
-	let RPCURLS: Array<string>;
-	if (envs.RPC_URL && envs.USE_RPC_URL_SCRAPER == "1") {
-		const RPCURLS_PROVIDED = envs.RPC_URL.startsWith("[") ? JSON.parse(envs.RPC_URL) : [envs.RPC_URL];
-		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, RPCURLS_PROVIDED);
-	} else if (!envs.RPC_URL && envs.USE_RPC_URL_SCRAPER == "1") {
-		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX);
-	} else if (envs.RPC_URL) {
-		RPCURLS = envs.RPC_URL.startsWith("[") ? JSON.parse(envs.RPC_URL) : [envs.RPC_URL];
-	} else {
-		console.log("no RPC URL provided or USE_RPC_URL_SCRAPER not set correctly");
-		process.exit(1);
-	}
-
-	// setup skipconfig if present
-	let skipConfig;
-	if (envs.USE_SKIP == "1") {
-		validateSkipEnvs(envs);
-		skipConfig = {
-			useSkip: true,
-			skipRpcUrl: envs.SKIP_URL ?? "",
-			skipBidWallet: envs.SKIP_BID_WALLET ?? "",
-			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
-			tryWithoutSkip: envs.TRY_WITHOUT_SKIP === "1" ? true : false,
-		};
-	}
-
 	// setup logger config.
 	const SIGN_OF_LIFE = Number(envs.SIGN_OF_LIFE === undefined ? 30 : +envs.SIGN_OF_LIFE);
 	const externalExemptCodesStr = envs.EXTERNAL_EXEMPT_CODES?.split(",") ?? [];
@@ -152,58 +116,33 @@ async function getBaseConfig(envs: DotenvParseOutput): Promise<BaseConfig> {
 		telegramChatId: envs.TELEGRAM_CHAT_ID,
 		externalExemptCodes: externalExemptCodes,
 	};
-
-	//Calculate tx fees and profit thresholds
-	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
-	const GAS_UNIT_PRICE = envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
-	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
-	const MAX_PATH_HOPS = +envs.MAX_PATH_HOPS; //required gas units per trade (hop)
-	//set all required fees for the depth of the hops set by user;
-	const TX_FEES = new Map<number, StdFee>();
-	const PROFIT_THRESHOLDS = new Map<number, number>();
-	for (let hops = 2; hops <= (MAX_PATH_HOPS - 1) * 2 + 1; hops++) {
-		if (envs.GAS_DENOM === "inj") {
-			const gasFee = {
-				denom: envs.GAS_DENOM,
-				amount: (GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE * 1e12).toFixed(),
-			};
-			TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) }); //in 6 decimals
-		} else {
-			const gasFee = { denom: envs.GAS_DENOM, amount: String(GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE) };
-			TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) }); //in 6 decimals
-		}
-
-		const profitThreshold: number = PROFIT_THRESHOLD + GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE; //in 6 decimal default
-		PROFIT_THRESHOLDS.set(hops, profitThreshold);
-	}
 	return {
 		setupType: setupType,
-		baseDenom: envs.BASE_DENOM,
-		chainPrefix: envs.CHAIN_PREFIX,
-		gasDenom: envs.GAS_DENOM,
-		gasPrice: envs.GAS_UNIT_PRICE,
 		loggerConfig: loggerConfig,
-		mnemonic: envs.WALLET_MNEMONIC,
-		profitThresholds: PROFIT_THRESHOLDS,
-		rpcUrls: RPCURLS,
-		grpcUrl: envs.GRPC_URL,
-		restUrl: envs.REST_URL,
 		signOfLife: SIGN_OF_LIFE,
-		skipConfig: skipConfig,
-		txFees: TX_FEES,
 		useMempool: envs.USE_MEMPOOL == "1" ? true : false,
+		useRpcUrlScraper: envs.USE_RPC_URL_SCRAPER == "1" ? true : false,
+		maxPathPools: envs.MAX_PATH_HOPS ? +envs.MAX_PATH_HOPS : 2,
 	};
 }
 /**
  *
  */
-function getLiquidationConfig(envs: DotenvParseOutput, baseConfig: BaseConfig): LiquidationConfig {
-	return { overseerAddresses: JSON.parse(envs.OVERSEER_ADDRESSES), ...baseConfig };
+function validateBotConfigEnvs(envs: DotenvParseOutput) {
+	assert(envs.SETUP_TYPE, `Please set the "SETUP_TYPE" in the env or .env file`);
 }
 /**
  *
  */
-function getDexConfig(envs: DotenvParseOutput, baseConfig: BaseConfig): DexConfig {
+function getLiquidationConfig(envs: DotenvParseOutput, chainConfig: ChainConfig): LiquidationChainConfig {
+	validateLiquidationEnvs(envs);
+	return { overseerAddresses: JSON.parse(envs.OVERSEER_ADDRESSES), ...chainConfig };
+}
+/**
+ *
+ */
+async function getChainConfig(envs: DotenvParseOutput, botConfig: BotConfig): Promise<ChainConfig> {
+	validateChainEnvs(envs);
 	let pools = envs.POOLS.trim()
 		.replace(/\n|\r|\t/g, "")
 		.replace(/,\s*$/, "");
@@ -229,34 +168,77 @@ function getDexConfig(envs: DotenvParseOutput, baseConfig: BaseConfig): DexConfi
 	if (envs.ORDERBOOKS) {
 		orderbooks = JSON.parse(envs.ORDERBOOKS);
 	}
+	let RPCURLS: Array<string>;
+	if (envs.RPC_URL && envs.USE_RPC_URL_SCRAPER == "1") {
+		const RPCURLS_PROVIDED = envs.RPC_URL.startsWith("[") ? JSON.parse(envs.RPC_URL) : [envs.RPC_URL];
+		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, RPCURLS_PROVIDED);
+	} else if (!envs.RPC_URL && envs.USE_RPC_URL_SCRAPER == "1") {
+		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX);
+	} else if (envs.RPC_URL) {
+		RPCURLS = envs.RPC_URL.startsWith("[") ? JSON.parse(envs.RPC_URL) : [envs.RPC_URL];
+	} else {
+		console.log("no RPC URL provided or USE_RPC_URL_SCRAPER not set correctly");
+		process.exit(1);
+	}
 
+	// setup skipconfig if present
+	let skipConfig;
+	if (envs.USE_SKIP == "1") {
+		validateSkipEnvs(envs);
+		skipConfig = {
+			useSkip: true,
+			skipRpcUrl: envs.SKIP_URL ?? "",
+			skipBidWallet: envs.SKIP_BID_WALLET ?? "",
+			skipBidRate: envs.SKIP_BID_RATE === undefined ? 0 : +envs.SKIP_BID_RATE,
+			tryWithoutSkip: envs.TRY_WITHOUT_SKIP === "1" ? true : false,
+		};
+	}
+	//Calculate tx fees and profit thresholds
+	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
+	const GAS_UNIT_PRICE = envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
+	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
+	const MAX_PATH_HOPS = +envs.MAX_PATH_HOPS; //required gas units per trade (hop)
+	//set all required fees for the depth of the hops set by user;
+	const TX_FEES = new Map<number, StdFee>();
+	const PROFIT_THRESHOLDS = new Map<number, number>();
+	for (let hops = 2; hops <= (MAX_PATH_HOPS - 1) * 2 + 1; hops++) {
+		if (envs.GAS_DENOM === "inj") {
+			const gasFee = {
+				denom: envs.GAS_DENOM,
+				amount: (GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE * 1e12).toFixed(),
+			};
+			TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) }); //in 6 decimals
+		} else {
+			const gasFee = { denom: envs.GAS_DENOM, amount: String(GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE) };
+			TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) }); //in 6 decimals
+		}
+
+		const profitThreshold: number = PROFIT_THRESHOLD + GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE; //in 6 decimal default
+		PROFIT_THRESHOLDS.set(hops, profitThreshold);
+	}
 	return {
-		...baseConfig,
+		baseDenom: envs.BASE_DENOM,
+		chainPrefix: envs.CHAIN_PREFIX,
+		gasDenom: envs.GAS_DENOM,
+		gasPrice: envs.GAS_UNIT_PRICE,
+		mnemonic: envs.WALLET_MNEMONIC,
+		profitThresholds: PROFIT_THRESHOLDS,
+		rpcUrls: RPCURLS,
+		grpcUrl: envs.GRPC_URL,
+		restUrl: envs.REST_URL,
+		skipConfig: skipConfig,
+		txFees: TX_FEES,
 		flashloanRouterAddress: envs.FLASHLOAN_ROUTER_ADDRESS,
 		flashloanFee: +envs.FLASHLOAN_FEE,
 		ignoreAddresses: IGNORE_ADDRS,
-		maxPathPools: +envs.MAX_PATH_HOPS,
 		mappingFactoryRouter: FACTORIES_TO_ROUTERS_MAPPING,
 		offerAssetInfo: OFFER_ASSET_INFO,
 		poolEnvs: POOLS_ENVS,
 		orderbooks: orderbooks ?? [],
 		timeoutDuration: timeoutDuration,
-		useRpcUrlScraper: envs.USE_RPC_URL_SCRAPER == "1" ? true : false,
 	};
 }
-/**
- *
- */
-function validateBaseEnvs(envs: DotenvParseOutput) {
-	assert(envs.SETUP_TYPE, `Please set the "SETUP_TYPE" in the env or .env file`);
-	assert(envs.WALLET_MNEMONIC, `Please set "WALLET_MNEMONIC" in env, or ".env" file`);
-	assert(envs.BASE_DENOM, `Please set "BASE_DENOM" in env or ".env" file`);
-	assert(envs.CHAIN_PREFIX, `Please set "CHAIN_PREFIX" in env or ".env" file`);
-	assert(envs.GAS_DENOM, `Please set "GAS_DENOM" in env or ".env" file`);
-	assert(envs.GAS_UNIT_PRICE, `Please set "GAS_DENOM" in env or ".env" file`);
-	assert(envs.PROFIT_THRESHOLD, `Please set a "PROFIT_THRESHOLD" in the env or .env file`);
-	assert(envs.RPC_URL, `Please set a "RPC_URL" in the env or .env file`);
-}
+
 /**
  *
  */
@@ -267,7 +249,14 @@ function validateLiquidationEnvs(envs: DotenvParseOutput) {
 /**
  *
  */
-function validateDexEnvs(envs: DotenvParseOutput) {
+function validateChainEnvs(envs: DotenvParseOutput) {
+	assert(envs.WALLET_MNEMONIC, `Please set "WALLET_MNEMONIC" in env, or ".env" file`);
+	assert(envs.BASE_DENOM, `Please set "BASE_DENOM" in env or ".env" file`);
+	assert(envs.CHAIN_PREFIX, `Please set "CHAIN_PREFIX" in env or ".env" file`);
+	assert(envs.GAS_DENOM, `Please set "GAS_DENOM" in env or ".env" file`);
+	assert(envs.GAS_UNIT_PRICE, `Please set "GAS_DENOM" in env or ".env" file`);
+	assert(envs.PROFIT_THRESHOLD, `Please set a "PROFIT_THRESHOLD" in the env or .env file`);
+	assert(envs.RPC_URL, `Please set a "RPC_URL" in the env or .env file`);
 	assert(envs.FLASHLOAN_ROUTER_ADDRESS, `Please set the "FLASHLOAN_ROUTER_ADDRESS" in the env or .env file`);
 	assert(envs.FLASHLOAN_FEE, `Please set the "FLASHLOAN_FEE" in the env or .env file`);
 	assert(envs.MAX_PATH_HOPS, `Please set the "MAX_PATH_HOPS" in the env or .env file`);
