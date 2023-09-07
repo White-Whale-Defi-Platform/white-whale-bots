@@ -4,7 +4,7 @@ import { StdFee } from "@cosmjs/stargate";
 import { Network } from "@injectivelabs/networks";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
-import { BotConfig } from "../types/base/configs";
+import { ChainConfig } from "../types/base/configs";
 import CosmjsAdapter from "./chainAdapters/cosmjs";
 import InjectiveAdapter from "./chainAdapters/injective";
 import { TxResponse } from "./chainOperatorInterface";
@@ -25,19 +25,19 @@ export class ChainOperator {
 	/**
 	 *
 	 */
-	static async connectWithSigner(botConfig: BotConfig): Promise<ChainOperator> {
-		if (botConfig.chainPrefix.includes("inj")) {
-			const injectiveClient = new InjectiveAdapter(botConfig, Network.Mainnet);
-			await injectiveClient.init(botConfig);
+	static async connectWithSigner(chainConfig: ChainConfig): Promise<ChainOperator> {
+		if (chainConfig.chainPrefix.includes("inj")) {
+			const injectiveClient = new InjectiveAdapter(chainConfig, Network.Mainnet);
+			await injectiveClient.init(chainConfig);
 			return new Promise((resolve, reject) => {
 				resolve(new ChainOperator(injectiveClient, Network.Mainnet));
 			});
 		}
 
-		const cosmjsClient = new CosmjsAdapter(botConfig);
-		await cosmjsClient.init(botConfig);
+		const cosmjsClient = new CosmjsAdapter(chainConfig);
+		await cosmjsClient.init(chainConfig);
 		return new Promise((resolve, reject) => {
-			resolve(new ChainOperator(cosmjsClient, botConfig.rpcUrls[0]));
+			resolve(new ChainOperator(cosmjsClient, chainConfig.rpcUrls[0]));
 		});
 	}
 	/**

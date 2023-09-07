@@ -5,7 +5,7 @@ import { getPaths, newGraph } from "../../../arbitrage/graph";
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
-import { DexConfig } from "../../base/configs";
+import { BotConfig, ChainConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { Orderbook } from "../../base/orderbook";
 import { getOrderbookAmmPaths, OrderbookPath, OrderSequence, Path } from "../../base/path";
@@ -27,21 +27,23 @@ export class DexLoop implements DexLoopInterface {
 	chainOperator: ChainOperator;
 	accountNumber = 0;
 	sequence = 0;
-	botConfig: DexConfig;
+	chainConfig: ChainConfig;
+	botConfig: BotConfig;
 	logger: Logger | undefined;
 	iterations = 0;
 	updatePoolStates: DexLoopInterface["updatePoolStates"];
 	updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"];
 	messageFactory: DexLoopInterface["messageFactory"];
-	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
-	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
+	ammArb: (paths: Array<Path>, chainConfig: ChainConfig) => OptimalTrade | undefined;
+	orderbookArb: (paths: Array<OrderbookPath>, chainConfig: ChainConfig) => OptimalOrderbookTrade | undefined;
 
 	/**
 	 *
 	 */
 	public constructor(
 		chainOperator: ChainOperator,
-		botConfig: DexConfig,
+		chainConfig: ChainConfig,
+		botConfig: BotConfig,
 		logger: Logger | undefined,
 		allPools: Array<Pool>,
 		orderbooks: Array<Orderbook>,
@@ -50,7 +52,7 @@ export class DexLoop implements DexLoopInterface {
 		updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"],
 	) {
 		const graph = newGraph(allPools);
-		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+		const paths = getPaths(graph, chainConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
 		const filteredPools = removedUnusedPools(allPools, paths);
 		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks);
 
@@ -67,22 +69,19 @@ export class DexLoop implements DexLoopInterface {
 		this.messageFactory = messageFactory;
 		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
+		this.chainConfig = chainConfig;
 		this.logger = logger;
 	}
 	/**
 	 *
 	 */
-	static async createLoop(
-		chainOperator: ChainOperator,
-		botConfig: DexConfig,
-		logger: Logger,
-	): Promise<DexLoopInterface> {
+	static async createLoop(botConfig: BotConfig, chainConfig: ChainConfig, logger: Logger): Promise<DexLoopInterface> {
 		const msgFactory = chains.defaults.messageFactory;
 		let getPoolStates = chains.defaults.getPoolStates;
 		let initPools = chains.defaults.initPools;
 		const initOrderbook = chains.injective.initOrderbooks;
 		const getOrderbookState = chains.injective.getOrderbookState;
-		await import("../../../../chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
+		await import("../../../../chains/" + chainConfig.chainPrefix).then(async (chainSetups) => {
 			if (chainSetups === undefined) {
 				await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
 			}
@@ -92,17 +91,23 @@ export class DexLoop implements DexLoopInterface {
 			return;
 		});
 		const orderbooks: Array<Orderbook> = [];
-		if (botConfig.chainPrefix === "inj" && botConfig.orderbooks.length > 0) {
+		//spawn chainOperator for chain interaction for each chainconfig//
+
+		const chainOperator = await ChainOperator.connectWithSigner(chainConfig);
+
+		/*******************************/
+		if (chainConfig.chainPrefix === "inj" && chainConfig.orderbooks.length > 0) {
 			const obs = await initOrderbook(chainOperator, botConfig);
 			if (obs) {
 				orderbooks.push(...obs);
 			}
 		}
-		const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
+		const allPools = await initPools(chainOperator, chainConfig.poolEnvs, chainConfig.mappingFactoryRouter);
+		if (botConfig.useMempool && !chainConfig.skipConfig?.useSkip) {
 			console.log("spinning up mempool loop");
 			return new DexMempoolLoop(
 				chainOperator,
+				chainConfig,
 				botConfig,
 				logger,
 				allPools,
@@ -111,10 +116,11 @@ export class DexLoop implements DexLoopInterface {
 				msgFactory,
 				getOrderbookState,
 			);
-		} else if (botConfig.useMempool && botConfig.skipConfig?.useSkip) {
+		} else if (botConfig.useMempool && chainConfig.skipConfig?.useSkip) {
 			console.log("spinning up skip mempool loop");
 			return new DexMempoolSkipLoop(
 				chainOperator,
+				chainConfig,
 				botConfig,
 				logger,
 				allPools,
@@ -127,6 +133,7 @@ export class DexLoop implements DexLoopInterface {
 		console.log("spinning up no-mempool loop");
 		return new DexLoop(
 			chainOperator,
+			chainConfig,
 			botConfig,
 			logger,
 			allPools,
@@ -142,8 +149,8 @@ export class DexLoop implements DexLoopInterface {
 	public async step() {
 		this.iterations++;
 
-		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
-		const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
+		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.chainConfig);
+		const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.chainConfig);
 
 		if (arbTrade || arbtradeOB) {
 			await this.trade(arbTrade, arbtradeOB);
@@ -215,7 +222,7 @@ export class DexLoop implements DexLoopInterface {
 		const messages = this.messageFactory(
 			arbTrade,
 			this.chainOperator.client.publicAddress,
-			this.botConfig.flashloanRouterAddress,
+			this.chainConfig.flashloanRouterAddress,
 		);
 		if (!messages) {
 			console.error("error in creating messages", 1);

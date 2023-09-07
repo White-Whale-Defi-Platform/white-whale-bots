@@ -8,7 +8,7 @@ import { OptimalTrade } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { SkipResult } from "../../../chainOperator/skipclients";
 import { Logger } from "../../../logging";
-import { DexConfig } from "../../base/configs";
+import { BotConfig, ChainConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { decodeMempool, MempoolTx } from "../../base/mempool";
 import { Orderbook } from "../../base/orderbook";
@@ -23,7 +23,8 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 	 */
 	public constructor(
 		chainOperator: ChainOperator,
-		botConfig: DexConfig,
+		chainConfig: ChainConfig,
+		botConfig: BotConfig,
 		logger: Logger | undefined,
 		allPools: Array<Pool>,
 		orderbooks: Array<Orderbook>,
@@ -34,6 +35,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 	) {
 		super(
 			chainOperator,
+			chainConfig,
 			botConfig,
 			logger,
 			allPools,
@@ -49,7 +51,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 	 */
 	public async step(): Promise<void> {
 		this.iterations++;
-		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
+		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.chainConfig);
 
 		if (arbTrade) {
 			await this.trade(arbTrade, undefined);
@@ -71,7 +73,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 			const mempoolTxs: Array<MempoolTx> = decodeMempool(
 				this.mempool,
 				this.ignoreAddresses,
-				this.botConfig.timeoutDuration,
+				this.chainConfig.timeoutDuration,
 				this.iterations,
 			);
 			if (mempoolTxs.length === 0) {
@@ -79,7 +81,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 			} else {
 				for (const mempoolTx of mempoolTxs) {
 					applyMempoolMessagesOnPools(this.pools, [mempoolTx]);
-					const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
+					const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.chainConfig);
 					if (arbTrade) {
 						await this.skipTrade(arbTrade, mempoolTx);
 						this.cdPaths(arbTrade.path);
@@ -96,10 +98,10 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 	 */
 	public async skipTrade(arbTrade: OptimalTrade, toArbTrade?: MempoolTx) {
 		if (
-			!this.botConfig.skipConfig?.useSkip ||
-			this.botConfig.skipConfig?.skipRpcUrl === undefined ||
-			this.botConfig.skipConfig?.skipBidRate === undefined ||
-			this.botConfig.skipConfig?.skipBidWallet === undefined
+			!this.chainConfig.skipConfig?.useSkip ||
+			this.chainConfig.skipConfig?.skipRpcUrl === undefined ||
+			this.chainConfig.skipConfig?.skipBidRate === undefined ||
+			this.chainConfig.skipConfig?.skipBidWallet === undefined
 		) {
 			await this.logger?.sendMessage(
 				"Please setup skip variables in the config environment file",
@@ -108,18 +110,18 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 			return;
 		}
 
-		const skipFee = Math.max(Math.round(arbTrade.profit * this.botConfig.skipConfig.skipBidRate), 651);
+		const skipFee = Math.max(Math.round(arbTrade.profit * this.chainConfig.skipConfig.skipBidRate), 651);
 
 		const bidMsgEncoded = getSendMessage(
 			String(skipFee),
-			this.botConfig.gasDenom,
+			this.chainConfig.gasDenom,
 			this.chainOperator.client.publicAddress,
-			this.botConfig.skipConfig.skipBidWallet,
+			this.chainConfig.skipConfig.skipBidWallet,
 		);
 		const messages = this.messageFactory(
 			arbTrade,
 			this.chainOperator.client.publicAddress,
-			this.botConfig.flashloanRouterAddress,
+			this.chainConfig.flashloanRouterAddress,
 		);
 		if (!messages) {
 			console.error("error in creating messages", 1);
@@ -129,8 +131,8 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 
 		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
 		const TX_FEE =
-			this.botConfig.txFees.get(messages[1]) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
+			this.chainConfig.txFees.get(messages[1]) ??
+			Array.from(this.chainConfig.txFees.values())[this.chainConfig.txFees.size - 1];
 		console.log(inspect(TX_FEE, { depth: null }));
 
 		let res: SkipResult;
@@ -156,7 +158,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		if (res.result.code !== 0) {
 			logMessage += `\t **error code:** ${res.result.code}\n**error:** ${res.result.error}\n`;
 		}
-		if (this.botConfig.skipConfig.tryWithoutSkip && res.result.code === 4) {
+		if (this.chainConfig.skipConfig.tryWithoutSkip && res.result.code === 4) {
 			await this.logger?.sendMessage("no skip validator up, trying default broadcast", LogType.Console);
 			await this.trade(arbTrade, undefined);
 		}
@@ -171,7 +173,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 					if (toArbTrade?.message.sender && idx == 0 && item["code"] == "5") {
 						this.ignoreAddresses[toArbTrade.message.sender] = {
 							timeoutAt: this.iterations,
-							duration: this.botConfig.timeoutDuration,
+							duration: this.chainConfig.timeoutDuration,
 						};
 						await this.logger?.sendMessage(
 							"Error on Trade from Address: " + toArbTrade.message.sender,
@@ -192,7 +194,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 						if (toArbTrade?.message.sender) {
 							this.ignoreAddresses[toArbTrade.message.sender] = {
 								timeoutAt: this.iterations,
-								duration: this.botConfig.timeoutDuration,
+								duration: this.chainConfig.timeoutDuration,
 							};
 							await this.logger?.sendMessage(
 								"Error on Trade from Address: " + toArbTrade.message.sender,

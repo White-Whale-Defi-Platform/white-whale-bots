@@ -1,12 +1,18 @@
 import dotenv from "dotenv";
 import fs from "fs";
 
-import { ChainOperator } from "./core/chainOperator/chainoperator";
 import { Logger } from "./core/logging";
 import { DexLoop } from "./core/types/arbitrageloops/loops/dexloop";
 import { IBCLoop } from "./core/types/arbitrageloops/loops/ibcloop";
 import { LiquidationLoop } from "./core/types/arbitrageloops/loops/liqMempoolLoop";
-import { BotConfig, ChainConfig, setBotConfig, setChainConfig, SetupType } from "./core/types/base/configs";
+import {
+	BotConfig,
+	ChainConfig,
+	LiquidationChainConfig,
+	setBotConfig,
+	setChainConfig,
+	SetupType,
+} from "./core/types/base/configs";
 
 /**
  * Runs the main program.
@@ -38,27 +44,16 @@ async function main() {
 	await logger.loopLogging.logConfig(botConfig);
 	/*******************************/
 
-	//spawn chainOperator for chain interaction for each chainconfig//
-	let chainOperator: any;
-	if (chainConfigs.length > 1) {
-		chainConfigs.forEach(async (config: any) => {
-			chainOperator.push(await ChainOperator.connectWithSigner(config));
-		});
-	} else {
-		chainOperator = await ChainOperator.connectWithSigner(chainConfigs[0]);
-	}
-	/*******************************/
-
 	//create the arbitrage loop based on input config
 	let loop;
-	switch (configs[0].setupType) {
+	switch (botConfig.setupType) {
 		case SetupType.DEX:
-			loop = await DexLoop.createLoop(chainOperator, <DexConfig>chainConfigs[0], logger);
+			loop = await DexLoop.createLoop(botConfig, chainConfigs[0], logger);
 			//print the created arbitrage loop
 			await logger.loopLogging.logDexLoop(loop);
 			break;
 		case SetupType.LIQUIDATION:
-			loop = await LiquidationLoop.createLoop(chainOperator, <LiquidationConfig>chainConfigs[0], logger);
+			loop = await LiquidationLoop.createLoop(botConfig, <LiquidationChainConfig>chainConfigs[0], logger);
 			//print the created arbitrage loop
 			await logger.loopLogging.logLiqLoop(loop);
 			break;

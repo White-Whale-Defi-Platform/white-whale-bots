@@ -8,7 +8,7 @@ import { HttpBatchClient, HttpClient } from "@cosmjs/tendermint-rpc/build/rpccli
 import { SkipBundleClient } from "@skip-mev/skipjs";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 
-import { BotConfig } from "../../types/base/configs";
+import { ChainConfig } from "../../types/base/configs";
 import { Mempool } from "../../types/base/mempool";
 import { ChainOperatorInterface, TxResponse } from "../chainOperatorInterface";
 
@@ -38,16 +38,16 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	constructor(botConfig: BotConfig) {
-		this._chainPrefix = botConfig.chainPrefix;
+	constructor(chainConfig: ChainConfig) {
+		this._chainPrefix = chainConfig.chainPrefix;
 		this._timeoutRPCs = new Map<string, number>();
-		this._currRpcUrl = botConfig.rpcUrls[0];
-		if (botConfig.skipConfig) {
-			this._skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
+		this._currRpcUrl = chainConfig.rpcUrls[0];
+		if (chainConfig.skipConfig) {
+			this._skipBundleClient = new SkipBundleClient(chainConfig.skipConfig.skipRpcUrl);
 		}
-		this._rpcUrls = botConfig.rpcUrls;
-		this._denom = botConfig.baseDenom;
-		this._gasPrice = botConfig.gasPrice;
+		this._rpcUrls = chainConfig.rpcUrls;
+		this._denom = chainConfig.baseDenom;
+		this._gasPrice = chainConfig.gasPrice;
 	}
 	/**
 	 *
@@ -82,13 +82,13 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	async init(botConfig: BotConfig) {
+	async init(chainConfig: ChainConfig) {
 		// derive signing wallet
-		this._signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
-			prefix: botConfig.chainPrefix,
+		this._signer = await DirectSecp256k1HdWallet.fromMnemonic(chainConfig.mnemonic, {
+			prefix: chainConfig.chainPrefix,
 		});
 		// connect to client and querier
-		await this.setClients(botConfig.rpcUrls[0]);
+		await this.setClients(chainConfig.rpcUrls[0]);
 		this._account = (await this._signer.getAccounts())[0];
 		const { accountNumber, sequence } = await this._signingCWClient.getSequence(this._account.address);
 		this._chainId = await this._signingCWClient.getChainId();

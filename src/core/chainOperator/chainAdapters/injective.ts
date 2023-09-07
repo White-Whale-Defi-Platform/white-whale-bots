@@ -28,7 +28,7 @@ import { MsgSend as CosmJSMsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { MsgExecuteContract as CosmJSMsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
-import { BotConfig } from "../../types/base/configs";
+import { ChainConfig } from "../../types/base/configs";
 import { Mempool } from "../../types/base/mempool";
 import { ChainOperatorInterface, TxResponse } from "../chainOperatorInterface";
 /**
@@ -56,23 +56,23 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	constructor(botConfig: BotConfig, network: Network = Network.Mainnet) {
+	constructor(chainConfig: ChainConfig, network: Network = Network.Mainnet) {
 		const endpoints = getNetworkEndpoints(network);
-		const privateKey = PrivateKey.fromMnemonic(botConfig.mnemonic, "m/44'/60'/0'/0/0");
+		const privateKey = PrivateKey.fromMnemonic(chainConfig.mnemonic, "m/44'/60'/0'/0/0");
 		this._privateKey = privateKey;
 		this._signAndBroadcastClient = new MsgBroadcasterWithPk({
 			network: network,
 			privateKey: privateKey,
 			endpoints: {
 				indexer: endpoints.indexer,
-				grpc: botConfig.grpcUrl ?? endpoints.grpc,
-				rest: botConfig.restUrl ?? endpoints.rest,
+				grpc: chainConfig.grpcUrl ?? endpoints.grpc,
+				rest: chainConfig.restUrl ?? endpoints.rest,
 			},
 		});
 		this._spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
-		this._wasmQueryClient = new ChainGrpcWasmApi(botConfig.grpcUrl ?? endpoints.grpc);
-		this._httpClient = new HttpBatchClient(botConfig.rpcUrls[0] ?? endpoints.rpc);
-		this._authClient = new ChainRestAuthApi(botConfig.restUrl ?? endpoints.rest);
+		this._wasmQueryClient = new ChainGrpcWasmApi(chainConfig.grpcUrl ?? endpoints.grpc);
+		this._httpClient = new HttpBatchClient(chainConfig.rpcUrls[0] ?? endpoints.rpc);
+		this._authClient = new ChainRestAuthApi(chainConfig.restUrl ?? endpoints.rest);
 		this._chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
 		this._network = network;
 		this._publicKey = privateKey.toPublicKey();
@@ -112,7 +112,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	async init(botConfig: BotConfig): Promise<void> {
+	async init(chainConfig: ChainConfig): Promise<void> {
 		const accountDetailsResponse = await this._authClient.fetchAccount(this._publicAddress);
 		const baseAccount = BaseAccount.fromRestApi(accountDetailsResponse);
 		const accountDetails = baseAccount.toAccountDetails();
@@ -120,13 +120,13 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		this.sequence = accountDetails.sequence;
 
 		const hdPath = stringToPath("m/44'/60'/0'/0/0");
-		this._signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
-			prefix: botConfig.chainPrefix,
+		this._signer = await DirectSecp256k1HdWallet.fromMnemonic(chainConfig.mnemonic, {
+			prefix: chainConfig.chainPrefix,
 			hdPaths: [hdPath],
 		});
 
-		if (botConfig.skipConfig) {
-			this._skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
+		if (chainConfig.skipConfig) {
+			this._skipBundleClient = new SkipBundleClient(chainConfig.skipConfig.skipRpcUrl);
 			this._skipSigningAddress = (await this._signer.getAccounts())[0].address;
 		}
 	}

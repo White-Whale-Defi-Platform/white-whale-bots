@@ -6,7 +6,7 @@ import { initLiquidationOverseers } from "../../../../chains/defaults/queries/in
 import { tryLiquidationArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
-import { LiquidationConfig } from "../../base/configs";
+import { BotConfig, LiquidationChainConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { decodeMempool, IgnoredAddresses, Mempool, MempoolTx } from "../../base/mempool";
 import {
@@ -31,7 +31,7 @@ import {
  *
  */
 export class LiquidationLoop {
-	botConfig: LiquidationConfig;
+	botConfig: LiquidationChainConfig;
 	chainOperator: ChainOperator;
 	ignoreAddresses: IgnoredAddresses = {};
 	iterations = 0;
@@ -48,7 +48,7 @@ export class LiquidationLoop {
 	 */
 	constructor(
 		chainOperator: ChainOperator,
-		botConfig: LiquidationConfig,
+		botConfig: LiquidationChainConfig,
 		overseers: Array<AnchorOverseer>,
 		logger: Logger,
 	) {
@@ -71,16 +71,17 @@ export class LiquidationLoop {
 	/**
 	 *
 	 */
-	static async createLoop(chainOperator: ChainOperator, botConfig: LiquidationConfig, logger: Logger) {
-		if (botConfig.useMempool === false || botConfig.skipConfig?.useSkip === true) {
+	static async createLoop(botConfig: BotConfig, chainConfig: LiquidationChainConfig, logger: Logger) {
+		if (botConfig.useMempool === false || chainConfig.skipConfig?.useSkip === true) {
 			await logger.sendMessage(
 				"Currently not possible to start liquidation bot without mempool or with skip",
 				LogType.Console,
 			);
 			process.exit(1);
 		}
-		const overseers = await initLiquidationOverseers(botConfig.overseerAddresses, chainOperator);
-		return new LiquidationLoop(chainOperator, botConfig, overseers, logger);
+		const chainOperator = await ChainOperator.connectWithSigner(chainConfig);
+		const overseers = await initLiquidationOverseers(chainConfig.overseerAddresses, chainOperator);
+		return new LiquidationLoop(chainOperator, chainConfig, overseers, logger);
 	}
 
 	/**
