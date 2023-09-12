@@ -1,138 +1,148 @@
-import axios from "axios";
-
-import * as chains from "../../../../chains";
-import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
+import * as chainImports from "../../../../chains";
+import { getPoolStates, initPools } from "../../../../chains/defaults";
 import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
-import { getPaths, newGraph } from "../../../arbitrage/graph";
+import { newGraph } from "../../../arbitrage/graph";
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
-import { DexConfig } from "../../base/configs";
+import { Chain } from "../../base/chain";
+import { BotConfig, ChainConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { Orderbook } from "../../base/orderbook";
-import { getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, OrderSequence, Path } from "../../base/path";
-import { Pool, removedUnusedPools } from "../../base/pool";
+import { OrderbookPath, Path } from "../../base/path";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 
 /**
  *
  */
 export class IBCLoop {
-	pools: Array<Pool>;
-	orderbooks: Array<Orderbook>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
 	orderbookPaths: Array<OrderbookPath>;
 	pathlib: Array<Path>; //holds all known paths
 	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
-	chainOperators: Array<ChainOperator>;
-	accountNumber = 0;
-	sequence = 0;
+	chains: Array<Chain>;
 	botConfig: any;
 	logger: Logger | undefined;
 	iterations = 0;
-	updatePoolStates: DexLoopInterface["updatePoolStates"];
-	updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"];
 	messageFactory: DexLoopInterface["messageFactory"];
-	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
-	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
+	ammArb: (paths: Array<Path>, chainConfig: ChainConfig) => OptimalTrade | undefined;
+	orderbookArb: (paths: Array<OrderbookPath>, chainConfig: ChainConfig) => OptimalOrderbookTrade | undefined;
 
 	/**
 	 *
 	 */
 	public constructor(
-		chainOperator: Array<ChainOperator>,
-		botConfig: DexConfig,
+		botConfig: BotConfig,
+		chains: Array<Chain>,
 		logger: Logger | undefined,
-		allPools: Array<Pool>,
-		orderbooks: Array<Orderbook>,
-		updatePoolStates: DexLoopInterface["updatePoolStates"],
 		messageFactory: DexLoopInterface["messageFactory"],
-		updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"],
 	) {
+		const allPools = chains.flatMap((chain) => chain.pools);
 		const graph = newGraph(allPools);
-		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
-		const filteredPools = removedUnusedPools(allPools, paths);
-		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks);
-
-		this.orderbookPaths = orderbookPaths;
-		this.orderbooks = orderbooks;
-		this.pools = filteredPools;
+		// const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+		// const filteredPools = removedUnusedPools(allPools, paths);
+		// const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks);
+		this.chains = chains;
+		this.paths = [];
+		this.pathlib = [];
+		this.orderbookPaths = [];
+		// this.orderbookPaths = orderbookPaths;
 		this.CDpaths = new Map<string, [number, number, number]>();
-		this.paths = paths;
-		this.pathlib = paths;
+		// this.paths = paths;
+		// this.pathlib = paths;
 		this.ammArb = tryAmmArb;
 		this.orderbookArb = tryOrderbookArb;
-		this.updatePoolStates = updatePoolStates;
-		this.updateOrderbookStates = updateOrderbookStates;
 		this.messageFactory = messageFactory;
-		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
 		this.logger = logger;
 	}
 	/**
 	 *
 	 */
-	static async createLoop(
-		chainOperator: Array<ChainOperator>,
-		configs: Array<DexConfig>,
-		logger: Logger,
-	): Promise<DexLoopInterface> {
-		for (let i = 0; i < chainOperator.length; i++) {
-			let msgFactory = chains.defaults.messageFactory;
-			let getPoolStates = chains.defaults.getPoolStates;
-			let initPools = chains.defaults.initPools;
-			const initOrderbook = chains.injective.initOrderbooks;
-			const getOrderbookState = chains.injective.getOrderbookState;
-			const operator = chainOperator[i];
-			const botConfig = configs[i];
-			await import("../../../../chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
+	static async createLoop(botConfig: BotConfig, chainConfigs: Array<ChainConfig>, logger: Logger): Promise<IBCLoop> {
+		const chains: Array<Chain> = [];
+		const msgFactory = chainImports.defaults.messageFactory;
+		const initOrderbook = chainImports.injective.initOrderbooks;
+		for (const chainConfig of chainConfigs) {
+			await import("../../../../chains/" + chainConfig.chainPrefix).then(async (chainSetups) => {
 				if (chainSetups === undefined) {
 					await logger.sendMessage(
 						"Unable to resolve specific chain imports, using defaults",
 						LogType.Console,
 					);
 				}
-				msgFactory = chainSetups.getFlashArbMessages;
-				getPoolStates = chainSetups.getPoolStates;
-				initPools = chainSetups.initPools;
+				// msgFactory = chainSetups.getFlashArbMessages;
+				const getPoolStatesChain: typeof getPoolStates = chainSetups.getPoolStates;
+				const initPoolsChain: typeof initPools = chainSetups.initPools;
+				const getOrderbookState = chainImports.injective.getOrderbookState; //default injective
+
+				const chainOperator = await ChainOperator.connectWithSigner(chainConfig);
+				const allPoolsChain = await initPoolsChain(
+					chainOperator,
+					chainConfig.poolEnvs,
+					chainConfig.mappingFactoryRouter,
+				);
+
+				const orderbooks: Array<Orderbook> = [];
+				if (chainConfig.chainPrefix === "inj" && chainConfig.orderbooks.length > 0) {
+					const obs = await initOrderbook(chainOperator, chainConfig);
+					if (obs) {
+						orderbooks.push(...obs);
+					}
+				}
+				const chain: Chain = {
+					chainConfig: chainConfig,
+					pools: allPoolsChain,
+					chainOperator: chainOperator,
+					orderbooks: orderbooks,
+					updatePoolStates: getPoolStatesChain,
+					updateOrderbookStates: getOrderbookState,
+				};
+
+				chains.push(chain);
 				return;
 			});
-			const orderbooks: Array<Orderbook> = [];
-			if (botConfig.chainPrefix === "inj" && botConfig.orderbooks && botConfig.orderbooks.length > 0) {
-				const obs = await initOrderbook(operator, botConfig);
-				if (obs) {
-					orderbooks.push(...obs);
-				}
+		}
+		return new IBCLoop(botConfig, chains, logger, msgFactory);
+	}
+	/*
+		const orderbooks: Array<Orderbook> = [];
+		if (botConfig.chainPrefix === "inj" && botConfig.orderbooks && botConfig.orderbooks.length > 0) {
+			const obs = await initOrderbook(operator, botConfig);
+			if (obs) {
+				orderbooks.push(...obs);
 			}
-			const originPools = await initPools(operator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
-			let poolsOtherChains: any;
-			let diffassets: any = new Set();
+		}
+		const originPools = await initPools(operator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+		let poolsOtherChains: any;
+		let diffassets: any = new Set();
 
-			for (let y = 0; y < originPools.length; y++) {
-				originPools[y].chainID = operator.client.chainId;
-				diffassets.add(originPools[y].assets[0].info);
-				diffassets.add(originPools[y].assets[1].info);
-			}
-			const options = {
-				method: "POST",
-				url: "https://api.skip.money/v1/fungible/assets_from_source",
-				headers: { accept: "application/json", "content-type": "application/json" },
-				data: {}
-				
-			};
-			diffassets = [...diffassets];
-			for (let x=0; x<chainOperator.length;x++){
-				if (chainOperator[x].client.chainId !== operator.client.chainId) {
-					const portedpools:any = [];
-					for (let y = 0; y < diffassets.length; y++) {
-						options.data = { allow_multi_tx: false, source_asset_chain_id: operator.client.chainId, source_asset_denom: diffassets[y] }
-						await axios.request(options)
-						
-					}
-					poolsOtherChains[chainOperator[x].client.chainId] = portedpools;
-				} else {
+		for (let y = 0; y < originPools.length; y++) {
+			originPools[y].chainID = operator.client.chainId;
+			diffassets.add(originPools[y].assets[0].info);
+			diffassets.add(originPools[y].assets[1].info);
+		}
+		const options = {
+			method: "POST",
+			url: "https://api.skip.money/v1/fungible/assets_from_source",
+			headers: { accept: "application/json", "content-type": "application/json" },
+			data: {},
+		};
+		diffassets = [...diffassets];
+		for (let x = 0; x < chainOperator.length; x++) {
+			if (chainOperator[x].client.chainId !== operator.client.chainId) {
+				const portedpools: any = [];
+				for (let y = 0; y < diffassets.length; y++) {
+					options.data = {
+						allow_multi_tx: false,
+						source_asset_chain_id: operator.client.chainId,
+						source_asset_denom: diffassets[y],
+					};
+					await axios.request(options);
 				}
-			}};
+				poolsOtherChains[chainOperator[x].client.chainId] = portedpools;
+			} else {
+			}
 		}
 
 		return new IBCLoop(
@@ -146,12 +156,14 @@ export class IBCLoop {
 			getOrderbookState,
 		);
 	}
+	*/
 	/**
 	 *
 	 */
 	public async step() {
 		this.iterations++;
 
+		/*
 		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 		const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
 
@@ -171,7 +183,8 @@ export class IBCLoop {
 			this.cdPaths(arbtradeOB.path);
 		}
 
-		await this.chainOperator.reset();
+		// await this.chainOperator.reset();
+		*/
 	}
 
 	/**
@@ -179,41 +192,47 @@ export class IBCLoop {
 	 */
 	async reset() {
 		this.unCDPaths();
-		await this.updatePoolStates(this.chainOperator, this.pools);
-		if (this.updateOrderbookStates) {
-			await this.updateOrderbookStates(this.chainOperator, this.orderbooks);
+		await Promise.all(this.chains.map((chain) => chain.updatePoolStates(chain.chainOperator, chain.pools)));
+		if (this.orderbookPaths.length > 0) {
+			await Promise.all(
+				this.chains.map((chain) => {
+					if (chain.updateOrderbookStates) {
+						return chain.updateOrderbookStates(chain.chainOperator, chain.orderbooks);
+					}
+				}),
+			);
 		}
 	}
 
 	/**
 	 *
 	 */
-	public async trade(arbTrade: OptimalTrade | OptimalOrderbookTrade) {
-		const publicAddress = this.chainOperator.client.publicAddress;
-		const messages = this.messageFactory(arbTrade, publicAddress, this.botConfig.flashloanRouterAddress);
-		if (!messages) {
-			console.error("error in creating messages", 1);
-			process.exit(1);
-		}
-		if (isOrderbookPath(arbTrade.path)) {
-			if (arbTrade.path.orderSequence === OrderSequence.AmmFirst) {
-				const txResponse = await this.chainOperator.signAndBroadcast(messages[0]);
-				await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTrade, [txResponse]);
-			} else {
-				const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]]);
-				await delay(2000);
-				const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]]);
-				await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTrade, [
-					txResponse,
-					txResponse2,
-				]);
-			}
-		} else {
-			const txResponse = await this.chainOperator.signAndBroadcast(messages[0]);
-			await this.logger?.tradeLogging.logAmmTrade(<OptimalTrade>arbTrade, [txResponse]);
-		}
-		await delay(10000);
-	}
+	// public async trade(arbTrade: OptimalTrade | OptimalOrderbookTrade) {
+	// 	const publicAddress = this.chainOperator.client.publicAddress;
+	// 	const messages = this.messageFactory(arbTrade, publicAddress, this.botConfig.flashloanRouterAddress);
+	// 	if (!messages) {
+	// 		console.error("error in creating messages", 1);
+	// 		process.exit(1);
+	// 	}
+	// 	if (isOrderbookPath(arbTrade.path)) {
+	// 		if (arbTrade.path.orderSequence === OrderSequence.AmmFirst) {
+	// 			const txResponse = await this.chainOperator.signAndBroadcast(messages[0]);
+	// 			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTrade, [txResponse]);
+	// 		} else {
+	// 			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]]);
+	// 			await delay(2000);
+	// 			const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]]);
+	// 			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTrade, [
+	// 				txResponse,
+	// 				txResponse2,
+	// 			]);
+	// 		}
+	// 	} else {
+	// 		const txResponse = await this.chainOperator.signAndBroadcast(messages[0]);
+	// 		await this.logger?.tradeLogging.logAmmTrade(<OptimalTrade>arbTrade, [txResponse]);
+	// 	}
+	// 	await delay(10000);
+	// }
 	/**
 	 * Put path on Cooldown, add to CDPaths with iteration number as block.
 	 * Updates the iteration count of elements in CDpaths if its in equalpath of param: path

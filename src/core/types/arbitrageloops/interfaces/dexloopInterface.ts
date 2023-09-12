@@ -5,7 +5,7 @@ import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arb
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
-import { DexConfig } from "../../base/configs";
+import { BotConfig } from "../../base/configs";
 import { Orderbook } from "../../base/orderbook";
 import { OrderbookPath, Path } from "../../base/path";
 import { Pool } from "../../base/pool";
@@ -22,7 +22,7 @@ export interface DexLoopInterface {
 	chainOperator: ChainOperator;
 	accountNumber: number;
 	sequence: number;
-	botConfig: DexConfig;
+	botConfig: BotConfig;
 	logger: Logger | undefined;
 	iterations: number;
 

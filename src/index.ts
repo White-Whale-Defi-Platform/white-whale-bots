@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 
 import { Logger } from "./core/logging";
+import { DexLoopInterface } from "./core/types/arbitrageloops/interfaces/dexloopInterface";
 import { DexLoop } from "./core/types/arbitrageloops/loops/dexloop";
 import { IBCLoop } from "./core/types/arbitrageloops/loops/ibcloop";
 import { LiquidationLoop } from "./core/types/arbitrageloops/loops/liqMempoolLoop";
@@ -19,7 +20,7 @@ import {
  */
 async function main() {
 	//read bot configuration files//
-	const botConfigOutput = dotenv.config({ path: "./src/envs/bot/botsetup.env" });
+	const botConfigOutput = dotenv.config({ path: "./src/envs/bot/botconfig.env" });
 	if (!botConfigOutput.parsed) {
 		console.error("Cannot read botconfig env file", 1);
 		process.exit(1);
@@ -30,8 +31,8 @@ async function main() {
 
 	//read chain configuration files//
 	const chainConfigs: Array<ChainConfig> = [];
-	fs.readdirSync("./src/envs", { encoding: null, withFileTypes: true }).forEach(async (file) => {
-		const dotenvResponse = dotenv.config({ path: "./src/envs/" + file.name });
+	fs.readdirSync("./src/envs/chains/", { encoding: null, withFileTypes: true }).forEach(async (file) => {
+		const dotenvResponse = dotenv.config({ path: "./src/envs//chains/" + file.name });
 		if (dotenvResponse.parsed) {
 			chainConfigs.push(await setChainConfig(dotenvResponse.parsed, botConfig));
 		}
@@ -41,7 +42,7 @@ async function main() {
 
 	//setup logging//
 	const logger = new Logger(botConfig);
-	await logger.loopLogging.logConfig(botConfig);
+	await logger.loopLogging.logConfig(botConfig, chainConfigs[0]);
 	/*******************************/
 
 	//create the arbitrage loop based on input config
@@ -58,8 +59,8 @@ async function main() {
 			await logger.loopLogging.logLiqLoop(loop);
 			break;
 		case SetupType.IBC:
-			loop = await IBCLoop.createLoop(chainOperator, chainConfigs, logger);
-			await logger.loopLogging.logIBCLoop(loop);
+			loop = await IBCLoop.createLoop(botConfig, chainConfigs, logger);
+			// await logger.loopLogging.logIBCLoop(loop);
 			break;
 	}
 
@@ -69,22 +70,25 @@ async function main() {
 		await loop.step();
 		await loop.reset();
 		const now = Date.now();
-		if (startupTime - now + botConfig.signOfLife * 60000 <= 0) {
-			timeIt++;
-			const mins = (botConfig.signOfLife * timeIt) % 60;
-			const hours = ~~((botConfig.signOfLife * timeIt) / 60);
-			startupTime = now;
-			const message = `**chain:** ${chainOperator.client.chainId} **wallet:**  **status:** running for ${
-				loop.iterations
-			} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
-			loop.clearIgnoreAddresses();
+		if (botConfig.setupType === SetupType.DEX || botConfig.setupType === SetupType.LIQUIDATION)
+			if (startupTime - now + botConfig.signOfLife * 60000 <= 0) {
+				timeIt++;
+				const mins = (botConfig.signOfLife * timeIt) % 60;
+				const hours = ~~((botConfig.signOfLife * timeIt) / 60);
+				startupTime = now;
+				const message = `**chain:** ${
+					(<DexLoopInterface>loop).chainOperator.client.chainId
+				} **wallet:**  **status:** running for ${loop.iterations} blocks or ${
+					hours === 0 ? "" : hours + " Hour(s) and "
+				}${mins} Minutes`;
+				loop.clearIgnoreAddresses();
 
-			//switching RPCS every 6 Hrs
-			if (mins == 0 && hours === 6 && botConfig.rpcUrls.length > 1) {
-				await chainOperator.client.getNewClients();
+				// //switching RPCS every 6 Hrs
+				// if (mins == 0 && hours === 6 && botConfig.rpcUrls.length > 1) {
+				// 	await chainOperator.client.getNewClients();
+				// }
+				await logger.sendMessage(message);
 			}
-			await logger.sendMessage(message);
-		}
 	}
 }
 

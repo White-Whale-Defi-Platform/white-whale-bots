@@ -1,6 +1,6 @@
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
 import { AssetInfo } from "../../../core/types/base/asset";
-import { DexConfig } from "../../../core/types/base/configs";
+import { ChainConfig } from "../../../core/types/base/configs";
 import { Orderbook } from "../../../core/types/base/orderbook";
 import { identity } from "../../../core/types/identity";
 import { getOrderbookState } from "./getOrderbookState";
@@ -9,10 +9,10 @@ import { getOrderbookState } from "./getOrderbookState";
  */
 export async function initOrderbooks(
 	chainoperator: ChainOperator,
-	botConfig: DexConfig,
+	chainConfig: ChainConfig,
 ): Promise<Array<Orderbook> | undefined> {
 	const orderbooks: Array<Orderbook> = [];
-	for (const orderbookAddress of botConfig.orderbooks) {
+	for (const orderbookAddress of chainConfig.orderbooks) {
 		const marketInfo = await chainoperator.queryMarket(orderbookAddress);
 		if (!marketInfo) {
 			console.log("cannot fetch market: ", orderbookAddress);

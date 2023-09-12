@@ -6,7 +6,7 @@ import { TxResponse } from "../chainOperator/chainOperatorInterface";
 import { DexLoopInterface } from "../types/arbitrageloops/interfaces/dexloopInterface";
 import { LiquidationLoop } from "../types/arbitrageloops/loops/liqMempoolLoop";
 import { isNativeAsset, NativeAssetInfo } from "../types/base/asset";
-import { BotConfig } from "../types/base/configs";
+import { BotConfig, ChainConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";
 import { Loan } from "../types/base/overseer";
 import { OrderSequence } from "../types/base/path";
@@ -62,7 +62,7 @@ export class Logger {
 		/**
 		 *
 		 */
-		async logConfig(botConfig: BotConfig) {
+		async logConfig(botConfig: BotConfig, chainConfig: ChainConfig) {
 			//todo: place this in the logger class
 			let startupMessage = "===".repeat(30);
 			startupMessage += "\n**White Whale Bot**\n";
@@ -70,13 +70,13 @@ export class Logger {
 			startupMessage += "===".repeat(30);
 
 			startupMessage += `\nEnvironment Variables:\n
-**RPC ENPDOINTS:** \t${botConfig.rpcUrls}
+**RPC ENPDOINTS:** \t${chainConfig.rpcUrls}
 **USE MEMPOOL:** \t${botConfig.useMempool}
-**USE SKIP:** \t${botConfig.skipConfig?.useSkip}
+**USE SKIP:** \t${chainConfig.skipConfig?.useSkip}
 				`;
-			if (botConfig.skipConfig) {
-				startupMessage += `**SKIP URL:** \t${botConfig.skipConfig.skipRpcUrl}\n`;
-				startupMessage += `**SKIP BID RATE:** \t${botConfig.skipConfig.skipBidRate}\n`;
+			if (chainConfig.skipConfig) {
+				startupMessage += `**SKIP URL:** \t${chainConfig.skipConfig.skipRpcUrl}\n`;
+				startupMessage += `**SKIP BID RATE:** \t${chainConfig.skipConfig.skipBidRate}\n`;
 			}
 			startupMessage += "\n";
 			startupMessage += "---".repeat(30);

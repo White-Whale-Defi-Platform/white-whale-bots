@@ -97,7 +97,7 @@ export class DexLoop implements DexLoopInterface {
 
 		/*******************************/
 		if (chainConfig.chainPrefix === "inj" && chainConfig.orderbooks.length > 0) {
-			const obs = await initOrderbook(chainOperator, botConfig);
+			const obs = await initOrderbook(chainOperator, chainConfig);
 			if (obs) {
 				orderbooks.push(...obs);
 			}
