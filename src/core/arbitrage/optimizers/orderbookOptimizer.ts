@@ -59,27 +59,13 @@ function getOptimalTradeForPath(
 	path: OrderbookPath,
 	offerAssetInfo: AssetInfo,
 ): [number, Asset, number, number, number] {
-	let tradesizes = [...Array(900).keys()];
+	let tradesizes = [...Array(500).keys()];
 	tradesizes = tradesizes.map((x) => x * 1e6);
 
-	let leftIndex = 0;
-	let rightIndex = tradesizes.length - 1;
-	let guessIndex = 0;
-	while (leftIndex < rightIndex) {
-		guessIndex = Math.floor((leftIndex + rightIndex) / 2);
-		if (
-			getProfitForTradesize(path, tradesizes[guessIndex], offerAssetInfo)[0] <
-			getProfitForTradesize(path, tradesizes[guessIndex + 1], offerAssetInfo)[0]
-		) {
-			leftIndex = guessIndex + 1;
-		} else if (
-			getProfitForTradesize(path, tradesizes[guessIndex], offerAssetInfo)[0] >
-			getProfitForTradesize(path, tradesizes[guessIndex + 1], offerAssetInfo)[0]
-		) {
-			rightIndex = guessIndex;
-		}
-	}
-	return getProfitForTradesize(path, tradesizes[guessIndex], offerAssetInfo);
+	return binarySearch(path, offerAssetInfo, tradesizes, 0, tradesizes.length - 1);
+	/**
+	 *
+	 */
 }
 
 /**
@@ -107,5 +93,33 @@ function getProfitForTradesize(
 		const offerAsset1 = { amount: String(outGivenIn0), info: outInfo0 };
 		const [outGivenIn1, outInfo1] = outGivenIn(path.pool, offerAsset1);
 		return [outGivenIn1 - +offerAsset.amount, offerAsset, worstPrice, averagePrice, outGivenIn0];
+	}
+}
+
+/**
+ *
+ */
+function binarySearch(
+	path: OrderbookPath,
+	offerAssetInfo: AssetInfo,
+	arr: Array<number>,
+	low: number,
+	high: number,
+): [number, Asset, number, number, number] {
+	if (low === high) {
+		return getProfitForTradesize(path, arr[low], offerAssetInfo);
+	}
+	const mid = Math.floor((low + high) / 2);
+	const midValue = getProfitForTradesize(path, arr[mid], offerAssetInfo)[0];
+	const leftOfMidValue = getProfitForTradesize(path, arr[mid - 1], offerAssetInfo)[0];
+	const rightOfMidValue = getProfitForTradesize(path, arr[mid + 1], offerAssetInfo)[0];
+
+	if (midValue > rightOfMidValue && midValue > leftOfMidValue) {
+		return getProfitForTradesize(path, arr[mid], offerAssetInfo);
+	}
+	if (midValue > rightOfMidValue && midValue < leftOfMidValue) {
+		return binarySearch(path, offerAssetInfo, arr, low, mid - 1);
+	} else {
+		return binarySearch(path, offerAssetInfo, arr, mid + 1, high);
 	}
 }

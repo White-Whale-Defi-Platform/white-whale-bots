@@ -142,6 +142,14 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		const jsonResult = JSON.parse(fromUtf8(queryResult.data));
 		return jsonResult;
 	}
+
+	/**
+	 *
+	 */
+	async queryBlockHeight() {
+		const blockResponse = await this._httpClient.execute(createJsonRpcRequest("block"));
+		return blockResponse.result.block.header.height;
+	}
 	/**
 	 *
 	 */

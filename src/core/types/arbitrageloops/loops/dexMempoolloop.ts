@@ -39,6 +39,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 	totalBytes = 0;
 	mempool!: Mempool;
 	ignoreAddresses!: IgnoredAddresses;
+	blockHeight = 0;
 
 	/**
 	 *
@@ -78,12 +79,18 @@ export class DexMempoolLoop implements DexLoopInterface {
 	 */
 	public async step() {
 		this.iterations++;
-		await this.updatePoolStates(this.chainOperator, this.pools);
+
 		if (this.updateOrderbookStates) {
-			await this.updateOrderbookStates(this.chainOperator, this.orderbooks);
+			await Promise.all([
+				this.updatePoolStates(this.chainOperator, this.pools),
+				this.updateOrderbookStates(this.chainOperator, this.orderbooks),
+			]);
+		} else {
+			await this.updatePoolStates(this.chainOperator, this.pools);
 		}
 
 		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
+
 		const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
 
 		if (arbTrade || arbtradeOB) {

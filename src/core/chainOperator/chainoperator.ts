@@ -69,6 +69,13 @@ export class ChainOperator {
 			return await this.client.queryMempool();
 		}
 	}
+
+	/**
+	 *
+	 */
+	async queryBlockheight() {
+		return this.client.queryBlockHeight();
+	}
 	/**
 	 *
 	 */

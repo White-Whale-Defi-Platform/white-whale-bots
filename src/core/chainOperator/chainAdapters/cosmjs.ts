@@ -175,6 +175,13 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		const mempoolResult = await this._httpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
 		return mempoolResult.result;
 	}
+	/**
+	 *
+	 */
+	async queryBlockHeight() {
+		const blockResponse = await this._httpClient.execute(createJsonRpcRequest("block"));
+		return blockResponse.result.block.header.height;
+	}
 
 	/**
 	 * Sets new Clients for Mempoolloop.
