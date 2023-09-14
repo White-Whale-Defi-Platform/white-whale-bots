@@ -20,12 +20,15 @@ export async function initOrderbooks(
 		}
 		const baseAssetInfo: AssetInfo = { native_token: { denom: marketInfo.baseDenom } };
 		const quoteAssetInfo: AssetInfo = { native_token: { denom: marketInfo.quoteDenom } };
+
+		const decimalAdjustment = (marketInfo.baseToken?.decimals ?? 6) - (marketInfo.quoteToken?.decimals ?? 6);
+		const quantityIncrement = marketInfo.minQuantityTickSize / 10 ** decimalAdjustment;
 		const ob = identity<Orderbook>({
 			baseAssetInfo: baseAssetInfo,
 			quoteAssetInfo: quoteAssetInfo,
 			baseAssetDecimals: marketInfo.baseToken?.decimals ?? 6,
 			quoteAssetDecimals: marketInfo.quoteToken?.decimals ?? 6,
-			minQuantityIncrement: marketInfo.minQuantityTickSize ?? 10e3,
+			minQuantityIncrement: quantityIncrement,
 			buys: [],
 			sells: [],
 			marketId: orderbookAddress,

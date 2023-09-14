@@ -83,7 +83,14 @@ function getProfitForTradesize(
 		const offerAsset: Asset = { amount: String(tradesize), info: offerAssetInfo };
 		const [outGivenIn0, outInfo0] = outGivenIn(path.pool, offerAsset);
 		// console.log("amm price received: ", ts / outGivenIn0, "tradesize: ", ts, "assets received: ", outGivenIn0);
-		const offerAsset1: Asset = { amount: String(outGivenIn0), info: outInfo0 };
+
+		//we have to compensate for the precision of the market stated by the minQuantityIncrement
+		const offerAsset1: Asset = {
+			amount: String(
+				Math.floor(outGivenIn0 / path.orderbook.minQuantityIncrement) * path.orderbook.minQuantityIncrement,
+			),
+			info: outInfo0,
+		};
 		const [outGivenIn1, worstPrice, averagePrice] = OrderbookMarketSell(path.orderbook, offerAsset1);
 		return [outGivenIn1 - +offerAsset.amount, offerAsset, worstPrice, averagePrice, outGivenIn1];
 	} else {

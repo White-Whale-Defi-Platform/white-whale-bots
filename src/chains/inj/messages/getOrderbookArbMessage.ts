@@ -23,7 +23,10 @@ export function getOrderbookArbMessages(
 		const msg0 = getSwapMessage(arbTrade.path.pool, offerAsset, publicAddress, price);
 
 		const offerAsset1 = {
-			amount: String(outGivenIn0),
+			amount: String(
+				Math.floor(outGivenIn0 / arbTrade.path.orderbook.minQuantityIncrement) *
+					arbTrade.path.orderbook.minQuantityIncrement,
+			),
 			info: outInfo0,
 		};
 

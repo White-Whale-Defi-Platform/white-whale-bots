@@ -27,10 +27,7 @@ export function getMarketSpotOrderMessage(
 		quoteDecimals: arbTrade.path.orderbook.quoteAssetDecimals,
 	});
 
-	let orderSize = +new BigNumberInBase(offerAsset.amount).toWei(decimals).toFixed();
-	orderSize =
-		Math.floor(+orderSize / arbTrade.path.orderbook.minQuantityIncrement) *
-		arbTrade.path.orderbook.minQuantityIncrement;
+	const orderSize = +new BigNumberInBase(offerAsset.amount).toWei(decimals).toFixed();
 
 	const marketSpotOrderMsg: SpotMarketOrderMessage = {
 		marketId: arbTrade.path.orderbook.marketId,
