@@ -35,7 +35,10 @@ export function getOrderbookArbMessages(
 		return [[msg0, msg1], 2];
 	} else {
 		const offerAsset1 = {
-			amount: String(arbTrade.outGivenIn),
+			amount: String(
+				Math.floor(arbTrade.outGivenIn / arbTrade.path.orderbook.minQuantityIncrement) *
+					arbTrade.path.orderbook.minQuantityIncrement,
+			),
 			info: arbTrade.path.orderbook.baseAssetInfo,
 		};
 		const msg0 = getMarketSpotOrderMessage(arbTrade, publicAddress, offerAsset1, 1);
