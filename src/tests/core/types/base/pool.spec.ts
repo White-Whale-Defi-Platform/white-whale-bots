@@ -34,6 +34,7 @@ describe("Test outGivenIn for pool with 18 and 6 decimal assets", () => {
 		inputfee: 0,
 		outputfee: 0.3,
 		LPratio: 0.6667,
+		ibcAssets: [],
 	});
 	it("Should return positive number for given swap", async () => {
 		const input: Asset = {
@@ -91,6 +92,7 @@ describe("Test outGivenIn for pool with 6 and 6 decimal assets", () => {
 		inputfee: 0,
 		outputfee: 0.3,
 		LPratio: 0.6667,
+		ibcAssets: [],
 	});
 	it("Should return positive number for given swap", async () => {
 		const input: Asset = {

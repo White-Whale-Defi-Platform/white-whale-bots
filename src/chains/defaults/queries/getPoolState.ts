@@ -61,6 +61,7 @@ export async function initPools(
 	chainOperator: ChainOperator,
 	poolAddresses: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>,
 	factoryMapping: Array<{ factory: string; router: string }>,
+	nativeOnly = false,
 ): Promise<Array<Pool>> {
 	const pools: Array<Pool> = [];
 	const factoryPools = await getPoolsFromFactory(chainOperator, factoryMapping);
@@ -78,17 +79,33 @@ export async function initPools(
 		const factory = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.factory ?? "";
 		const router = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.router ?? "";
 
-		pools.push({
-			assets: assets,
-			totalShare: totalShare,
-			address: poolAddress.pool,
-			dexname: dexname,
-			inputfee: poolAddress.inputfee,
-			outputfee: poolAddress.outputfee,
-			LPratio: poolAddress.LPratio,
-			factoryAddress: factory,
-			routerAddress: router,
-		});
+		if (!nativeOnly) {
+			pools.push({
+				assets: assets,
+				totalShare: totalShare,
+				address: poolAddress.pool,
+				dexname: dexname,
+				inputfee: poolAddress.inputfee,
+				outputfee: poolAddress.outputfee,
+				LPratio: poolAddress.LPratio,
+				factoryAddress: factory,
+				routerAddress: router,
+				ibcAssets: [],
+			});
+		} else if (nativeOnly && isNativeAsset(assets[0].info) && isNativeAsset(assets[1].info)) {
+			pools.push({
+				assets: assets,
+				totalShare: totalShare,
+				address: poolAddress.pool,
+				dexname: dexname,
+				inputfee: poolAddress.inputfee,
+				outputfee: poolAddress.outputfee,
+				LPratio: poolAddress.LPratio,
+				factoryAddress: factory,
+				routerAddress: router,
+				ibcAssets: [],
+			});
+		}
 	}
 	return pools;
 }

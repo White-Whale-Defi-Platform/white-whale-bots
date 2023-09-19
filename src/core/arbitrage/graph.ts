@@ -22,22 +22,23 @@ type Edge = {
 /**
  *
  */
-export function newGraph(pools: Array<Pool>): Graph {
+export function newGraph(pools: Array<Pool>, ibcGraph = false): Graph {
 	const vertices = new Map();
 	const graph: Graph = { vertices: vertices };
 	for (const pool of pools) {
-		const vertexA: Vertex = getVertex(
-			graph,
-			isNativeAsset(pool.assets[0].info)
-				? pool.assets[0].info.native_token.denom
-				: pool.assets[0].info.token.contract_addr,
-		);
-		const vertexB: Vertex = getVertex(
-			graph,
-			isNativeAsset(pool.assets[1].info)
-				? pool.assets[1].info.native_token.denom
-				: pool.assets[1].info.token.contract_addr,
-		);
+		const nameLeft = ibcGraph
+			? `${pool.ibcAssets[0].origin_chain_id}/${pool.ibcAssets[0].origin_denom}`
+			: isNativeAsset(pool.assets[0].info)
+			? pool.assets[0].info.native_token.denom
+			: pool.assets[0].info.token.contract_addr;
+		const nameRight = ibcGraph
+			? `${pool.ibcAssets[1].origin_chain_id}/${pool.ibcAssets[1].origin_denom}`
+			: isNativeAsset(pool.assets[1].info)
+			? pool.assets[1].info.native_token.denom
+			: pool.assets[1].info.token.contract_addr;
+
+		const vertexA: Vertex = getVertex(graph, nameLeft);
+		const vertexB: Vertex = getVertex(graph, nameRight);
 		connectTo(vertexA, vertexB, pool);
 		connectTo(vertexB, vertexA, pool);
 	}
@@ -59,10 +60,22 @@ function getVertex(graph: Graph, name: string): Vertex {
 /**
  *
  */
-export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number): Array<Path> | undefined {
-	const startingAssetName = isNativeAsset(startingAsset)
-		? startingAsset.native_token.denom
-		: startingAsset.token.contract_addr;
+export function getPaths(
+	graph: Graph,
+	startingAsset: AssetInfo | string,
+	depth: number,
+	ibcPaths = false,
+): Array<Path> | undefined {
+	let startingAssetName: string;
+	if (typeof startingAsset === "string" && ibcPaths) {
+		startingAssetName = startingAsset;
+	} else if (typeof startingAsset !== "string" && !ibcPaths) {
+		startingAssetName = isNativeAsset(startingAsset)
+			? startingAsset.native_token.denom
+			: startingAsset.token.contract_addr;
+	} else {
+		return undefined;
+	}
 	const root = graph.vertices.get(startingAssetName);
 	if (!root) {
 		console.log("graph does not contain starting asset");

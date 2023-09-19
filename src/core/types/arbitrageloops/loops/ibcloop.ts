@@ -1,14 +1,10 @@
-import * as chainImports from "../../../../chains";
-import { getPoolStates, initPools } from "../../../../chains/defaults";
+import { messageFactory } from "../../../../chains/defaults";
 import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
-import { newGraph } from "../../../arbitrage/graph";
+import { getPaths, newGraph } from "../../../arbitrage/graph";
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
-import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
-import { Chain } from "../../base/chain";
+import { Chain, initChain } from "../../base/chain";
 import { BotConfig, ChainConfig } from "../../base/configs";
-import { LogType } from "../../base/logging";
-import { Orderbook } from "../../base/orderbook";
 import { OrderbookPath, Path } from "../../base/path";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 
@@ -38,8 +34,21 @@ export class IBCLoop {
 		messageFactory: DexLoopInterface["messageFactory"],
 	) {
 		const allPools = chains.flatMap((chain) => chain.pools);
-		const graph = newGraph(allPools);
-		// const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+		// allPools.forEach((pool) => {
+		// 	console.log(pool.address, pool.ibcAssets[0], pool.ibcAssets[1]);
+		// });
+		const graph = newGraph(allPools, true);
+		//test values
+		const startingAssetName = "juno-1/ujuno";
+		const paths = getPaths(graph, startingAssetName, botConfig.maxPathPools, true) ?? [];
+		console.log(paths.length);
+		paths.forEach((path) => {
+			let poolText = `${path.identifier}:\n`;
+			path.pools.forEach((pool) => {
+				poolText += `${pool.address}: ${pool.ibcAssets[0].origin_denom}/${pool.ibcAssets[1].origin_denom}\n`;
+			});
+			console.log(poolText);
+		});
 		// const filteredPools = removedUnusedPools(allPools, paths);
 		// const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks);
 		this.chains = chains;
@@ -61,49 +70,11 @@ export class IBCLoop {
 	 */
 	static async createLoop(botConfig: BotConfig, chainConfigs: Array<ChainConfig>, logger: Logger): Promise<IBCLoop> {
 		const chains: Array<Chain> = [];
-		const msgFactory = chainImports.defaults.messageFactory;
-		const initOrderbook = chainImports.injective.initOrderbooks;
 		for (const chainConfig of chainConfigs) {
-			await import("../../../../chains/" + chainConfig.chainPrefix).then(async (chainSetups) => {
-				if (chainSetups === undefined) {
-					await logger.sendMessage(
-						"Unable to resolve specific chain imports, using defaults",
-						LogType.Console,
-					);
-				}
-				// msgFactory = chainSetups.getFlashArbMessages;
-				const getPoolStatesChain: typeof getPoolStates = chainSetups.getPoolStates;
-				const initPoolsChain: typeof initPools = chainSetups.initPools;
-				const getOrderbookState = chainImports.injective.getOrderbookState; //default injective
-
-				const chainOperator = await ChainOperator.connectWithSigner(chainConfig);
-				const allPoolsChain = await initPoolsChain(
-					chainOperator,
-					chainConfig.poolEnvs,
-					chainConfig.mappingFactoryRouter,
-				);
-
-				const orderbooks: Array<Orderbook> = [];
-				if (chainConfig.chainPrefix === "inj" && chainConfig.orderbooks.length > 0) {
-					const obs = await initOrderbook(chainOperator, chainConfig);
-					if (obs) {
-						orderbooks.push(...obs);
-					}
-				}
-				const chain: Chain = {
-					chainConfig: chainConfig,
-					pools: allPoolsChain,
-					chainOperator: chainOperator,
-					orderbooks: orderbooks,
-					updatePoolStates: getPoolStatesChain,
-					updateOrderbookStates: getOrderbookState,
-				};
-
-				chains.push(chain);
-				return;
-			});
+			const chain: Chain = await initChain(chainConfig, logger);
+			chains.push(chain);
 		}
-		return new IBCLoop(botConfig, chains, logger, msgFactory);
+		return new IBCLoop(botConfig, chains, logger, messageFactory);
 	}
 	/*
 		const orderbooks: Array<Orderbook> = [];
@@ -161,6 +132,12 @@ export class IBCLoop {
 	 *
 	 */
 	public async step() {
+		// this.chains.map((chain) => {
+		// 	chain.pools.forEach((pool) => {
+		// 		console.log(pool.address, pool.ibcAssets[0], pool.ibcAssets[1]);
+		// 	});
+		// });
+		await delay(10000);
 		this.iterations++;
 
 		/*

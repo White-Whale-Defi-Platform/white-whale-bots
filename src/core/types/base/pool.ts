@@ -3,6 +3,7 @@ import { BigNumber } from "bignumber.js";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { inspect } from "util";
 
+import { IbcAssetEntry } from "../../ibc/chainAssets";
 import { isSendMessage } from "../messages/sendmessages";
 import {
 	isAstroSwapOperationsMessages,
@@ -52,6 +53,7 @@ export interface Pool {
 	LPratio: number;
 	factoryAddress: string;
 	routerAddress: string;
+	ibcAssets: Array<IbcAssetEntry>;
 }
 
 /**
