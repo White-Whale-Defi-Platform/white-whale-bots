@@ -8,7 +8,7 @@ import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { Orderbook } from "../../base/orderbook";
-import { getOrderbookAmmPaths, OrderbookPath, OrderSequence, Path } from "../../base/path";
+import { getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, OrderSequence, Path } from "../../base/path";
 import { Pool, removedUnusedPools } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { DexMempoolLoop } from "./dexMempoolloop";
@@ -22,8 +22,7 @@ export class DexLoop implements DexLoopInterface {
 	orderbooks: Array<Orderbook>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
 	orderbookPaths: Array<OrderbookPath>;
-	pathlib: Array<Path>; //holds all known paths
-	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
+	CDpaths: Map<string, { timeoutIteration: number; timeoutDuration: number; path: OrderbookPath | Path }>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
 	accountNumber = 0;
 	sequence = 0;
@@ -57,9 +56,11 @@ export class DexLoop implements DexLoopInterface {
 		this.orderbookPaths = orderbookPaths;
 		this.orderbooks = orderbooks;
 		this.pools = filteredPools;
-		this.CDpaths = new Map<string, [number, number, number]>();
+		this.CDpaths = new Map<
+			string,
+			{ timeoutIteration: number; timeoutDuration: number; path: OrderbookPath | Path }
+		>();
 		this.paths = paths;
-		this.pathlib = paths;
 		this.ammArb = tryAmmArb;
 		this.orderbookArb = tryOrderbookArb;
 		this.updatePoolStates = updatePoolStates;
@@ -234,42 +235,37 @@ export class DexLoop implements DexLoopInterface {
 	public cdPaths(path: Path | OrderbookPath) {
 		//add equalpaths to the CDPath array
 		for (const equalpath of path.equalpaths) {
-			this.CDpaths.set(equalpath[0], [this.iterations, 5, equalpath[1]]);
+			this.CDpaths.set(equalpath.identifier, {
+				timeoutIteration: this.iterations,
+				timeoutDuration: 5,
+				path: equalpath,
+			});
 		}
 		//add self to the CDPath array
-		this.CDpaths.set(path.identifier[0], [this.iterations, 10, path.identifier[1]]);
+		this.CDpaths.set(path.identifier, { timeoutIteration: this.iterations, timeoutDuration: 10, path: path });
 
-		const out = new Array<Path>();
-		//remove all equal paths from this.paths if this.paths'identifier overlaps with one in equalpaths
-		this.paths.forEach((activePath) => {
-			//if our updated cdpaths contains the path still active, make sure to remove it from the active paths
-			if (!this.CDpaths.get(activePath.identifier[0])) {
-				out.push(activePath);
-			}
-		});
-		this.paths = out;
+		//remove all paths on cooldown from active paths
+		this.paths = this.paths.filter((pathToCheck) => this.CDpaths.get(pathToCheck.identifier) === undefined);
 
-		const outOB = new Array<OrderbookPath>();
-		//remove all equal paths from this.paths if this.paths'identifier overlaps with one in equalpaths
-		this.orderbookPaths.forEach((activePath) => {
-			//if our updated cdpaths contains the path still active, make sure to remove it from the active paths
-			if (!this.CDpaths.get(activePath.identifier[0])) {
-				outOB.push(activePath);
-			}
-		});
-		this.orderbookPaths = outOB;
+		//remove all orderbookpaths on cooldown from active orderbookpaths
+		this.orderbookPaths = this.orderbookPaths.filter(
+			(pathToCheck) => this.CDpaths.get(pathToCheck.identifier) === undefined,
+		);
 	}
 
-	/** Removes the CD Paths if CD iteration number of path + Cooldownblocks <= this.iterations
-	 * ADDS the path from pathlibary to this.paths.
+	/** Removes the CD Paths if CD iteration number of path + Cooldownblocks <= this.iterations.
 	 */
 	public unCDPaths() {
 		this.CDpaths.forEach((value, key) => {
 			// if time set to cooldown (in iteration numbers) + cooldown amount < current iteration, remove it from cd
-			if (value[0] + value[1] < this.iterations) {
+			if (value.timeoutIteration + value.timeoutDuration < this.iterations) {
 				this.CDpaths.delete(key);
 				//add the path back to active paths
-				this.paths.push(this.pathlib[value[2]]);
+				if (isOrderbookPath(value.path)) {
+					this.orderbookPaths.push(value.path);
+				} else {
+					this.paths.push(value.path);
+				}
 			}
 		});
 	}

@@ -17,8 +17,7 @@ export interface DexLoopInterface {
 	orderbooks: Array<Orderbook>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
 	orderbookPaths: Array<OrderbookPath>;
-	pathlib: Array<Path>; //holds all known paths
-	CDpaths: Map<string, [number, number, number]>; //holds all cooldowned paths' identifiers
+	CDpaths: Map<string, { timeoutIteration: number; timeoutDuration: number; path: OrderbookPath | Path }>; //holds all cooldowned paths' identifiers
 	chainOperator: ChainOperator;
 	accountNumber: number;
 	sequence: number;

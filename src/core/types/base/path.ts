@@ -5,8 +5,8 @@ import { Pool } from "./pool";
 
 export interface Path {
 	pools: Array<Pool>;
-	equalpaths: Array<[string, number]>;
-	identifier: [string, number];
+	equalpaths: Array<Path>;
+	identifier: string;
 }
 
 export enum OrderSequence {
@@ -18,8 +18,8 @@ export interface OrderbookPath {
 	pool: Pool;
 	orderbook: Orderbook;
 	orderSequence: OrderSequence;
-	equalpaths: Array<[string, number]>;
-	identifier: [string, number];
+	equalpaths: Array<OrderbookPath>;
+	identifier: string;
 }
 /**
  *
@@ -46,14 +46,14 @@ export function getOrderbookAmmPaths(pools: Array<Pool>, orderbooks: Array<Order
 					orderbook: orderbook,
 					orderSequence: OrderSequence.AmmFirst,
 					equalpaths: [],
-					identifier: [pool.LPratio + orderbook.marketId, idx],
+					identifier: pool.address + orderbook.marketId,
 				});
 				const reversedpath = identity<OrderbookPath>({
 					pool: pool,
 					orderbook: orderbook,
 					orderSequence: OrderSequence.OrderbookFirst,
 					equalpaths: [],
-					identifier: [orderbook.marketId + pool.LPratio, idx + 1],
+					identifier: orderbook.marketId + pool.address,
 				});
 				paths.push(path, reversedpath);
 				idx += 2;

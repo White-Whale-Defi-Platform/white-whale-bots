@@ -84,16 +84,14 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 	}
 	const paths: Array<Path> = [];
 
-	let idx = 0;
-	// create paths and sets identifier number starting at 0
+	// create paths and sets identifier
 	for (const poolList of poolLists) {
 		if (poolList.length >= 2) {
 			paths.push({
 				pools: poolList,
-				equalpaths: new Array<[string, number]>(),
-				identifier: [getAddrfromPools(poolList), idx],
+				equalpaths: new Array<Path>(),
+				identifier: getAddrfromPools(poolList),
 			});
-			idx++;
 		}
 	}
 
@@ -118,7 +116,7 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 				intersection.length > Math.floor(path.pools.length / 2) &&
 				sameIndexed >= Math.floor(intersection.length / 2)
 			) {
-				path.equalpaths.push(path2.identifier);
+				path.equalpaths.push(path2);
 			}
 		}
 	}
