@@ -32,7 +32,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 
 	private _rpcUrls!: Array<string>;
 	private _denom!: string;
-	private _gasPrice!: string;
+	private _gasPrice!: number;
 	private _currRpcUrl: string;
 
 	/**

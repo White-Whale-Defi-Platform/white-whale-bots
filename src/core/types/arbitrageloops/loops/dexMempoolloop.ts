@@ -2,13 +2,19 @@
 
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
-import { getPaths, newGraph } from "../../../arbitrage/graph";
 import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
 import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } from "../../base/mempool";
-import { getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, OrderSequence, Path } from "../../base/path";
+import {
+	getAmmPaths,
+	getOrderbookAmmPaths,
+	isOrderbookPath,
+	OrderbookPath,
+	OrderSequence,
+	Path,
+} from "../../base/path";
 import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { Orderbook } from "../../base/orderbook";
@@ -53,10 +59,9 @@ export class DexMempoolLoop implements DexLoopInterface {
 		messageFactory: DexLoopInterface["messageFactory"],
 		updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"],
 	) {
-		const graph = newGraph(allPools);
-		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+		const paths = getAmmPaths(allPools, botConfig);
 		const filteredPools = removedUnusedPools(allPools, paths);
-		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks);
+		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks, botConfig);
 		this.orderbookPaths = orderbookPaths;
 		this.pools = filteredPools;
 		this.orderbooks = orderbooks;
@@ -182,17 +187,14 @@ export class DexMempoolLoop implements DexLoopInterface {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		const TX_FEE =
-			this.botConfig.txFees.get(messages[1]) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
 
 		if (arbTradeOB.path.orderSequence === OrderSequence.AmmFirst) {
-			const txResponse = await this.chainOperator.signAndBroadcast(messages[0], TX_FEE);
+			const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTradeOB.path.fee);
 			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
 		} else {
-			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], TX_FEE);
+			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], arbTradeOB.path.fee);
 			await delay(3000);
-			const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]], TX_FEE);
+			const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]], arbTradeOB.path.fee);
 			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
 				txResponse,
 				txResponse2,
@@ -213,11 +215,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		const TX_FEE =
-			this.botConfig.txFees.get(messages[1]) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
-
-		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], TX_FEE);
+		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTrade.path.fee);
 
 		await this.logger?.tradeLogging.logAmmTrade(arbTrade, [txResponse]);
 	}

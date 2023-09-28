@@ -1,12 +1,17 @@
+import { StdFee } from "@cosmjs/stargate";
+
+import { getPaths, newGraph } from "../../arbitrage/graph";
 import { identity } from "../identity";
 import { isMatchingAssetInfos } from "./asset";
+import { DexConfig } from "./configs";
 import { Orderbook } from "./orderbook";
 import { Pool } from "./pool";
-
 export interface Path {
 	pools: Array<Pool>;
 	equalpaths: Array<Path>;
 	identifier: string;
+	fee: StdFee;
+	threshold: number;
 }
 
 export enum OrderSequence {
@@ -20,6 +25,8 @@ export interface OrderbookPath {
 	orderSequence: OrderSequence;
 	equalpaths: Array<OrderbookPath>;
 	identifier: string;
+	fee: StdFee;
+	threshold: number;
 }
 /**
  *
@@ -30,7 +37,11 @@ export function isOrderbookPath(x: any): x is OrderbookPath {
 /**
  *
  */
-export function getOrderbookAmmPaths(pools: Array<Pool>, orderbooks: Array<Orderbook>): Array<OrderbookPath> {
+export function getOrderbookAmmPaths(
+	pools: Array<Pool>,
+	orderbooks: Array<Orderbook>,
+	botConfig: DexConfig,
+): Array<OrderbookPath> {
 	const paths: Array<OrderbookPath> = [];
 	let idx = 0;
 	for (const orderbook of orderbooks) {
@@ -41,12 +52,15 @@ export function getOrderbookAmmPaths(pools: Array<Pool>, orderbooks: Array<Order
 				(isMatchingAssetInfos(pool.assets[1].info, orderbook.baseAssetInfo) &&
 					isMatchingAssetInfos(pool.assets[0].info, orderbook.quoteAssetInfo))
 			) {
+				const { fee, threshold } = getFeeAndThresholdForOrderbookPath(pool, orderbook, botConfig);
 				const path = identity<OrderbookPath>({
 					pool: pool,
 					orderbook: orderbook,
 					orderSequence: OrderSequence.AmmFirst,
 					equalpaths: [],
 					identifier: pool.address + orderbook.marketId,
+					fee: fee,
+					threshold: threshold,
 				});
 				const reversedpath = identity<OrderbookPath>({
 					pool: pool,
@@ -54,6 +68,8 @@ export function getOrderbookAmmPaths(pools: Array<Pool>, orderbooks: Array<Order
 					orderSequence: OrderSequence.OrderbookFirst,
 					equalpaths: [],
 					identifier: orderbook.marketId + pool.address,
+					fee: fee,
+					threshold: threshold,
 				});
 				paths.push(path, reversedpath);
 				idx += 2;
@@ -61,4 +77,59 @@ export function getOrderbookAmmPaths(pools: Array<Pool>, orderbooks: Array<Order
 		}
 	}
 	return paths;
+}
+
+/**
+ *
+ */
+export function getAmmPaths(pools: Array<Pool>, botConfig: DexConfig) {
+	const graph = newGraph(pools);
+	return getPaths(graph, botConfig) ?? [];
+}
+
+/**
+ *
+ */
+export function getFeeAndThresholdForAmmPath(
+	pathPools: Array<Pool>,
+	botConfig: DexConfig,
+): { fee: StdFee; threshold: number } {
+	const decimalCompensator = botConfig.gasDenom === "inj" ? 1e12 : 1;
+	const flashloanCompensator = 4;
+	const gasFee = {
+		denom: botConfig.gasDenom,
+		amount: (
+			botConfig.gasPerHop *
+			pathPools.length *
+			botConfig.gasPrice *
+			decimalCompensator *
+			flashloanCompensator
+		).toFixed(),
+	};
+	const threshold =
+		botConfig.profitThreshold + botConfig.gasPerHop * pathPools.length * botConfig.gasPrice * flashloanCompensator;
+	return {
+		fee: { amount: [gasFee], gas: String(botConfig.gasPerHop * pathPools.length * flashloanCompensator) },
+		threshold: threshold,
+	}; //in 6 decimals
+}
+
+/**
+ *
+ */
+export function getFeeAndThresholdForOrderbookPath(
+	pool: Pool,
+	orderbook: Orderbook,
+	botConfig: DexConfig,
+): { fee: StdFee; threshold: number } {
+	const decimalCompensator = botConfig.gasDenom === "inj" ? 1e12 : 1;
+	const gasFee = {
+		denom: botConfig.gasDenom,
+		amount: (botConfig.gasPerHop * 2 * botConfig.gasPrice * decimalCompensator).toFixed(),
+	};
+	const threshold = botConfig.profitThreshold + botConfig.gasPerHop * 2 * botConfig.gasPrice;
+	return {
+		fee: { amount: [gasFee], gas: String(botConfig.gasPerHop * 2) },
+		threshold: threshold,
+	}; //in 6 decimals
 }

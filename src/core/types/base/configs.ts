@@ -1,4 +1,3 @@
-import { StdFee } from "@cosmjs/stargate";
 import axios from "axios";
 import { assert } from "console";
 
@@ -30,11 +29,12 @@ export interface BaseConfig {
 	baseDenom: string;
 	chainPrefix: string;
 	gasDenom: string;
-	gasPrice: string;
+	gasPrice: number;
+	gasPerHop: number;
+	profitThreshold: number;
 	// Logger specific config.
 	loggerConfig: LoggerConfig;
 	mnemonic: string;
-	profitThresholds: Map<number, number>;
 	rpcUrls: Array<string>;
 	grpcUrl?: string;
 	restUrl?: string;
@@ -42,7 +42,6 @@ export interface BaseConfig {
 	signOfLife: number;
 	// Skip specific (optionally)
 	skipConfig?: SkipConfig;
-	txFees: Map<number, StdFee>;
 	useMempool: boolean;
 }
 
@@ -152,42 +151,24 @@ async function getBaseConfig(envs: NodeJS.ProcessEnv): Promise<BaseConfig> {
 
 	//Calculate tx fees and profit thresholds
 	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
-	const GAS_UNIT_PRICE = envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
+	const GAS_UNIT_PRICE = +envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
 	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
-	const MAX_PATH_HOPS = +envs.MAX_PATH_HOPS; //required gas units per trade (hop)
-	//set all required fees for the depth of the hops set by user;
-	const TX_FEES = new Map<number, StdFee>();
-	const PROFIT_THRESHOLDS = new Map<number, number>();
-	for (let hops = 2; hops <= (MAX_PATH_HOPS - 1) * 2 + 1; hops++) {
-		if (envs.GAS_DENOM === "inj") {
-			const gasFee = {
-				denom: envs.GAS_DENOM,
-				amount: (GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE * 1e12).toFixed(),
-			};
-			TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) }); //in 6 decimals
-		} else {
-			const gasFee = { denom: envs.GAS_DENOM, amount: String(GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE) };
-			TX_FEES.set(hops, { amount: [gasFee], gas: String(GAS_USAGE_PER_HOP * hops) }); //in 6 decimals
-		}
 
-		const profitThreshold: number = PROFIT_THRESHOLD + GAS_USAGE_PER_HOP * hops * +GAS_UNIT_PRICE; //in 6 decimal default
-		PROFIT_THRESHOLDS.set(hops, profitThreshold);
-	}
 	return {
 		setupType: setupType,
 		baseDenom: envs.BASE_DENOM,
 		chainPrefix: envs.CHAIN_PREFIX,
 		gasDenom: envs.GAS_DENOM,
-		gasPrice: envs.GAS_UNIT_PRICE,
+		gasPrice: GAS_UNIT_PRICE,
+		gasPerHop: GAS_USAGE_PER_HOP,
+		profitThreshold: PROFIT_THRESHOLD,
 		loggerConfig: loggerConfig,
 		mnemonic: envs.WALLET_MNEMONIC,
-		profitThresholds: PROFIT_THRESHOLDS,
 		rpcUrls: RPCURLS,
 		grpcUrl: envs.GRPC_URL,
 		restUrl: envs.REST_URL,
 		signOfLife: SIGN_OF_LIFE,
 		skipConfig: skipConfig,
-		txFees: TX_FEES,
 		useMempool: envs.USE_MEMPOOL == "1" ? true : false,
 	};
 }

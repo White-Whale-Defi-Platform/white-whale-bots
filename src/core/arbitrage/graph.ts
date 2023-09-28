@@ -1,5 +1,6 @@
 import { AssetInfo, isNativeAsset } from "../types/base/asset";
-import { Path } from "../types/base/path";
+import { DexConfig } from "../types/base/configs";
+import { getFeeAndThresholdForAmmPath, Path } from "../types/base/path";
 import { Pool } from "../types/base/pool";
 
 export interface Graph {
@@ -59,10 +60,10 @@ function getVertex(graph: Graph, name: string): Vertex {
 /**
  *
  */
-export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number): Array<Path> | undefined {
-	const startingAssetName = isNativeAsset(startingAsset)
-		? startingAsset.native_token.denom
-		: startingAsset.token.contract_addr;
+export function getPaths(graph: Graph, botConfig: DexConfig): Array<Path> | undefined {
+	const startingAsset: AssetInfo = botConfig.offerAssetInfo;
+	const depth: number = botConfig.maxPathPools;
+	const startingAssetName = startingAsset.native_token.denom;
 	const root = graph.vertices.get(startingAssetName);
 	if (!root) {
 		console.log("graph does not contain starting asset");
@@ -86,11 +87,14 @@ export function getPaths(graph: Graph, startingAsset: AssetInfo, depth: number):
 
 	// create paths and sets identifier
 	for (const poolList of poolLists) {
+		const { fee, threshold } = getFeeAndThresholdForAmmPath(poolList, botConfig);
 		if (poolList.length >= 2) {
 			paths.push({
 				pools: poolList,
 				equalpaths: new Array<Path>(),
 				identifier: getAddrfromPools(poolList),
+				fee: fee,
+				threshold: threshold,
 			});
 		}
 	}

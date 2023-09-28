@@ -128,22 +128,28 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		messages[0].push(bidMsgEncoded);
 
 		//if gas fee cannot be found in the botconfig based on pathlengths, pick highest available
-		const TX_FEE =
-			this.botConfig.txFees.get(messages[1]) ??
-			Array.from(this.botConfig.txFees.values())[this.botConfig.txFees.size - 1];
-		console.log(inspect(TX_FEE, { depth: null }));
 
 		let res: SkipResult;
 		if (toArbTrade) {
 			const txToArbRaw: TxRaw = TxRaw.decode(toArbTrade.txBytes);
 			res = <SkipResult>(
-				await this.chainOperator.signAndBroadcastSkipBundle(messages[0], TX_FEE, undefined, txToArbRaw)
+				await this.chainOperator.signAndBroadcastSkipBundle(
+					messages[0],
+					arbTrade.path.fee,
+					undefined,
+					txToArbRaw,
+				)
 			);
 			console.log("mempool transaction to backrun: ");
 			console.log(toHex(sha256(toArbTrade.txBytes)));
 		} else {
 			res = <SkipResult>(
-				await this.chainOperator.signAndBroadcastSkipBundle(messages[0], TX_FEE, undefined, undefined)
+				await this.chainOperator.signAndBroadcastSkipBundle(
+					messages[0],
+					arbTrade.path.fee,
+					undefined,
+					undefined,
+				)
 			);
 		}
 		console.log(inspect(res, { depth: null }));

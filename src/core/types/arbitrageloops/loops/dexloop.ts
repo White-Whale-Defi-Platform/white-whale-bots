@@ -1,14 +1,20 @@
 import * as chains from "../../../../chains";
 import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
 import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
-import { getPaths, newGraph } from "../../../arbitrage/graph";
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { Orderbook } from "../../base/orderbook";
-import { getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, OrderSequence, Path } from "../../base/path";
+import {
+	getAmmPaths,
+	getOrderbookAmmPaths,
+	isOrderbookPath,
+	OrderbookPath,
+	OrderSequence,
+	Path,
+} from "../../base/path";
 import { Pool, removedUnusedPools } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { DexMempoolLoop } from "./dexMempoolloop";
@@ -48,10 +54,9 @@ export class DexLoop implements DexLoopInterface {
 		messageFactory: DexLoopInterface["messageFactory"],
 		updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"],
 	) {
-		const graph = newGraph(allPools);
-		const paths = getPaths(graph, botConfig.offerAssetInfo, botConfig.maxPathPools) ?? [];
+		const paths = getAmmPaths(allPools, botConfig);
 		const filteredPools = removedUnusedPools(allPools, paths);
-		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks);
+		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks, botConfig);
 
 		this.orderbookPaths = orderbookPaths;
 		this.orderbooks = orderbooks;
