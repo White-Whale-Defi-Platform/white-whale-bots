@@ -1,4 +1,4 @@
-import { Asset, AssetInfo } from "../../types/base/asset";
+import { AssetInfo, RichAsset } from "../../types/base/asset";
 import { OrderbookMarketBuy, OrderbookMarketSell } from "../../types/base/orderbook";
 import { OrderbookPath, OrderSequence } from "../../types/base/path";
 import { outGivenIn } from "../../types/base/pool";
@@ -22,7 +22,7 @@ export function getOptimalTrade(
 ): OptimalOrderbookTrade | undefined {
 	let optimalOrderbookTrade: OptimalOrderbookTrade = {
 		path: paths[0],
-		offerAsset: { amount: "0", info: offerAssetInfo },
+		offerAsset: { amount: "0", info: offerAssetInfo, decimals: 6 },
 		profit: 0,
 		worstPrice: 0,
 		averagePrice: 0,
@@ -58,7 +58,7 @@ export function getOptimalTrade(
 function getOptimalTradeForPath(
 	path: OrderbookPath,
 	offerAssetInfo: AssetInfo,
-): [number, Asset, number, number, number] {
+): [number, RichAsset, number, number, number] {
 	let tradesizes = [...Array(500).keys()];
 	tradesizes = tradesizes.map((x) => x * 1e6);
 
@@ -78,34 +78,31 @@ function getProfitForTradesize(
 	path: OrderbookPath,
 	tradesize: number,
 	offerAssetInfo: AssetInfo,
-): [number, Asset, number, number, number] {
+): [number, RichAsset, number, number, number] {
 	if (path.orderSequence === OrderSequence.AmmFirst) {
-		const offerAsset: Asset = { amount: String(tradesize), info: offerAssetInfo };
-		const [outGivenIn0, outInfo0] = outGivenIn(path.pool, offerAsset);
-		// console.log("amm price received: ", ts / outGivenIn0, "tradesize: ", ts, "assets received: ", outGivenIn0);
+		const offerAsset: RichAsset = { amount: String(tradesize), info: offerAssetInfo, decimals: 6 };
+		const outAsset0 = outGivenIn(path.pool, offerAsset);
 
 		//we have to compensate for the precision of the market stated by the minQuantityIncrement
-		const offerAsset1: Asset = {
-			amount: String(
-				Math.floor(outGivenIn0 / path.orderbook.minQuantityIncrement) * path.orderbook.minQuantityIncrement,
-			),
-			info: outInfo0,
-		};
-		const [outGivenIn1, worstPrice, averagePrice] = OrderbookMarketSell(path.orderbook, offerAsset1);
+		outAsset0.amount = String(
+			Math.floor(+outAsset0.amount / path.orderbook.minQuantityIncrement) * path.orderbook.minQuantityIncrement,
+		);
+
+		const [outGivenIn1, worstPrice, averagePrice] = OrderbookMarketSell(path.orderbook, outAsset0);
 		//we have to compensate for the precision of the market stated by the minQuantityIncrement
 		const outGivenInReturned =
 			Math.floor(outGivenIn1 / path.orderbook.minQuantityIncrement) * path.orderbook.minQuantityIncrement;
 
 		return [outGivenInReturned - +offerAsset.amount, offerAsset, worstPrice, averagePrice, outGivenInReturned];
 	} else {
-		const offerAsset: Asset = { amount: String(tradesize), info: path.orderbook.quoteAssetInfo };
+		const offerAsset: RichAsset = { amount: String(tradesize), info: path.orderbook.quoteAssetInfo, decimals: 6 };
 		const [outGivenIn0, worstPrice, averagePrice] = OrderbookMarketBuy(path.orderbook, offerAsset);
 		const outGivenInOrderbook =
 			Math.floor(outGivenIn0 / path.orderbook.minQuantityIncrement) * path.orderbook.minQuantityIncrement;
 		const outInfo0 = path.orderbook.baseAssetInfo;
 		const offerAsset1 = { amount: String(outGivenInOrderbook), info: outInfo0 };
-		const [outGivenIn1, outInfo1] = outGivenIn(path.pool, offerAsset1);
-		return [outGivenIn1 - +offerAsset.amount, offerAsset, worstPrice, averagePrice, outGivenInOrderbook];
+		const outAsset1 = outGivenIn(path.pool, offerAsset1);
+		return [+outAsset1.amount - +offerAsset.amount, offerAsset, worstPrice, averagePrice, outGivenInOrderbook];
 	}
 }
 
@@ -118,7 +115,7 @@ function binarySearch(
 	arr: Array<number>,
 	low: number,
 	high: number,
-): [number, Asset, number, number, number] {
+): [number, RichAsset, number, number, number] {
 	if (low === high) {
 		return getProfitForTradesize(path, arr[low], offerAssetInfo);
 	}

@@ -3,7 +3,7 @@ import { assert } from "chai";
 import dotenv from "dotenv";
 import { describe } from "mocha";
 
-import { Asset, fromChainAsset, toChainAsset, toChainPrice } from "../../../../core/types/base/asset";
+import { Asset, fromChainAsset, RichAsset, toChainAsset, toChainPrice } from "../../../../core/types/base/asset";
 // load env files
 dotenv.config();
 
@@ -31,9 +31,10 @@ describe("Test convert 18 to 6 decimal asset and vice versa", () => {
 	});
 
 	it("Should return 18 decimal asset after 6 decimal input 'inj' denom TO chain", async () => {
-		const input: Asset = {
+		const input: RichAsset = {
 			amount: String(new BigNumber("512.34123412341234123412341324").multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "inj" } },
+			decimals: 18,
 		};
 
 		const output = toChainAsset(input);
@@ -42,9 +43,10 @@ describe("Test convert 18 to 6 decimal asset and vice versa", () => {
 	});
 
 	it("Should return 6 decimal asset after 6 decimal input 'uwhale' denom TO chain", async () => {
-		const input: Asset = {
+		const input: RichAsset = {
 			amount: String(new BigNumber(5.0110111).multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "uwhale" } },
+			decimals: 6,
 		};
 
 		const output = toChainAsset(input);
@@ -54,51 +56,59 @@ describe("Test convert 18 to 6 decimal asset and vice versa", () => {
 
 describe("Test convert 18 to 6 decimal prices and vice versa", () => {
 	it("Should return 18 decimal compensated price for 'inj' input", async () => {
-		const input: Asset = {
+		const input: RichAsset = {
 			amount: String(new BigNumber(5).multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "inj" } },
+			decimals: 18,
 		};
-		const output: Asset = {
+		const output: RichAsset = {
 			amount: String(new BigNumber(3).multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "uwhale" } },
+			decimals: 6,
 		};
 		const chainPrice = toChainPrice(input, output);
 
 		assert.equal(new BigNumber(chainPrice).toFixed(0), new BigNumber(5 / 3).multipliedBy(1e12).toFixed(0));
 	});
 	it("Should return 18 decimal compensated price for 'inj' output", async () => {
-		const input: Asset = {
+		const input: RichAsset = {
 			amount: String(new BigNumber(5).multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "uwhale" } },
+			decimals: 6,
 		};
-		const output: Asset = {
+		const output: RichAsset = {
 			amount: String(new BigNumber(3).multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "inj" } },
+			decimals: 18,
 		};
 		const chainPrice = toChainPrice(input, output);
 		assert.equal(chainPrice, new BigNumber(5 / 3).dividedBy(1e12).toFixed(18));
 	});
 
 	it("Should not compensate price for non 'inj' in-and-output", async () => {
-		const input: Asset = {
+		const input: RichAsset = {
 			amount: String(new BigNumber(5).multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "uwhale" } },
+			decimals: 6,
 		};
-		const output: Asset = {
+		const output: RichAsset = {
 			amount: String(new BigNumber(3).multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "ujuno" } },
+			decimals: 6,
 		};
 		const chainPrice = toChainPrice(input, output);
 		assert.equal(new BigNumber(chainPrice).toFixed(6), new BigNumber(5 / 3).toFixed(6));
 	});
 	it("Should not compensate price for 'inj' in-and-output", async () => {
-		const input: Asset = {
+		const input: RichAsset = {
 			amount: String(new BigNumber(5).multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "inj" } },
+			decimals: 18,
 		};
-		const output: Asset = {
+		const output: RichAsset = {
 			amount: String(new BigNumber(3).multipliedBy(new BigNumber(10).pow(6))),
 			info: { native_token: { denom: "inj" } },
+			decimals: 18,
 		};
 		const chainPrice = toChainPrice(input, output);
 		assert.equal(new BigNumber(chainPrice).toFixed(6), new BigNumber(5 / 3).toFixed(6));

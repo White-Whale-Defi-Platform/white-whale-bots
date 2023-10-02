@@ -6,6 +6,7 @@ import {
 	isWyndDaoNativeAsset,
 	isWyndDaoTokenAsset,
 	JunoSwapAssetInfo,
+	RichAsset,
 } from "../../../core/types/base/asset";
 import { AmmDexName, Pool } from "../../../core/types/base/pool";
 import { Uint128 } from "../../../core/types/base/uint128";
@@ -65,7 +66,7 @@ export async function initPools(
 	const pools: Array<Pool> = [];
 	const factoryPools = await getPoolsFromFactory(chainOperator, factoryMapping);
 	for (const poolAddress of poolAddresses) {
-		let assets: Array<Asset> = [];
+		let assets: Array<RichAsset> = [];
 		let dexname: AmmDexName;
 		let totalShare: string;
 		try {
@@ -96,22 +97,26 @@ export async function initPools(
 /**
  *
  */
-function processPoolStateAssets(poolState: PoolState): [Array<Asset>, AmmDexName, string] {
-	const assets: Array<Asset> = [];
+function processPoolStateAssets(poolState: PoolState): [Array<RichAsset>, AmmDexName, string] {
+	const assets: Array<RichAsset> = [];
 	let type = AmmDexName.default;
 
 	for (const assetState of poolState.assets) {
 		if (isWyndDaoNativeAsset(assetState.info)) {
-			assets.push({
-				amount: assetState.amount,
-				info: { native_token: { denom: assetState.info.native } },
-			});
+			assets.push(
+				fromChainAsset({
+					amount: assetState.amount,
+					info: { native_token: { denom: assetState.info.native } },
+				}),
+			);
 			type = AmmDexName.wyndex;
 		} else if (isWyndDaoTokenAsset(assetState.info)) {
-			assets.push({
-				amount: assetState.amount,
-				info: { token: { contract_addr: assetState.info.token } },
-			});
+			assets.push(
+				fromChainAsset({
+					amount: assetState.amount,
+					info: { token: { contract_addr: assetState.info.token } },
+				}),
+			);
 			type = AmmDexName.wyndex;
 		} else {
 			assets.push(fromChainAsset(assetState));
@@ -123,21 +128,25 @@ function processPoolStateAssets(poolState: PoolState): [Array<Asset>, AmmDexName
 /**
  *
  */
-function processJunoswapPoolStateAssets(poolState: JunoSwapPoolState): [Array<Asset>, AmmDexName, string] {
-	const assets: Array<Asset> = [];
-	assets.push({
-		amount: String(poolState.token1_reserve),
-		info: isJunoSwapNativeAssetInfo(poolState.token1_denom)
-			? { native_token: { denom: poolState.token1_denom.native } }
-			: { token: { contract_addr: poolState.token1_denom.cw20 } },
-	});
+function processJunoswapPoolStateAssets(poolState: JunoSwapPoolState): [Array<RichAsset>, AmmDexName, string] {
+	const assets: Array<RichAsset> = [];
+	assets.push(
+		fromChainAsset({
+			amount: String(poolState.token1_reserve),
+			info: isJunoSwapNativeAssetInfo(poolState.token1_denom)
+				? { native_token: { denom: poolState.token1_denom.native } }
+				: { token: { contract_addr: poolState.token1_denom.cw20 } },
+		}),
+	);
 
-	assets.push({
-		amount: String(poolState.token2_reserve),
-		info: isJunoSwapNativeAssetInfo(poolState.token2_denom)
-			? { native_token: { denom: poolState.token2_denom.native } }
-			: { token: { contract_addr: poolState.token2_denom.cw20 } },
-	});
+	assets.push(
+		fromChainAsset({
+			amount: String(poolState.token2_reserve),
+			info: isJunoSwapNativeAssetInfo(poolState.token2_denom)
+				? { native_token: { denom: poolState.token2_denom.native } }
+				: { token: { contract_addr: poolState.token2_denom.cw20 } },
+		}),
+	);
 
 	return [assets, AmmDexName.junoswap, poolState.lp_token_supply];
 }

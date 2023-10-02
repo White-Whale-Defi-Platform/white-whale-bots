@@ -15,7 +15,7 @@ import {
 	isWWSwapOperationsMessages,
 	isWyndDaoSwapOperationsMessages,
 } from "../messages/swapmessages";
-import { Asset, AssetInfo, fromChainAsset, isMatchingAssetInfos, isWyndDaoNativeAsset } from "./asset";
+import { Asset, AssetInfo, fromChainAsset, isMatchingAssetInfos, isWyndDaoNativeAsset, RichAsset } from "./asset";
 import { MempoolTx } from "./mempool";
 import { Path } from "./path";
 import { Uint128 } from "./uint128";
@@ -36,7 +36,7 @@ export interface Pool {
 	/**
 	 * The two assets that can be swapped between in the pool.
 	 */
-	assets: Array<Asset>;
+	assets: Array<RichAsset>;
 	/**
 	 * The total amount of LP tokens that exist.
 	 */
@@ -60,7 +60,7 @@ export interface Pool {
  * @param offer_asset The offer asset the user wants to trade on the pool.
  * @return [number, assetInfo] of the received asset by the user.
  */
-export function outGivenIn(pool: Pool, offer_asset: Asset): [number, AssetInfo] {
+export function outGivenIn(pool: Pool, offer_asset: Asset): RichAsset {
 	const [asset_in, asset_out] = getAssetsOrder(pool, offer_asset.info) ?? [];
 	const a_in = BigNumber(asset_in.amount);
 	const a_out = BigNumber(asset_out.amount);
@@ -70,14 +70,14 @@ export function outGivenIn(pool: Pool, offer_asset: Asset): [number, AssetInfo] 
 		const r1 = BigNumber(BigNumber(1).minus(BigNumber(pool.inputfee).dividedBy(100)));
 		const amount_in_after_fee = BigNumber(offer_asset.amount).multipliedBy(r1);
 		const outGivenIn = a_out.minus(k.dividedBy(a_in.plus(amount_in_after_fee))).toNumber();
-		return [outGivenIn, asset_out.info];
+		return { amount: String(outGivenIn), info: asset_out.info, decimals: asset_out.decimals };
 	} else {
 		const r2 = BigNumber(1).minus(BigNumber(pool.outputfee).dividedBy(100));
 		const outGivenIn = a_out
 			.minus(k.dividedBy(a_in.plus(offer_asset.amount)))
 			.multipliedBy(r2)
 			.toNumber();
-		return [outGivenIn, asset_out.info];
+		return { amount: String(outGivenIn), info: asset_out.info, decimals: asset_out.decimals };
 	}
 }
 
@@ -219,13 +219,13 @@ function applySwapMsg(pool: Pool, msg: MsgExecuteContract, pools: Array<Pool>) {
 		applyTradeOnPool(pool, offerAsset);
 
 		// Second swap
-		const [outGivenIn0, nextOfferAssetInfo] = outGivenIn(pool, offerAsset);
+		const outAsset0 = outGivenIn(pool, offerAsset);
 		const secondPoolToUpdate = pools.find(
 			(pool) => pool.address === decodedMsg.pass_through_swap.output_amm_address,
 		);
 
 		if (secondPoolToUpdate !== undefined) {
-			applyTradeOnPool(secondPoolToUpdate, { amount: String(outGivenIn0), info: nextOfferAssetInfo });
+			applyTradeOnPool(secondPoolToUpdate, outAsset0);
 		}
 	}
 }
@@ -244,9 +244,9 @@ function applySwapOperationMsg(poolsFromRouter: Array<Pool>, msg: MsgExecuteCont
 		for (const operation of decodedMsg.execute_swap_operations.routes[0].operations) {
 			const currentPool = poolsFromRouter.find((pool) => pool.address === operation.t_f_m_swap.pair_contract);
 			if (currentPool) {
-				const [outGivenInNext, offerAssetInfoNext] = outGivenIn(currentPool, offerAsset);
+				const offerAssetNext = outGivenIn(currentPool, offerAsset);
 				applyTradeOnPool(currentPool, offerAsset);
-				offerAsset = { amount: String(outGivenInNext), info: offerAssetInfoNext };
+				offerAsset = offerAssetNext;
 			}
 		}
 	} else if (isSwapOperationsMessage(decodedMsg)) {
@@ -266,9 +266,9 @@ function applySwapOperationMsg(poolsFromRouter: Array<Pool>, msg: MsgExecuteCont
 				);
 
 				if (currentPool !== undefined) {
+					const offerAssetNext = outGivenIn(currentPool, offerAsset);
 					applyTradeOnPool(currentPool, offerAsset);
-					const [outGivenInNext, offerAssetInfoNext] = outGivenIn(currentPool, offerAsset);
-					offerAsset = { amount: String(outGivenInNext), info: offerAssetInfoNext };
+					offerAsset = offerAssetNext;
 				}
 			}
 		}
@@ -285,9 +285,9 @@ function applySwapOperationMsg(poolsFromRouter: Array<Pool>, msg: MsgExecuteCont
 					operation.astro_swap.ask_asset_info,
 				);
 				if (currentPool !== undefined) {
+					const offerAssetNext = outGivenIn(currentPool, offerAsset);
 					applyTradeOnPool(currentPool, offerAsset);
-					const [outGivenInNext, offerAssetInfoNext] = outGivenIn(currentPool, offerAsset);
-					offerAsset = { amount: String(outGivenInNext), info: offerAssetInfoNext };
+					offerAsset = offerAssetNext;
 				}
 			}
 		}
@@ -317,9 +317,9 @@ function applySwapOperationMsg(poolsFromRouter: Array<Pool>, msg: MsgExecuteCont
 					: { token: { contract_addr: operation.wyndex_swap.ask_asset_info.token } };
 				const currentPool = findPoolByInfos(poolsFromRouter, offerAssetInfo, askAssetInfo);
 				if (currentPool !== undefined) {
+					const offerAssetNext = outGivenIn(currentPool, offerAsset);
 					applyTradeOnPool(currentPool, offerAsset);
-					const [outGivenInNext, offerAssetInfoNext] = outGivenIn(currentPool, offerAsset);
-					offerAsset = { amount: String(outGivenInNext), info: offerAssetInfoNext };
+					offerAsset = offerAssetNext;
 				}
 			}
 		}
@@ -343,9 +343,9 @@ function findPoolByInfos(pools: Array<Pool>, infoA: AssetInfo, infoB: AssetInfo)
  */
 export function getAssetsOrder(pool: Pool, assetInfo: AssetInfo) {
 	if (isMatchingAssetInfos(pool.assets[0].info, assetInfo)) {
-		return [pool.assets[0], pool.assets[1]] as Array<Asset>;
+		return [pool.assets[0], pool.assets[1]] as Array<RichAsset>;
 	} else if (isMatchingAssetInfos(pool.assets[1].info, assetInfo)) {
-		return [pool.assets[1], pool.assets[0]] as Array<Asset>;
+		return [pool.assets[1], pool.assets[0]] as Array<RichAsset>;
 	} else {
 		return undefined;
 	}

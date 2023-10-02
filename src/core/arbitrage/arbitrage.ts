@@ -1,4 +1,4 @@
-import { Asset } from "../types/base/asset";
+import { RichAsset } from "../types/base/asset";
 import { DexConfig, LiquidationConfig } from "../types/base/configs";
 import { AnchorOverseer } from "../types/base/overseer";
 import { isOrderbookPath, OrderbookPath, Path } from "../types/base/path";
@@ -6,7 +6,7 @@ import { getOptimalTrade as getOptimalAmmTrade } from "./optimizers/analyticalOp
 import { getOptimalTrade as getOptimalOrderbookTrade, OptimalOrderbookTrade } from "./optimizers/orderbookOptimizer";
 
 export interface OptimalTrade {
-	offerAsset: Asset;
+	offerAsset: RichAsset;
 	profit: number;
 	path: Path;
 }

@@ -21,7 +21,11 @@ export function getOptimalTrade(paths: Array<Path>, offerAssetInfo: AssetInfo): 
 		}
 	});
 	if (maxPath) {
-		return { path: maxPath, offerAsset: { amount: String(maxTradesize), info: offerAssetInfo }, profit: maxProfit };
+		return {
+			path: maxPath,
+			offerAsset: { amount: String(maxTradesize), info: offerAssetInfo, decimals: 6 },
+			profit: maxProfit,
+		};
 	} else {
 		return undefined;
 	}
@@ -65,8 +69,8 @@ export function getOptimalTradeForPath(path: Path, offerAssetInfo: AssetInfo): [
 
 	let currentOfferAsset = { amount: String(delta_a), info: offerAssetInfo };
 	for (let i = 0; i < path.pools.length; i++) {
-		const [outAmount, outInfo] = outGivenIn(path.pools[i], currentOfferAsset);
-		currentOfferAsset = { amount: String(outAmount), info: outInfo };
+		const outAsset = outGivenIn(path.pools[i], currentOfferAsset);
+		currentOfferAsset = outAsset;
 	}
 	const profit = +currentOfferAsset.amount - delta_a;
 

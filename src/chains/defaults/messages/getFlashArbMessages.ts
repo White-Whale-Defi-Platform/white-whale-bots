@@ -3,7 +3,13 @@ import { EncodeObject } from "@cosmjs/proto-signing";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
 import { OptimalTrade } from "../../../core/arbitrage/arbitrage";
-import { Asset, isMatchingAssetInfos, isNativeAsset, toChainAsset, toChainPrice } from "../../../core/types/base/asset";
+import {
+	isMatchingAssetInfos,
+	isNativeAsset,
+	RichAsset,
+	toChainAsset,
+	toChainPrice,
+} from "../../../core/types/base/asset";
 import { Path } from "../../../core/types/base/path";
 import { AmmDexName, outGivenIn, Pool } from "../../../core/types/base/pool";
 import { IncreaseAllowanceMessage } from "../../../core/types/messages/allowance";
@@ -35,10 +41,14 @@ export function getFlashArbMessages(
 /**
  *
  */
-function getFlashArbMessage(path: Path, offerAsset0: Asset): FlashLoanMessage {
+function getFlashArbMessage(path: Path, offerAsset0: RichAsset): FlashLoanMessage {
 	const wasmMsgs = [];
 	const loanOfferAsset = { amount: String(Math.floor(+offerAsset0.amount)), info: offerAsset0.info };
-	let offerAsset = { amount: String(Math.floor(+offerAsset0.amount)), info: offerAsset0.info };
+	let offerAsset: RichAsset = {
+		amount: String(Math.floor(+offerAsset0.amount)),
+		info: offerAsset0.info,
+		decimals: offerAsset0.decimals,
+	};
 	for (const pool of path.pools) {
 		const [wasmMsgsPool, offerAssetNext] = getWasmMessages(pool, offerAsset);
 		wasmMsgs.push(...wasmMsgsPool);
@@ -55,10 +65,10 @@ function getFlashArbMessage(path: Path, offerAsset0: Asset): FlashLoanMessage {
 /**
  *
  */
-function getWasmMessages(pool: Pool, _offerAsset: Asset) {
-	const [outGivenInTrade, returnAssetInfo] = outGivenIn(pool, _offerAsset);
+function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
+	const outAsset = outGivenIn(pool, _offerAsset);
 	const offerAssetChain = toChainAsset(_offerAsset); //will be compensated for 18 decimals if needed
-	const beliefPriceChain = toChainPrice(_offerAsset, { amount: String(outGivenInTrade), info: returnAssetInfo }); //will be compensated for 18 decimals if needed
+	const beliefPriceChain = toChainPrice(_offerAsset, outAsset); //will be compensated for 18 decimals if needed
 	let msg: DefaultSwapMessage | JunoSwapMessage | SendMessage;
 	if (pool.dexname === AmmDexName.default || pool.dexname === AmmDexName.wyndex) {
 		if (isNativeAsset(offerAssetChain.info)) {
@@ -98,7 +108,7 @@ function getWasmMessages(pool: Pool, _offerAsset: Asset) {
 			swap: {
 				input_token: isMatchingAssetInfos(pool.assets[0].info, offerAssetChain.info) ? "Token1" : "Token2",
 				input_amount: offerAssetChain.amount,
-				min_output: String(Math.round(outGivenInTrade * 0.99)),
+				min_output: String(Math.round(+outAsset.amount * 0.99)),
 			},
 		};
 	}
@@ -143,5 +153,5 @@ function getWasmMessages(pool: Pool, _offerAsset: Asset) {
 		wasmMessages.push(allowanceWasmMessage);
 	}
 	wasmMessages.push(wasmMessage);
-	return [wasmMessages, { amount: String(outGivenInTrade), info: returnAssetInfo }] as const;
+	return [wasmMessages, outAsset] as const;
 }
