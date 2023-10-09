@@ -83,7 +83,7 @@ export class DexLoop implements DexLoopInterface {
 		botConfig: DexConfig,
 		logger: Logger,
 	): Promise<DexLoopInterface> {
-		const msgFactory = chains.defaults.messageFactory;
+		let msgFactory = chains.defaults.messageFactory;
 		let getPoolStates = chains.defaults.getPoolStates;
 		let initPools = chains.defaults.initPools;
 		const initOrderbook = chains.injective.initOrderbooks;
@@ -92,7 +92,7 @@ export class DexLoop implements DexLoopInterface {
 			if (chainSetups === undefined) {
 				await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
 			}
-			// msgFactory = chainSetups.getFlashArbMessages;
+			msgFactory = chainSetups.messageFactory;
 			getPoolStates = chainSetups.getPoolStates;
 			initPools = chainSetups.initPools;
 			return;

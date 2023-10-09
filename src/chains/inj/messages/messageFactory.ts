@@ -2,9 +2,9 @@ import { EncodeObject } from "@cosmjs/proto-signing";
 
 import { OptimalTrade } from "../../../core/arbitrage/arbitrage";
 import { OptimalOrderbookTrade } from "../../../core/arbitrage/optimizers/orderbookOptimizer";
-import { getOrderbookArbMessages } from "../../inj/messages/getOrderbookArbMessage";
-import { getOrderbookFlashArbMessages } from "../../inj/messages/getOrderbookFlashArbMessages";
-import { getFlashArbMessages } from "./getFlashArbMessages";
+import { getFlashArbMessages } from "../../defaults/messages/getFlashArbMessages";
+import { getOrderbookArbMessages } from "./getOrderbookArbMessage";
+import { getOrderbookFlashArbMessages } from "./getOrderbookFlashArbMessages";
 /**
  *
  */

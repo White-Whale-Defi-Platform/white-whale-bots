@@ -15,7 +15,15 @@ import {
 	isWWSwapOperationsMessages,
 	isWyndDaoSwapOperationsMessages,
 } from "../messages/swapmessages";
-import { Asset, AssetInfo, fromChainAsset, isMatchingAssetInfos, isWyndDaoNativeAsset, RichAsset } from "./asset";
+import {
+	Asset,
+	AssetInfo,
+	fromChainAsset,
+	isMatchingAssetInfos,
+	isWyndDaoNativeAsset,
+	RichAsset,
+	toChainPrice,
+} from "./asset";
 import { MempoolTx } from "./mempool";
 import { Path } from "./path";
 import { Uint128 } from "./uint128";
@@ -362,4 +370,17 @@ export function removedUnusedPools(pools: Array<Pool>, paths: Array<Path>): Arra
 		pools.filter((pool) => paths.some((path) => path.pools.some((pathPool) => pathPool.address === pool.address))),
 	);
 	return [...filteredPools];
+}
+
+/**
+ *
+ */
+export function caclulateSpread(pool: Pool, offerAsset: RichAsset, belief_price: string): number {
+	const balances = getAssetsOrder(pool, offerAsset.info);
+	if (!balances) {
+		console.log("cannot find assets in pool");
+		return 0;
+	}
+	const statePrice = toChainPrice(balances[0], balances[1]);
+	return Math.max(Math.round(((+belief_price - +statePrice) / +statePrice) * 1000) / 1000, 0.005);
 }

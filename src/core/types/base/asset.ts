@@ -91,7 +91,7 @@ export function isMatchingAssetInfos(a: AssetInfo, b: AssetInfo) {
 export function toChainAsset(input: RichAsset): Asset {
 	const decimalAdjustment = input.decimals - 6; //6 as default decimals for cosmos chains
 	return {
-		amount: new BigNumber(+input.amount).multipliedBy(new BigNumber(10).pow(decimalAdjustment)).toFixed(),
+		amount: new BigNumber(+input.amount).multipliedBy(new BigNumber(10).pow(decimalAdjustment)).toFixed(0),
 		info: input.info,
 	};
 }

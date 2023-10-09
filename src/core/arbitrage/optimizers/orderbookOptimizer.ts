@@ -116,20 +116,26 @@ function binarySearch(
 	low: number,
 	high: number,
 ): [number, RichAsset, number, number, number] {
-	if (low === high) {
+	if (low === high || low > high) {
 		return getProfitForTradesize(path, arr[low], offerAssetInfo);
 	}
 	const mid = Math.floor((low + high) / 2);
 	const midValue = getProfitForTradesize(path, arr[mid], offerAssetInfo)[0];
 	const leftOfMidValue = getProfitForTradesize(path, arr[mid - 1], offerAssetInfo)[0];
 	const rightOfMidValue = getProfitForTradesize(path, arr[mid + 1], offerAssetInfo)[0];
-
-	if (midValue > rightOfMidValue && midValue > leftOfMidValue) {
-		return getProfitForTradesize(path, arr[mid], offerAssetInfo);
+	try {
+		if (midValue > rightOfMidValue && midValue > leftOfMidValue) {
+			return getProfitForTradesize(path, arr[mid], offerAssetInfo);
+		}
+		if (midValue > rightOfMidValue && midValue < leftOfMidValue) {
+			return binarySearch(path, offerAssetInfo, arr, low, mid - 1);
+		} else {
+			return binarySearch(path, offerAssetInfo, arr, mid + 1, high);
+		}
+	} catch (e) {
+		console.log(e);
+		console.log(low, mid, high);
+		console.log(leftOfMidValue, midValue, rightOfMidValue);
 	}
-	if (midValue > rightOfMidValue && midValue < leftOfMidValue) {
-		return binarySearch(path, offerAssetInfo, arr, low, mid - 1);
-	} else {
-		return binarySearch(path, offerAssetInfo, arr, mid + 1, high);
-	}
+	return binarySearch(path, offerAssetInfo, arr, low, high);
 }

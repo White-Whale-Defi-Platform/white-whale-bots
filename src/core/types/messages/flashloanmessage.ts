@@ -14,6 +14,6 @@ export type WasmMessage = {
 export type FlashLoanMessage = {
 	flash_loan: {
 		assets: Array<Asset>;
-		msgs: Array<WasmMessage>;
+		msgs: Array<WasmMessage | any>;
 	};
 };

@@ -12,7 +12,7 @@ export function getMarketSpotOrderMessage(
 	arbTrade: OptimalOrderbookTrade,
 	injectiveAddress: string,
 	offerAsset: Asset,
-	orderType: 1 | 2,
+	orderType: 1 | 2 | 9 | 10,
 ) {
 	let decimals = 6;
 	if (isMatchingAssetInfos(offerAsset.info, arbTrade.path.orderbook.baseAssetInfo)) {

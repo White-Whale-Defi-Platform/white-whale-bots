@@ -19,6 +19,7 @@ import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../bas
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { Orderbook } from "../../base/orderbook";
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
+import { inspect } from "util";
 
 /**
  *
@@ -182,13 +183,18 @@ export class DexMempoolLoop implements DexLoopInterface {
 	 *
 	 */
 	private async tradeOrderbook(arbTradeOB: OptimalOrderbookTrade) {
-		const messages = this.messageFactory(arbTradeOB, this.chainOperator.client.publicAddress, undefined);
+		const messages = this.messageFactory(
+			arbTradeOB,
+			this.chainOperator.client.publicAddress,
+			this.botConfig.flashloanRouterAddress,
+		);
 		if (!messages) {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
+		console.log("derived flashloan message: ", inspect(messages, true, null, true));
 
-		if (arbTradeOB.path.orderSequence === OrderSequence.AmmFirst) {
+		if (arbTradeOB.path.orderSequence === OrderSequence.AmmFirst || messages[0].length === 1) {
 			const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTradeOB.path.fee);
 			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
 		} else {

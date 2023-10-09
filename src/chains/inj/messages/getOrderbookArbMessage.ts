@@ -3,7 +3,7 @@ import { EncodeObject } from "@cosmjs/proto-signing";
 import { OptimalOrderbookTrade } from "../../../core/arbitrage/optimizers/orderbookOptimizer";
 import { toChainAsset, toChainPrice } from "../../../core/types/base/asset";
 import { OrderSequence } from "../../../core/types/base/path";
-import { outGivenIn } from "../../../core/types/base/pool";
+import { caclulateSpread, outGivenIn } from "../../../core/types/base/pool";
 import { getSwapMessage } from "../../defaults/messages/getSwapMessage";
 import { getMarketSpotOrderMessage } from "./getSpotOrderMessage";
 
@@ -19,8 +19,10 @@ export function getOrderbookArbMessages(
 		const outAsset0 = outGivenIn(arbTrade.path.pool, arbTrade.offerAsset);
 
 		const price = toChainPrice(arbTrade.offerAsset, outAsset0);
+		const spread = caclulateSpread(arbTrade.path.pool, arbTrade.offerAsset, price);
 		const offerAsset = toChainAsset(arbTrade.offerAsset);
-		const msg0 = getSwapMessage(arbTrade.path.pool, offerAsset, publicAddress, price);
+
+		const msg0 = getSwapMessage(arbTrade.path.pool, offerAsset, publicAddress, price, spread);
 
 		outAsset0.amount = String(
 			Math.floor(+outAsset0.amount / arbTrade.path.orderbook.minQuantityIncrement) *
@@ -44,9 +46,10 @@ export function getOrderbookArbMessages(
 		const outAsset1 = outGivenIn(arbTrade.path.pool, offerAsset1);
 
 		const belief_price = toChainPrice(offerAsset1, outAsset1);
+		const spread = caclulateSpread(arbTrade.path.pool, offerAsset1, belief_price);
 		const offerAsset = toChainAsset(offerAsset1);
 
-		const msg1 = getSwapMessage(arbTrade.path.pool, offerAsset, publicAddress, belief_price);
+		const msg1 = getSwapMessage(arbTrade.path.pool, offerAsset, publicAddress, belief_price, spread);
 
 		return [[msg0, msg1], 2];
 	}
