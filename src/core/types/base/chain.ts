@@ -1,7 +1,7 @@
 import * as chainImports from "../../../chains";
 import { getPoolStates, initPools } from "../../../chains/defaults";
 import { ChainOperator } from "../../chainOperator/chainoperator";
-import { ChainAssetList, getChainAssetList } from "../../ibc/chainAssets";
+import { ChainAssetList, getChainAssetList, IbcAssetEntry } from "../../ibc/chainAssets";
 import { Logger } from "../../logging";
 import { DexLoopInterface } from "../arbitrageloops/interfaces/dexloopInterface";
 import { isNativeAsset } from "./asset";
@@ -15,6 +15,7 @@ export interface Chain {
 	pools: Array<Pool>;
 	chainOperator: ChainOperator;
 	orderbooks: Array<Orderbook>;
+	chainAssets: Map<string, IbcAssetEntry>;
 	updatePoolStates: DexLoopInterface["updatePoolStates"];
 	updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"];
 }
@@ -34,13 +35,14 @@ export async function initChain(chainConfig: ChainConfig, logger: Logger): Promi
 		const getOrderbookState = chainImports.injective.getOrderbookState; //default injective
 
 		const chainOperator = await ChainOperator.connectWithSigner(chainConfig);
-		let nativeTokenPoolsChain = await initPoolsChain(
+		const nativeTokenPoolsChain = await initPoolsChain(
 			chainOperator,
 			chainConfig.poolEnvs,
 			chainConfig.mappingFactoryRouter,
-			true,
+			false,
 		);
 
+		const ibcStartingAssets: Map<string, IbcAssetEntry> = new Map();
 		const chainAssetListFull: ChainAssetList = await getChainAssetList(chainOperator.client.chainId);
 		nativeTokenPoolsChain.forEach((pool) => {
 			const assetIbcInfo0 = chainAssetListFull.chain_to_assets_map[chainOperator.client.chainId].assets.find(
@@ -52,11 +54,14 @@ export async function initChain(chainConfig: ChainConfig, logger: Logger): Promi
 					asset.denom === (isNativeAsset(pool.assets[1].info) ? pool.assets[1].info.native_token.denom : ""),
 			);
 			if (assetIbcInfo0 && assetIbcInfo1) {
+				ibcStartingAssets.set(`${assetIbcInfo0.origin_chain_id}/${assetIbcInfo0.origin_denom}`, assetIbcInfo0);
+				ibcStartingAssets.set(`${assetIbcInfo1.origin_chain_id}/${assetIbcInfo1.origin_denom}`, assetIbcInfo1);
 				pool.ibcAssets = [assetIbcInfo0, assetIbcInfo1];
 			} else {
-				nativeTokenPoolsChain = nativeTokenPoolsChain.filter(
-					(poolToKeep) => poolToKeep.address !== pool.address,
-				);
+				// console.log("removing: ", pool.address, pool.assets[0].info, pool.assets[1].info);
+				// nativeTokenPoolsChain = nativeTokenPoolsChain.filter(
+				// 	(poolToKeep) => poolToKeep.address !== pool.address,
+				// );
 			}
 		});
 		const orderbooks: Array<Orderbook> = [];
@@ -72,6 +77,7 @@ export async function initChain(chainConfig: ChainConfig, logger: Logger): Promi
 			pools: nativeTokenPoolsChain,
 			chainOperator: chainOperator,
 			orderbooks: orderbooks,
+			chainAssets: ibcStartingAssets,
 			updatePoolStates: getPoolStatesChain,
 			updateOrderbookStates: getOrderbookState,
 		};

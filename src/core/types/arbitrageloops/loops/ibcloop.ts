@@ -34,13 +34,20 @@ export class IBCLoop {
 		messageFactory: DexLoopInterface["messageFactory"],
 	) {
 		const allPools = chains.flatMap((chain) => chain.pools);
-		// allPools.forEach((pool) => {
-		// 	console.log(pool.address, pool.ibcAssets[0], pool.ibcAssets[1]);
-		// });
+
 		const graph = newGraph(allPools, true);
+		console.log(graph.vertices.size);
 		//test values
-		const startingAssetName = "juno-1/ujuno";
-		const paths = getPaths(graph, startingAssetName, botConfig.maxPathPools, true) ?? [];
+		const paths: Array<Path> = [];
+		chains.map((chain) => {
+			chain.chainAssets.forEach((val, key) => {
+				const chainPaths = getPaths(graph, key, botConfig.maxPathPools, true);
+				if (chainPaths) {
+					paths.push(...chainPaths);
+				}
+			});
+		});
+		// const paths = getPaths(graph, startingAssetName, botConfig.maxPathPools, true) ?? [];
 		console.log(paths.length);
 		paths.forEach((path) => {
 			let poolText = `${path.identifier}:\n`;

@@ -26,16 +26,22 @@ export function newGraph(pools: Array<Pool>, ibcGraph = false): Graph {
 	const vertices = new Map();
 	const graph: Graph = { vertices: vertices };
 	for (const pool of pools) {
-		const nameLeft = ibcGraph
-			? `${pool.ibcAssets[0].origin_chain_id}/${pool.ibcAssets[0].origin_denom}`
-			: isNativeAsset(pool.assets[0].info)
-			? pool.assets[0].info.native_token.denom
-			: pool.assets[0].info.token.contract_addr;
-		const nameRight = ibcGraph
-			? `${pool.ibcAssets[1].origin_chain_id}/${pool.ibcAssets[1].origin_denom}`
-			: isNativeAsset(pool.assets[1].info)
-			? pool.assets[1].info.native_token.denom
-			: pool.assets[1].info.token.contract_addr;
+		let nameLeft;
+		if (ibcGraph && pool.ibcAssets[0]) {
+			nameLeft = `${pool.ibcAssets[0].origin_chain_id}/${pool.ibcAssets[0].origin_denom}`;
+		} else {
+			nameLeft = isNativeAsset(pool.assets[0].info)
+				? pool.assets[0].info.native_token.denom
+				: pool.assets[0].info.token.contract_addr;
+		}
+		let nameRight;
+		if (ibcGraph && pool.ibcAssets[1]) {
+			nameRight = `${pool.ibcAssets[1].origin_chain_id}/${pool.ibcAssets[1].origin_denom}`;
+		} else {
+			nameRight = isNativeAsset(pool.assets[1].info)
+				? pool.assets[1].info.native_token.denom
+				: pool.assets[1].info.token.contract_addr;
+		}
 
 		const vertexA: Vertex = getVertex(graph, nameLeft);
 		const vertexB: Vertex = getVertex(graph, nameRight);
