@@ -16,6 +16,7 @@ describe("Test outGivenIn for pool with 18 and 6 decimal assets", () => {
 					},
 				},
 				amount: "144264731967.836615185675",
+				decimals: 18,
 			},
 			{
 				info: {
@@ -24,6 +25,7 @@ describe("Test outGivenIn for pool with 18 and 6 decimal assets", () => {
 					},
 				},
 				amount: "946834545199",
+				decimals: 6,
 			},
 		],
 		totalShare: "357638203545997474",
@@ -46,7 +48,7 @@ describe("Test outGivenIn for pool with 18 and 6 decimal assets", () => {
 		};
 
 		const output = outGivenIn(pool, input);
-		assert.isAbove(output[0], 0);
+		assert.isAbove(+output.amount, 0);
 	});
 	it("Should return 4138502584293659410 within 1000 margin for given input swap 27244227peggy0xdAC17F958D2ee523a2206206994597C13D831ec7", async () => {
 		const input: Asset = {
@@ -59,7 +61,7 @@ describe("Test outGivenIn for pool with 18 and 6 decimal assets", () => {
 		};
 
 		const output = outGivenIn(pool, input);
-		assert.closeTo(output[0] * 1e12, BigNumber("4138502584293659410").toNumber(), 1000);
+		assert.closeTo(+output.amount * 1e12, BigNumber("4138502584293659410").toNumber(), 1000);
 	});
 });
 
@@ -73,6 +75,7 @@ describe("Test outGivenIn for pool with 6 and 6 decimal assets", () => {
 					},
 				},
 				amount: "1442647319670",
+				decimals: 6,
 			},
 			{
 				info: {
@@ -81,6 +84,7 @@ describe("Test outGivenIn for pool with 6 and 6 decimal assets", () => {
 					},
 				},
 				amount: "946834545199",
+				decimals: 6,
 			},
 		],
 		totalShare: "357638203545997474",
@@ -103,7 +107,7 @@ describe("Test outGivenIn for pool with 6 and 6 decimal assets", () => {
 		};
 
 		const output = outGivenIn(pool, input);
-		assert.isAbove(output[0], 0);
+		assert.isAbove(+output.amount, 0);
 	});
 	it("Should return tokens nearly equal to the price of uwhale in the pool for swapping 1whale", async () => {
 		const input: Asset = {
@@ -116,9 +120,9 @@ describe("Test outGivenIn for pool with 6 and 6 decimal assets", () => {
 		};
 		const output = outGivenIn(pool, input);
 		const price = BigNumber(pool.assets[1].amount).dividedBy(BigNumber(pool.assets[0].amount));
-		console.log(`price ${price.toNumber() * 0.997 * +input.amount}, outgivenin: ${output[0]}`);
+		console.log(`price ${price.toNumber() * 0.997 * +input.amount}, outgivenin: ${+output.amount}`);
 
-		assert.closeTo(price.toNumber() * 0.997 * +input.amount, output[0], 100);
+		assert.closeTo(price.toNumber() * 0.997 * +input.amount, +output.amount, 100);
 	});
 });
 

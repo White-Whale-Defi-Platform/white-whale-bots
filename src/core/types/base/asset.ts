@@ -12,6 +12,10 @@ export interface Asset {
 	info: AssetInfo;
 }
 
+export interface RichAsset extends Asset {
+	decimals: number;
+}
+
 export type AssetInfo = NativeAssetInfo | TokenAssetInfo;
 export interface NativeAssetInfo {
 	native_token: { denom: string };
@@ -84,26 +88,18 @@ export function isMatchingAssetInfos(a: AssetInfo, b: AssetInfo) {
 /**
  *
  */
-export function toChainAsset(input: Asset): Asset {
-	if (
-		isNativeAsset(input.info) &&
-		["inj", "peggy0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"].includes(input.info.native_token.denom)
-	) {
-		return {
-			amount: new BigNumber(+input.amount).multipliedBy(new BigNumber(10).pow(12)).toFixed(),
-			info: input.info,
-		};
-	} else
-		return {
-			amount: String(Math.floor(+input.amount)),
-			info: input.info,
-		};
+export function toChainAsset(input: RichAsset): Asset {
+	const decimalAdjustment = input.decimals - 6; //6 as default decimals for cosmos chains
+	return {
+		amount: new BigNumber(+input.amount).multipliedBy(new BigNumber(10).pow(decimalAdjustment)).toFixed(),
+		info: input.info,
+	};
 }
 
 /**
  *
  */
-export function fromChainAsset(input: Asset): Asset {
+export function fromChainAsset(input: Asset): RichAsset {
 	if (
 		isNativeAsset(input.info) &&
 		["inj", "peggy0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"].includes(input.info.native_token.denom)
@@ -111,36 +107,31 @@ export function fromChainAsset(input: Asset): Asset {
 		return {
 			amount: new BigNumber(+input.amount).dividedBy(new BigNumber(10).pow(12)).toFixed(6),
 			info: input.info,
+			decimals: 18,
 		};
 	} else if (isWyndDaoNativeAsset(input.info)) {
 		return {
 			amount: input.amount,
 			info: { native_token: { denom: input.info.native } },
+			decimals: 6,
 		};
 	} else if (isWyndDaoTokenAsset(input.info)) {
 		return {
 			amount: input.amount,
 			info: { token: { contract_addr: input.info.token } },
+			decimals: 6,
 		};
 	} else {
-		return input;
+		const output: RichAsset = { ...input, decimals: 6 };
+		return output;
 	}
 }
 
 /**
  *
  */
-export function toChainPrice(input: Asset, output: Asset): string {
+export function toChainPrice(input: RichAsset, output: RichAsset): string {
 	const inputChain = toChainAsset(input);
 	const outputChain = toChainAsset(output);
-	if (isMatchingAssetInfos(inputChain.info, outputChain.info)) {
-		return new BigNumber(inputChain.amount).dividedBy(outputChain.amount).toFixed(6);
-	} else if (
-		isNativeAsset(outputChain.info) &&
-		["inj", "peggy0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2"].includes(outputChain.info.native_token.denom)
-	) {
-		return new BigNumber(inputChain.amount).dividedBy(outputChain.amount).toFixed(18);
-	} else {
-		return new BigNumber(inputChain.amount).dividedBy(outputChain.amount).toFixed(6);
-	}
+	return new BigNumber(inputChain.amount).dividedBy(outputChain.amount).toFixed(output.decimals);
 }
