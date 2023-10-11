@@ -205,12 +205,13 @@ export class DexLoop implements DexLoopInterface {
 			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
 		} else {
 			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]]);
-			await delay(2000);
-			const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]]);
-			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
-				txResponse,
-				txResponse2,
-			]);
+			if (txResponse.code == 0) {
+				const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]]);
+				await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
+					txResponse,
+					txResponse2,
+				]);
+			}
 		}
 	}
 
