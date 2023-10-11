@@ -183,11 +183,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 	 *
 	 */
 	private async tradeOrderbook(arbTradeOB: OptimalOrderbookTrade) {
-		const messages = this.messageFactory(
-			arbTradeOB,
-			this.chainOperator.client.publicAddress,
-			this.botConfig.flashloanRouterAddress,
-		);
+		const messages = this.messageFactory(arbTradeOB, this.chainOperator.client.publicAddress);
 		if (!messages) {
 			console.error("error in creating messages", 1);
 			process.exit(1);
@@ -199,12 +195,13 @@ export class DexMempoolLoop implements DexLoopInterface {
 			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
 		} else {
 			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], arbTradeOB.path.fee);
-			await delay(3000);
-			const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]], arbTradeOB.path.fee);
-			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
-				txResponse,
-				txResponse2,
-			]);
+			if (txResponse.code == 0) {
+				const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]], arbTradeOB.path.fee);
+				await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
+					txResponse,
+					txResponse2,
+				]);
+			}
 		}
 	}
 

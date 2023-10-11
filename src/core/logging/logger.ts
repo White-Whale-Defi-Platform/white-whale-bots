@@ -1,5 +1,3 @@
-import { inspect } from "util";
-
 import { OptimalTrade } from "../arbitrage/arbitrage";
 import { OptimalOrderbookTrade } from "../arbitrage/optimizers/orderbookOptimizer";
 import { TxResponse } from "../chainOperator/chainOperatorInterface";
@@ -10,6 +8,7 @@ import { BotConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";
 import { Loan } from "../types/base/overseer";
 import { OrderSequence } from "../types/base/path";
+import { outGivenIn } from "../types/base/pool";
 import { DiscordLogger } from "./discordLogger";
 import { SlackLogger } from "./slackLogger";
 import { TelegramLogger } from "./telegramLogger";
@@ -65,7 +64,7 @@ export class Logger {
 		async logConfig(botConfig: BotConfig) {
 			//todo: place this in the logger class
 			let startupMessage = "===".repeat(30);
-			startupMessage += "\n**White Whale Bot**\n";
+			startupMessage += "\n**White Whale Bot**";
 			startupMessage += `\n**Setup type: ${botConfig.setupType}**\n`;
 			startupMessage += "===".repeat(30);
 
@@ -87,16 +86,16 @@ export class Logger {
 		 */
 		async logDexLoop(loop: DexLoopInterface) {
 			let setupMessage = "---".repeat(30);
-			setupMessage += `**\nDerived Paths for Arbitrage:
-				Total Paths:** \t${loop.paths.length}\n`;
+			setupMessage += `\n**Derived Paths for Arbitrage:**`;
+			setupMessage += `\nTotal AMM Paths: \t${loop.paths.length}\n`;
 			for (let pathlength = 2; pathlength <= loop.botConfig.maxPathPools; pathlength++) {
 				const nrOfPaths = loop.paths.filter((path) => path.pools.length === pathlength).length;
-				setupMessage += `**${pathlength} HOP Paths:** \t${nrOfPaths}\n`;
+				setupMessage += `${pathlength} HOP Paths: \t${nrOfPaths}\n`;
 			}
-			setupMessage += `**\nOrderbooks: ${loop.orderbooks.map(
+			setupMessage += `\n**Orderbooks: **${loop.orderbooks.map(
 				(ob) => `\n[${ob.quoteAssetInfo.native_token.denom} - ${ob.baseAssetInfo.native_token.denom}]`,
 			)}`;
-			setupMessage += `**\nOrderbook paths: ${loop.orderbookPaths.length}\n`;
+			setupMessage += `\n**Total Orderbook paths: ** \t${loop.orderbookPaths.length}\n`;
 			setupMessage += "---".repeat(30);
 			await this._sendMessage(setupMessage, LogType.All);
 		},
@@ -114,11 +113,11 @@ export class Logger {
 			const maxRisk = allLoans.sort((a, b) => b.riskRatio - a.riskRatio);
 			const totalLoan = allLoans.map((loan) => loan.loanAmt).reduce((sum, current) => (sum += current), 0);
 			let setupMessage = "---".repeat(30);
-			setupMessage += `**\nDerived Overseers: ${Object.keys(loop.allOverseerAddresses)}`;
-			setupMessage += `**\nMax Risk ratio: ${maxRisk[0].riskRatio.toPrecision(3)}
+			setupMessage += `\n**Derived Overseers: ${Object.keys(loop.allOverseerAddresses)}`;
+			setupMessage += `\n**Max Risk ratio: ${maxRisk[0].riskRatio.toPrecision(3)}
 Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
-			setupMessage += `**\nAmount of outstanding loans: ${allLoans.length}`;
-			setupMessage += `**\nTotal amount of outstanding value: ${totalLoan / 1e6}`;
+			setupMessage += `\n**Amount of outstanding loans: ${allLoans.length}`;
+			setupMessage += `\n**Total amount of outstanding value: ${totalLoan / 1e6}`;
 
 			await this._sendMessage(setupMessage, LogType.All);
 		},
@@ -136,23 +135,43 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 		 */
 		async logOrderbookTrade(arbtradeOB: OptimalOrderbookTrade, txResponses?: Array<TxResponse>) {
 			let tradeMsg = "-".repeat(39) + "Orderbook Arb" + "-".repeat(38);
+			tradeMsg += `\n**Offering: ${arbtradeOB.offerAsset.amount}${
+				(<NativeAssetInfo>arbtradeOB.offerAsset.info).native_token.denom
+			}`;
 			if (arbtradeOB.path.orderSequence === OrderSequence.AmmFirst) {
-				tradeMsg += `**\nPool: ${arbtradeOB.path.pool.address}: ${
+				tradeMsg += `\n**Pool: ${arbtradeOB.path.pool.address}: ${arbtradeOB.path.pool.assets[0].amount}${
 					(<NativeAssetInfo>arbtradeOB.path.pool.assets[0].info).native_token.denom
-				}/${(<NativeAssetInfo>arbtradeOB.path.pool.assets[1].info).native_token.denom}`;
-				tradeMsg += `**\nOrderbook: ${
+				}/${arbtradeOB.path.pool.assets[1].amount}${
+					(<NativeAssetInfo>arbtradeOB.path.pool.assets[1].info).native_token.denom
+				}`;
+				tradeMsg += `\n**OutGivenInPool: ${outGivenIn(arbtradeOB.path.pool, arbtradeOB.offerAsset).amount}`;
+				tradeMsg += `\n**Orderbook: ${
 					(<NativeAssetInfo>arbtradeOB.path.orderbook.baseAssetInfo).native_token.denom
 				} / USDT`;
+				tradeMsg += `\n**OutGivenInOrderbook: ${arbtradeOB.outGivenIn}`;
 			} else {
-				tradeMsg += `**\nOrderbook: ${
+				const outGivenInOrderbook =
+					Math.floor(arbtradeOB.outGivenIn / arbtradeOB.path.orderbook.minQuantityIncrement) *
+					arbtradeOB.path.orderbook.minQuantityIncrement;
+
+				const offerAssetPool = {
+					amount: String(outGivenInOrderbook),
+					info: arbtradeOB.path.orderbook.baseAssetInfo,
+					decimals: arbtradeOB.path.orderbook.baseAssetDecimals,
+				};
+				tradeMsg += `\n**Orderbook: ${
 					(<NativeAssetInfo>arbtradeOB.path.orderbook.baseAssetInfo).native_token.denom
 				} / USDT`;
-				tradeMsg += `**\nPool: ${arbtradeOB.path.pool.address}: ${
+				tradeMsg += `\n**OutGivenInOrderbook: ${outGivenInOrderbook}`;
+				tradeMsg += `\n**Pool: ${arbtradeOB.path.pool.address}: ${arbtradeOB.path.pool.assets[0].amount}${
 					(<NativeAssetInfo>arbtradeOB.path.pool.assets[0].info).native_token.denom
-				}/${(<NativeAssetInfo>arbtradeOB.path.pool.assets[1].info).native_token.denom}`;
+				}/${arbtradeOB.path.pool.assets[1].amount}${
+					(<NativeAssetInfo>arbtradeOB.path.pool.assets[1].info).native_token.denom
+				}`;
+				tradeMsg += `\n**OutGivenInPool: ${outGivenIn(arbtradeOB.path.pool, offerAssetPool).amount}`;
 			}
-			tradeMsg += `**\nOffering: ${inspect(arbtradeOB.offerAsset, true, null, true)}`;
-			tradeMsg += `**\nExpected profit: ${arbtradeOB.profit}`;
+
+			tradeMsg += `\n**Expected profit: ${arbtradeOB.profit}`;
 			if (txResponses) {
 				txResponses.forEach((txResponse: TxResponse) => {
 					tradeMsg += `\nHash: ${txResponse.transactionHash} Code: ${txResponse.code}`;
@@ -177,8 +196,10 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 						: pool.assets[1].info.token.contract_addr
 				}`;
 			});
-			tradeMsg += `**\nOffering: ${inspect(arbTrade.offerAsset, { showHidden: true, depth: 3, colors: true })}`;
-			tradeMsg += `**\nExpected profit: ${arbTrade.profit}`;
+			tradeMsg += `\n**Offering: ${arbTrade.offerAsset.amount}${
+				(<NativeAssetInfo>arbTrade.offerAsset.info).native_token.denom
+			}`;
+			tradeMsg += `\n**Expected profit: ${arbTrade.profit}`;
 			if (txResponses) {
 				txResponses.forEach((txResponse: TxResponse) => {
 					tradeMsg += `\nHash: ${txResponse.transactionHash} Code: ${txResponse.code}`;
@@ -219,7 +240,7 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			}
 
 			if ([LogType.All, LogType.Console].includes(type)) {
-				message = message.replaceAll("**", "");
+				message = message.replaceAll("**", "").replaceAll("*", "");
 				console.log(message);
 			}
 		}
