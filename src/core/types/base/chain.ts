@@ -53,9 +53,13 @@ export async function initChain(chainConfig: ChainConfig, logger: Logger): Promi
 				(asset) =>
 					asset.denom === (isNativeAsset(pool.assets[1].info) ? pool.assets[1].info.native_token.denom : ""),
 			);
-			if (assetIbcInfo0 && assetIbcInfo1) {
+			if (assetIbcInfo0) {
 				ibcStartingAssets.set(`${assetIbcInfo0.origin_chain_id}/${assetIbcInfo0.origin_denom}`, assetIbcInfo0);
+			}
+			if (assetIbcInfo1) {
 				ibcStartingAssets.set(`${assetIbcInfo1.origin_chain_id}/${assetIbcInfo1.origin_denom}`, assetIbcInfo1);
+			}
+			if (assetIbcInfo0 && assetIbcInfo1) {
 				pool.ibcAssets = [assetIbcInfo0, assetIbcInfo1];
 			} else {
 				// console.log("removing: ", pool.address, pool.assets[0].info, pool.assets[1].info);

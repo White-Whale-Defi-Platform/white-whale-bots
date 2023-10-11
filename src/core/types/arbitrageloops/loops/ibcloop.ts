@@ -2,10 +2,12 @@ import { messageFactory } from "../../../../chains/defaults";
 import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { getPaths, newGraph } from "../../../arbitrage/graph";
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
+import { getChainTransfer } from "../../../ibc/chainTransfer";
 import { Logger } from "../../../logging";
 import { Chain, initChain } from "../../base/chain";
 import { BotConfig, ChainConfig } from "../../base/configs";
 import { OrderbookPath, Path } from "../../base/path";
+import { removedUnusedPools } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 
 /**
@@ -36,31 +38,43 @@ export class IBCLoop {
 		const allPools = chains.flatMap((chain) => chain.pools);
 
 		const graph = newGraph(allPools, true);
-		console.log(graph.vertices.size);
 		//test values
 		const paths: Array<Path> = [];
+		const uniqueStartingAssets = [...new Set(chains.flatMap((chain) => Array.from(chain.chainAssets.keys())))];
+
+		//derive all paths for all starting assets on all chains
+		uniqueStartingAssets.map((startingAssetName) => {
+			console.log("starting asset: ", startingAssetName);
+			const saPaths = getPaths(graph, startingAssetName, botConfig.maxPathPools, true);
+			console.log("paths: ", saPaths?.length);
+			if (saPaths) {
+				paths.push(...saPaths);
+				console.log("===".repeat(20));
+			}
+		});
+
+		//remove all pools from all chains that arent in any path
+		console.log("total paths: ", paths.length);
 		chains.map((chain) => {
-			chain.chainAssets.forEach((val, key) => {
-				const chainPaths = getPaths(graph, key, botConfig.maxPathPools, true);
-				if (chainPaths) {
-					paths.push(...chainPaths);
+			console.log(chain.chainConfig.chainPrefix);
+			console.log("total pools in chain: ", chain.pools.length);
+			chain.pools = removedUnusedPools(chain.pools, paths);
+			console.log("total pools in chain: ", chain.pools.length);
+		});
+
+		this.chains = chains;
+		//store IBC transfer messages from all chains to each other
+		this.chains.map((sourceChain) => {
+			this.chains.map(async (destChain) => {
+				if (sourceChain.chainOperator.client.chainId === destChain.chainOperator.client.chainId) {
+					return;
+				} else {
+					await getChainTransfer(sourceChain, destChain);
 				}
 			});
 		});
-		// const paths = getPaths(graph, startingAssetName, botConfig.maxPathPools, true) ?? [];
-		console.log(paths.length);
-		paths.forEach((path) => {
-			let poolText = `${path.identifier}:\n`;
-			path.pools.forEach((pool) => {
-				poolText += `${pool.address}: ${pool.ibcAssets[0].origin_denom}/${pool.ibcAssets[1].origin_denom}\n`;
-			});
-			console.log(poolText);
-		});
-		// const filteredPools = removedUnusedPools(allPools, paths);
-		// const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks);
-		this.chains = chains;
-		this.paths = [];
-		this.pathlib = [];
+		this.paths = paths;
+		this.pathlib = paths;
 		this.orderbookPaths = [];
 		// this.orderbookPaths = orderbookPaths;
 		this.CDpaths = new Map<string, [number, number, number]>();
