@@ -22,19 +22,6 @@ export function getSwapMessage(
 			// belief_price: beliefPrice,
 		},
 	};
-	console.log({
-		funds: [
-			{
-				denom: isNativeAsset(offerAsset.info)
-					? offerAsset.info.native_token.denom
-					: offerAsset.info.token.contract_addr,
-				amount: offerAsset.amount,
-			},
-		],
-		sender: walletAddress,
-		contract: pool.address,
-		msg: toUtf8(JSON.stringify(msg)),
-	});
 	const encodedMsgObject: EncodeObject = {
 		typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
 		value: MsgExecuteContract.fromPartial({
