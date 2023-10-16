@@ -20,7 +20,9 @@ export type IbcAssetEntry = {
  *
  */
 export async function getChainAssetList(chainId: string): Promise<ChainAssetList> {
-	const chainAssetsResults = await axios.get(`https://api.skip.money/v1/fungible/assets?chain_id=${chainId}`);
+	const chainAssetsResults = await axios.get(
+		`https://api.skip.money/v1/fungible/assets?chain_id=${chainId}&native_only=false`,
+	);
 
 	return chainAssetsResults.data;
 }

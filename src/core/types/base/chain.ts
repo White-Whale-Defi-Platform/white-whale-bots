@@ -1,3 +1,5 @@
+import { MsgTransfer } from "cosmjs-types/ibc/applications/transfer/v1/tx";
+
 import * as chainImports from "../../../chains";
 import { getPoolStates, initPools } from "../../../chains/defaults";
 import { ChainOperator } from "../../chainOperator/chainoperator";
@@ -15,7 +17,8 @@ export interface Chain {
 	pools: Array<Pool>;
 	chainOperator: ChainOperator;
 	orderbooks: Array<Orderbook>;
-	chainAssets: Map<string, IbcAssetEntry>;
+	IBCAssets: Map<string, IbcAssetEntry>;
+	IBCTransferMessages: Map<string, Array<MsgTransfer>>;
 	updatePoolStates: DexLoopInterface["updatePoolStates"];
 	updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"];
 }
@@ -81,7 +84,8 @@ export async function initChain(chainConfig: ChainConfig, logger: Logger): Promi
 			pools: nativeTokenPoolsChain,
 			chainOperator: chainOperator,
 			orderbooks: orderbooks,
-			chainAssets: ibcStartingAssets,
+			IBCAssets: ibcStartingAssets,
+			IBCTransferMessages: new Map(),
 			updatePoolStates: getPoolStatesChain,
 			updateOrderbookStates: getOrderbookState,
 		};

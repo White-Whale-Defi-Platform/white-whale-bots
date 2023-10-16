@@ -1,14 +1,25 @@
 import axios, { AxiosRequestConfig } from "axios";
+import { MsgTransfer } from "cosmjs-types/ibc/applications/transfer/v1/tx";
 
 import { ChainOperator } from "../chainOperator/chainoperator";
 import { Chain } from "../types/base/chain";
 
+export interface IbcTransferOperations {
+	msgs: Array<IbcTransferMessage>;
+}
+
+export interface IbcTransferMessage {
+	chain_id: string;
+	path: object;
+	msg: string;
+	msg_type_url: string;
+}
 /**
  *
  */
 export async function getChainTransfer(sourceChain: Chain, destinationChain: Chain) {
-	sourceChain.chainAssets.forEach(async (sourceEntry, key) => {
-		const destinationEntry = destinationChain.chainAssets.get(key);
+	sourceChain.IBCAssets.forEach(async (sourceEntry, key) => {
+		const destinationEntry = destinationChain.IBCAssets.get(key);
 		if (destinationEntry) {
 			const payload = getQueryPayload(
 				sourceChain.chainOperator,
@@ -23,11 +34,45 @@ export async function getChainTransfer(sourceChain: Chain, destinationChain: Cha
 				},
 			};
 			const res = await axios.post("https://api.skip.money/v1/fungible/msgs_direct", payload, axiosConfig);
-			console.log(res.data);
+			await delay(250);
+			const ibcTransferOperations: IbcTransferOperations = res.data;
+			const ibcTransferMessages = ibcTransferOperations.msgs;
+			sourceChain.IBCTransferMessages.set(
+				sourceEntry.denom + "->" + destinationEntry.chain_id,
+
+				getIbcTransferMessageFromResponse(ibcTransferMessages),
+			);
 		}
 	});
 }
-
+/**
+ *
+ */
+function getIbcTransferMessageFromResponse(msgs: Array<IbcTransferMessage>) {
+	type SkipMsgTransfer = {
+		source_port: string;
+		source_channel: string;
+		token: { denom: string; amount: string };
+		sender: string;
+		receiver: string;
+		timeout_height: any;
+		timeout_timestamp: string;
+		memo: string | undefined;
+	};
+	return msgs.map((msg) => {
+		const skipMsg: SkipMsgTransfer = JSON.parse(msg.msg);
+		return MsgTransfer.fromPartial({
+			sourcePort: skipMsg.source_port,
+			sourceChannel: skipMsg.source_channel,
+			token: skipMsg.token,
+			sender: skipMsg.sender,
+			receiver: skipMsg.receiver,
+			timeoutHeight: skipMsg.timeout_height,
+			timeoutTimestamp: skipMsg.timeout_timestamp,
+			memo: skipMsg.memo,
+		});
+	});
+}
 /**
  *
  */
@@ -64,3 +109,9 @@ curl --request POST \
      --data 
 const payload =
 */
+/**
+ *
+ */
+function delay(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}

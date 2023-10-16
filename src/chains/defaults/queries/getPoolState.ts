@@ -73,8 +73,16 @@ export async function initPools(
 			const poolState = <PoolState>await chainOperator.queryContractSmart(poolAddress.pool, { pool: {} });
 			[assets, dexname, totalShare] = processPoolStateAssets(poolState);
 		} catch (error) {
-			const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(poolAddress.pool, { info: {} });
-			[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
+			try {
+				const poolState = <JunoSwapPoolState>(
+					await chainOperator.queryContractSmart(poolAddress.pool, { info: {} })
+				);
+				[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
+			} catch (e) {
+				console.log(e);
+				console.log(poolAddress.pool);
+				process.exit(1);
+			}
 		}
 		const factory = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.factory ?? "";
 		const router = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.router ?? "";

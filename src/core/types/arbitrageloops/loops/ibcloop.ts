@@ -40,7 +40,7 @@ export class IBCLoop {
 		const graph = newGraph(allPools, true);
 		//test values
 		const paths: Array<Path> = [];
-		const uniqueStartingAssets = [...new Set(chains.flatMap((chain) => Array.from(chain.chainAssets.keys())))];
+		const uniqueStartingAssets = [...new Set(chains.flatMap((chain) => Array.from(chain.IBCAssets.keys())))];
 
 		//derive all paths for all starting assets on all chains
 		uniqueStartingAssets.map((startingAssetName) => {
@@ -67,7 +67,7 @@ export class IBCLoop {
 		this.chains.map((sourceChain) => {
 			this.chains.map(async (destChain) => {
 				if (sourceChain.chainOperator.client.chainId === destChain.chainOperator.client.chainId) {
-					return;
+					//
 				} else {
 					await getChainTransfer(sourceChain, destChain);
 				}
@@ -153,12 +153,14 @@ export class IBCLoop {
 	 *
 	 */
 	public async step() {
-		// this.chains.map((chain) => {
-		// 	chain.pools.forEach((pool) => {
-		// 		console.log(pool.address, pool.ibcAssets[0], pool.ibcAssets[1]);
-		// 	});
-		// });
-		await delay(10000);
+		console.log("step ", this.iterations);
+
+		console.time("states update");
+		await Promise.all(this.chains.map((chain) => chain.updatePoolStates(chain.chainOperator, chain.pools)));
+		console.timeEnd("states update");
+
+		this.ammArb(this.paths, this.chains[0].chainConfig);
+		await delay(3000);
 		this.iterations++;
 
 		/*
