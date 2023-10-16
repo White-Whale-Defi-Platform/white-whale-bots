@@ -1,15 +1,13 @@
-import { JsonObject } from "@cosmjs/cosmwasm-stargate";
+import { JsonObject, setupWasmExtension, WasmExtension } from "@cosmjs/cosmwasm-stargate";
 import { stringToPath } from "@cosmjs/crypto/build/slip10";
-import { fromUtf8 } from "@cosmjs/encoding";
-import { EncodeObject } from "@cosmjs/proto-signing";
-import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
-import { StdFee } from "@cosmjs/stargate";
+import { DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing";
+import { QueryClient, StdFee } from "@cosmjs/stargate";
+import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
 import { HttpBatchClient } from "@cosmjs/tendermint-rpc";
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
 import {
 	BaseAccount,
-	ChainGrpcWasmApi,
 	ChainRestAuthApi,
 	createTransaction,
 	IndexerGrpcSpotApi,
@@ -38,12 +36,11 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	private _privateKey: PrivateKey;
 	private _signAndBroadcastClient: MsgBroadcasterWithPk;
 	private _spotQueryClient: IndexerGrpcSpotApi;
-	private _wasmQueryClient: ChainGrpcWasmApi;
-	private _httpClient: HttpBatchClient;
+	private _wasmQueryClient!: QueryClient & WasmExtension; //used to query wasm methods (contract states)
+	private _httpClient!: HttpBatchClient;
 	private _authClient: ChainRestAuthApi;
 	private _chainId: ChainId;
 
-	private _network: Network;
 	private _publicKey: PublicKey;
 	private _publicAddress!: string;
 
@@ -70,11 +67,8 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			},
 		});
 		this._spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
-		this._wasmQueryClient = new ChainGrpcWasmApi(botConfig.grpcUrl ?? endpoints.grpc);
-		this._httpClient = new HttpBatchClient(botConfig.rpcUrls[0] ?? endpoints.rpc);
 		this._authClient = new ChainRestAuthApi(botConfig.restUrl ?? endpoints.rest);
 		this._chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
-		this._network = network;
 		this._publicKey = privateKey.toPublicKey();
 		this.publicAddress = privateKey.toPublicKey().toAddress().address;
 	}
@@ -119,6 +113,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		this._accountNumber = accountDetails.accountNumber;
 		this.sequence = accountDetails.sequence;
 
+		await this.setClients(botConfig.rpcUrls[0]);
 		const hdPath = stringToPath("m/44'/60'/0'/0/0");
 		this._signer = await DirectSecp256k1HdWallet.fromMnemonic(botConfig.mnemonic, {
 			prefix: botConfig.chainPrefix,
@@ -133,14 +128,19 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
+	async setClients(rpcUrl: string) {
+		this._httpClient = new HttpBatchClient(rpcUrl);
+		const tmClient = await Tendermint34Client.create(this._httpClient);
+		this._wasmQueryClient = QueryClient.withExtensions(tmClient, setupWasmExtension);
+		// this._signingCWClient = await SigningCosmWasmClient.connectWithSigner(rpcUrl, this._signer, {
+		// 	gasPrice: GasPrice.fromString(this._gasPrice + this._denom),
+		// });
+	}
+	/**
+	 *
+	 */
 	async queryContractSmart(address: string, queryMsg: Record<string, unknown>): Promise<JsonObject> {
-		const queryResult = await this._wasmQueryClient.fetchSmartContractState(
-			address,
-			Buffer.from(JSON.stringify(queryMsg)).toString("base64"),
-		);
-
-		const jsonResult = JSON.parse(fromUtf8(queryResult.data));
-		return jsonResult;
+		return await this._wasmQueryClient.wasm.queryContractSmart(address, queryMsg);
 	}
 
 	/**
