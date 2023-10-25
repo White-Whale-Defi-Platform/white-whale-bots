@@ -59,7 +59,7 @@ function getOptimalTradeForPath(
 	path: OrderbookPath,
 	offerAssetInfo: AssetInfo,
 ): [number, RichAsset, number, number, number] {
-	let tradesizes = [...Array(500).keys()];
+	let tradesizes = [...Array(100).keys()];
 	tradesizes = tradesizes.map((x) => x * 1e6);
 
 	return binarySearch(path, offerAssetInfo, tradesizes, 0, tradesizes.length - 1);

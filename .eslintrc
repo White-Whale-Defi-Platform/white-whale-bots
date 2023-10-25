@@ -47,6 +47,7 @@
     "@typescript-eslint/no-non-null-assertion": "off",
     "@typescript-eslint/no-empty-function": "warn",
     "@typescript-eslint/no-floating-promises": "error",
+    "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/ban-ts-comment": [
       "error",
       {

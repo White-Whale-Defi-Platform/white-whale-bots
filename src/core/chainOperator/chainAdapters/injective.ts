@@ -124,6 +124,10 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			this._skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
 			this._skipSigningAddress = (await this._signer.getAccounts())[0].address;
 		}
+		// const markets = await this._spotQueryClient.fetchMarkets();
+		// for (const market of markets) {
+		// 	console.log(market.marketId, market.baseDenom, market.quoteDenom, market.ticker);
+		// }
 	}
 	/**
 	 *

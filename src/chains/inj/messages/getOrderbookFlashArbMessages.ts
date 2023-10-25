@@ -1,5 +1,6 @@
 import { toBase64, toUtf8 } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
+import { OrderTypeMap } from "@injectivelabs/sdk-ts";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { inspect } from "util";
 
@@ -64,13 +65,17 @@ function getOrderbookFlashArbMessage(arbTrade: OptimalOrderbookTrade, publicAddr
 				path.orderbook.minQuantityIncrement,
 		);
 
-		const msg1 = getMarketSpotOrderMessage(arbTrade, publicAddress, offerAsset, 10);
-		const tst: any = msg1.value.toWeb3();
-		if (tst.order?.order_type) {
-			tst.order.order_type = "SELL_ATOMIC";
+		const msg1 = getMarketSpotOrderMessage(arbTrade, publicAddress, offerAsset, OrderTypeMap.SELL_ATOMIC);
+		const msg11: any = msg1.value.toProto();
+		if (msg11.order) {
+			msg11.order.orderType = "SELL_ATOMIC";
 		}
+
 		const nestedMsg1 = {
-			custom: tst,
+			stargate: {
+				type_url: msg1.typeUrl,
+				value: Buffer.from(JSON.stringify(msg1.value)).toString("base64"),
+			},
 		};
 		operationMsgs.push(...ammWasmMessage, nestedMsg1);
 	} else {
@@ -82,13 +87,16 @@ function getOrderbookFlashArbMessage(arbTrade: OptimalOrderbookTrade, publicAddr
 			info: arbTrade.path.orderbook.baseAssetInfo,
 			decimals: arbTrade.path.orderbook.baseAssetDecimals,
 		};
-		const msg0 = getMarketSpotOrderMessage(arbTrade, publicAddress, offerAsset1, 9);
-		const tst: any = msg0.value.toWeb3();
-		if (tst.order?.order_type) {
-			tst.order.order_type = "BUY_ATOMIC";
+		const msg0 = getMarketSpotOrderMessage(arbTrade, publicAddress, offerAsset1, OrderTypeMap.BUY_ATOMIC);
+		const msg00: any = msg0.value.toProto();
+		if (msg00.order) {
+			msg00.order.orderType = "BUY_ATOMIC";
 		}
 		const nestedMsg0 = {
-			custom: tst,
+			stargate: {
+				type_url: msg0.typeUrl,
+				value: Buffer.from(JSON.stringify(msg0.value)).toString("base64"),
+			},
 		};
 		const [ammWasmMessage, offerAssetNext] = getWasmMessages(path.pool, offerAsset1);
 		operationMsgs.push(nestedMsg0, ...ammWasmMessage);

@@ -19,7 +19,7 @@ export function getSwapMessage(
 		swap: {
 			max_spread: String(maxSpread),
 			offer_asset: offerAsset,
-			// belief_price: beliefPrice,
+			belief_price: beliefPrice,
 		},
 	};
 	const encodedMsgObject: EncodeObject = {

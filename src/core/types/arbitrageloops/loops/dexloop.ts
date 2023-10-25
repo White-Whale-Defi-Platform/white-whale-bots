@@ -195,18 +195,22 @@ export class DexLoop implements DexLoopInterface {
 	 *
 	 */
 	private async tradeOrderbook(arbTradeOB: OptimalOrderbookTrade) {
-		const messages = this.messageFactory(arbTradeOB, this.chainOperator.client.publicAddress, undefined);
+		const messages = this.messageFactory(
+			arbTradeOB,
+			this.chainOperator.client.publicAddress,
+			this.botConfig.flashloanRouterAddress,
+		);
 		if (!messages) {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
 		if (arbTradeOB.path.orderSequence === OrderSequence.AmmFirst) {
-			const txResponse = await this.chainOperator.signAndBroadcast(messages[0]);
+			const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTradeOB.path.fee);
 			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
 		} else {
-			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]]);
+			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], arbTradeOB.path.fee);
 			if (txResponse.code == 0) {
-				const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]]);
+				const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]], arbTradeOB.path.fee);
 				await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
 					txResponse,
 					txResponse2,
@@ -228,7 +232,7 @@ export class DexLoop implements DexLoopInterface {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		const txResponse = await this.chainOperator.signAndBroadcast(messages[0]);
+		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTrade.path.fee);
 
 		await this.logger?.tradeLogging.logAmmTrade(arbTrade, [txResponse]);
 	}
