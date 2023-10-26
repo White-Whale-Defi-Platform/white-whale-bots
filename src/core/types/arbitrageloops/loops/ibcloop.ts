@@ -2,7 +2,7 @@ import { messageFactory } from "../../../../chains/defaults";
 import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { getPaths, newGraph } from "../../../arbitrage/graph";
 import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
-import { getChainTransfer } from "../../../ibc/chainTransfer";
+import { setChainTransferMessages } from "../../../ibc/chainTransfers";
 import { Logger } from "../../../logging";
 import { Chain, initChain } from "../../base/chain";
 import { BotConfig, ChainConfig } from "../../base/configs";
@@ -63,16 +63,7 @@ export class IBCLoop {
 		});
 
 		this.chains = chains;
-		//store IBC transfer messages from all chains to each other
-		this.chains.map((sourceChain) => {
-			this.chains.map(async (destChain) => {
-				if (sourceChain.chainOperator.client.chainId === destChain.chainOperator.client.chainId) {
-					//
-				} else {
-					await getChainTransfer(sourceChain, destChain);
-				}
-			});
-		});
+
 		this.paths = paths;
 		this.pathlib = paths;
 		this.orderbookPaths = [];
@@ -95,6 +86,9 @@ export class IBCLoop {
 			const chain: Chain = await initChain(chainConfig, logger);
 			chains.push(chain);
 		}
+
+		await setChainTransferMessages(chains);
+
 		return new IBCLoop(botConfig, chains, logger, messageFactory);
 	}
 	/*
