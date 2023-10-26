@@ -1,5 +1,3 @@
-import { inspect } from "util";
-
 import * as chains from "../../../../chains";
 import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
 import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
@@ -9,14 +7,7 @@ import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { Orderbook } from "../../base/orderbook";
-import {
-	getAmmPaths,
-	getOrderbookAmmPaths,
-	isOrderbookPath,
-	OrderbookPath,
-	OrderSequence,
-	Path,
-} from "../../base/path";
+import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
 import { Pool, removedUnusedPools } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { DexMempoolLoop } from "./dexMempoolloop";
@@ -206,20 +197,9 @@ export class DexLoop implements DexLoopInterface {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		console.log(inspect(arbTradeOB.path.fee, true, null, true));
-		if (arbTradeOB.path.orderSequence === OrderSequence.AmmFirst) {
-			const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTradeOB.path.fee);
-			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
-		} else {
-			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], arbTradeOB.path.fee);
-			if (txResponse.code == 0) {
-				const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]], arbTradeOB.path.fee);
-				await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
-					txResponse,
-					txResponse2,
-				]);
-			}
-		}
+
+		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTradeOB.path.fee);
+		await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
 	}
 
 	/**

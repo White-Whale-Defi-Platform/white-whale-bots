@@ -95,14 +95,30 @@ function getProfitForTradesize(
 
 		return [outGivenInReturned - +offerAsset.amount, offerAsset, worstPrice, averagePrice, outGivenInReturned];
 	} else {
-		const offerAsset: RichAsset = { amount: String(tradesize), info: path.orderbook.quoteAssetInfo, decimals: 6 };
+		const offerAsset: RichAsset = {
+			amount: String(tradesize),
+			info: path.orderbook.quoteAssetInfo,
+			decimals: 6,
+		};
 		const [outGivenIn0, worstPrice, averagePrice] = OrderbookMarketBuy(path.orderbook, offerAsset);
 		const outGivenInOrderbook =
 			Math.floor(outGivenIn0 / path.orderbook.minQuantityIncrement) * path.orderbook.minQuantityIncrement;
 		const outInfo0 = path.orderbook.baseAssetInfo;
 		const offerAsset1 = { amount: String(outGivenInOrderbook), info: outInfo0 };
 		const outAsset1 = outGivenIn(path.pool, offerAsset1);
-		return [+outAsset1.amount - +offerAsset.amount, offerAsset, worstPrice, averagePrice, outGivenInOrderbook];
+
+		const actualOfferAsset: RichAsset = {
+			amount: String(Math.ceil(outGivenInOrderbook * worstPrice * 1.002)),
+			info: path.orderbook.quoteAssetInfo,
+			decimals: 6,
+		};
+		return [
+			+outAsset1.amount - +actualOfferAsset.amount,
+			actualOfferAsset,
+			worstPrice,
+			averagePrice,
+			outGivenInOrderbook,
+		];
 	}
 }
 

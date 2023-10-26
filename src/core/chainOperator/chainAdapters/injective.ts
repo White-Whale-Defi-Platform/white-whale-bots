@@ -25,7 +25,6 @@ import { SkipBundleClient } from "@skip-mev/skipjs";
 import { MsgSend as CosmJSMsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { MsgExecuteContract as CosmJSMsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
-import { inspect } from "util";
 
 import { BotConfig } from "../../types/base/configs";
 import { Mempool } from "../../types/base/mempool";
@@ -245,7 +244,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 						gas: +fee.gas,
 					},
 				};
-				console.log(inspect(broadcasterOptions, true, 3, true));
+
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
 				return {
 					height: res.height,

@@ -54,5 +54,5 @@ export function OrderbookMarketBuy(orderbook: Orderbook, offerAsset: Asset) {
 		result = result + Math.floor(currentOrderSize / currentSell.price);
 		sellIndex = sellIndex + 1;
 	}
-	return [Math.floor(0.998 * result), orderbook.sells[sellIndex].price, +offerAsset.amount / (0.998 * result)];
+	return [result, orderbook.sells[sellIndex].price, +offerAsset.amount / result];
 }
