@@ -109,6 +109,7 @@ export class ChainOperator {
 		fee?: StdFee | "auto",
 		memo?: string | undefined,
 	): Promise<TxResponse> {
+		console.log(fee);
 		try {
 			return await this.client.signAndBroadcast(msgs, fee, memo);
 		} catch (e) {

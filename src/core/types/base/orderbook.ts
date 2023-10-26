@@ -34,7 +34,7 @@ export function OrderbookMarketSell(orderbook: Orderbook, offerAsset: Asset) {
 		result = result + Math.floor(currentOrderSize * currentBuy.price);
 		buyIndex = buyIndex + 1;
 	}
-	return [Math.floor(0.999 * result), orderbook.buys[buyIndex].price, (0.999 * result) / +offerAsset.amount];
+	return [Math.floor(0.998 * result), orderbook.buys[buyIndex].price, (0.998 * result) / +offerAsset.amount];
 }
 
 /**
@@ -54,5 +54,5 @@ export function OrderbookMarketBuy(orderbook: Orderbook, offerAsset: Asset) {
 		result = result + Math.floor(currentOrderSize / currentSell.price);
 		sellIndex = sellIndex + 1;
 	}
-	return [Math.floor(0.999 * result), orderbook.sells[sellIndex].price, +offerAsset.amount / (0.999 * result)];
+	return [Math.floor(0.998 * result), orderbook.sells[sellIndex].price, +offerAsset.amount / (0.998 * result)];
 }

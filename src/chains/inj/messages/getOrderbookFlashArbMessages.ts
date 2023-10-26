@@ -2,7 +2,6 @@ import { toBase64, toUtf8 } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
 import { OrderTypeMap } from "@injectivelabs/sdk-ts";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
-import { inspect } from "util";
 
 import { OptimalOrderbookTrade } from "../../../core/arbitrage/optimizers/orderbookOptimizer";
 import {
@@ -27,8 +26,7 @@ export function getOrderbookFlashArbMessages(
 	publicAddress: string,
 	flashloancontract: string,
 ): [Array<EncodeObject>, number] {
-	const flashloanMessage = getOrderbookFlashArbMessage(arbTrade, publicAddress);
-	console.log(inspect(flashloanMessage, true, null, true));
+	const flashloanMessage = getOrderbookFlashArbMessage(arbTrade, flashloancontract);
 	const encodedMsgObject: EncodeObject = {
 		typeUrl: "/cosmwasm.wasm.v1.MsgExecuteContract",
 		value: MsgExecuteContract.fromPartial({
@@ -66,15 +64,11 @@ function getOrderbookFlashArbMessage(arbTrade: OptimalOrderbookTrade, publicAddr
 		);
 
 		const msg1 = getMarketSpotOrderMessage(arbTrade, publicAddress, offerAsset, OrderTypeMap.SELL_ATOMIC);
-		const msg11: any = msg1.value.toProto();
-		if (msg11.order) {
-			msg11.order.orderType = "SELL_ATOMIC";
-		}
 
 		const nestedMsg1 = {
 			stargate: {
 				type_url: msg1.typeUrl,
-				value: Buffer.from(JSON.stringify(msg1.value)).toString("base64"),
+				value: Buffer.from(msg1.value.toBinary()).toString("base64"),
 			},
 		};
 		operationMsgs.push(...ammWasmMessage, nestedMsg1);
@@ -88,14 +82,11 @@ function getOrderbookFlashArbMessage(arbTrade: OptimalOrderbookTrade, publicAddr
 			decimals: arbTrade.path.orderbook.baseAssetDecimals,
 		};
 		const msg0 = getMarketSpotOrderMessage(arbTrade, publicAddress, offerAsset1, OrderTypeMap.BUY_ATOMIC);
-		const msg00: any = msg0.value.toProto();
-		if (msg00.order) {
-			msg00.order.orderType = "BUY_ATOMIC";
-		}
+
 		const nestedMsg0 = {
 			stargate: {
 				type_url: msg0.typeUrl,
-				value: Buffer.from(JSON.stringify(msg0.value)).toString("base64"),
+				value: Buffer.from(msg0.value.toBinary()).toString("base64"),
 			},
 		};
 		const [ammWasmMessage, offerAssetNext] = getWasmMessages(path.pool, offerAsset1);
@@ -131,7 +122,7 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 								: { native: offerAssetChain.info.native_token.denom },
 					},
 
-					// belief_price: beliefPriceChain,
+					belief_price: beliefPriceChain,
 				},
 			};
 		} else {

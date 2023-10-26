@@ -1,3 +1,5 @@
+import { inspect } from "util";
+
 import * as chains from "../../../../chains";
 import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
 import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
@@ -204,6 +206,7 @@ export class DexLoop implements DexLoopInterface {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
+		console.log(inspect(arbTradeOB.path.fee, true, null, true));
 		if (arbTradeOB.path.orderSequence === OrderSequence.AmmFirst) {
 			const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTradeOB.path.fee);
 			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
