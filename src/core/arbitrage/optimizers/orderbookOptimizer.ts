@@ -55,7 +55,7 @@ function getOptimalTradeForPath(
 	path: OrderbookPath,
 	offerAssetInfo: AssetInfo,
 ): [number, RichAsset, number, number, number] {
-	let tradesizes = [...Array(100).keys()];
+	let tradesizes = [...Array(1400).keys()];
 	tradesizes = tradesizes.map((x) => x * 1e6);
 
 	return binarySearch(path, offerAssetInfo, tradesizes, 0, tradesizes.length - 1);
@@ -104,7 +104,7 @@ function getProfitForTradesize(
 		const outAsset1 = outGivenIn(path.pool, offerAsset1);
 
 		const actualOfferAsset: RichAsset = {
-			amount: String(Math.ceil(outGivenInOrderbook * worstPrice * 1.002)),
+			amount: String(Math.ceil(outGivenInOrderbook * worstPrice * (1 + path.orderbook.takerFeeRate))),
 			info: path.orderbook.quoteAssetInfo,
 			decimals: 6,
 		};

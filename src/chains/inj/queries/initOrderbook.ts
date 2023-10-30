@@ -23,6 +23,7 @@ export async function initOrderbooks(
 
 		const decimalAdjustment = (marketInfo.baseToken?.decimals ?? 6) - (marketInfo.quoteToken?.decimals ?? 6);
 		const quantityIncrement = marketInfo.minQuantityTickSize / 10 ** decimalAdjustment;
+		console.log(marketInfo.makerFeeRate, marketInfo.takerFeeRate);
 		const ob = identity<Orderbook>({
 			baseAssetInfo: baseAssetInfo,
 			quoteAssetInfo: quoteAssetInfo,
@@ -32,6 +33,8 @@ export async function initOrderbooks(
 			buys: [],
 			sells: [],
 			marketId: orderbookAddress,
+			makerFeeRate: +marketInfo.makerFeeRate,
+			takerFeeRate: +marketInfo.takerFeeRate,
 		});
 		orderbooks.push(ob);
 	}
