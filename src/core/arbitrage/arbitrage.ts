@@ -60,7 +60,10 @@ export function tryLiquidationArb(
  */
 function isAboveThreshold(botConfig: DexConfig, optimalTrade: OptimalTrade | OptimalOrderbookTrade): boolean {
 	if (isOrderbookPath(optimalTrade.path)) {
-		return optimalTrade.profit >= optimalTrade.path.threshold;
+		return (
+			optimalTrade.profit - (botConfig.flashloanFee / 100) * +optimalTrade.offerAsset.amount >=
+			optimalTrade.path.threshold
+		);
 	} else {
 		// We dont know the number of message required to execute the trade, so the profit threshold will be set to the most conservative value: nr_of_pools*2-1
 		if (botConfig.skipConfig) {
