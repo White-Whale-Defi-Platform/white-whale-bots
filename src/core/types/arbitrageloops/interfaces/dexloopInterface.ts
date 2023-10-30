@@ -1,14 +1,14 @@
 import { getPoolStates } from "../../../../chains/defaults";
 import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
 import { getOrderbookState } from "../../../../chains/inj";
-import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
-import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
+import { tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
 import { Orderbook } from "../../base/orderbook";
 import { OrderbookPath, Path } from "../../base/path";
 import { Pool } from "../../base/pool";
+import { OptimalOrderbookTrade, OptimalTrade } from "../../base/trades";
 /**
  *
  */

@@ -2,14 +2,8 @@ import { AssetInfo, RichAsset } from "../../types/base/asset";
 import { OrderbookMarketBuy, OrderbookMarketSell } from "../../types/base/orderbook";
 import { OrderbookPath, OrderSequence } from "../../types/base/path";
 import { outGivenIn } from "../../types/base/pool";
-import { OptimalTrade } from "../arbitrage";
+import { OptimalOrderbookTrade, TradeType } from "../../types/base/trades";
 
-export interface OptimalOrderbookTrade extends Omit<OptimalTrade, "path"> {
-	worstPrice: number; //worst price for the market order to accept to fill the order
-	averagePrice: number; //average price obtained by the order
-	path: OrderbookPath;
-	outGivenIn: number;
-}
 /**
  *Calculates the optimal tradesize given a CLOB and a AMM xy=k pool.
  *@param orderbook Orderbook type to arb against.
@@ -21,12 +15,13 @@ export function getOptimalTrade(
 	offerAssetInfo: AssetInfo,
 ): OptimalOrderbookTrade | undefined {
 	let optimalOrderbookTrade: OptimalOrderbookTrade = {
+		tradeType: TradeType.COMBINED,
 		path: paths[0],
 		offerAsset: { amount: "0", info: offerAssetInfo, decimals: 6 },
 		profit: 0,
 		worstPrice: 0,
 		averagePrice: 0,
-		outGivenIn: 0,
+		outGivenInOrderbook: 0,
 	};
 	let optimalProfit = 0;
 	for (const path of paths) {
@@ -39,12 +34,13 @@ export function getOptimalTrade(
 		] = getOptimalTradeForPath(path, offerAssetInfo);
 		if (optimalProfitPath > optimalProfit) {
 			optimalOrderbookTrade = {
+				tradeType: TradeType.COMBINED,
 				path: path,
 				offerAsset: optimalOfferAssetPath,
 				profit: optimalProfitPath,
 				worstPrice: optimalWorstPricePath,
 				averagePrice: optimalAveragePricePath,
-				outGivenIn: optimalOutGivenInPath,
+				outGivenInOrderbook: optimalOutGivenInPath,
 			};
 			optimalProfit = optimalProfitPath;
 		}

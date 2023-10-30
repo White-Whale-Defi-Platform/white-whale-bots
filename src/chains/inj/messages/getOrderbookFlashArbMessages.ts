@@ -4,7 +4,6 @@ import { OrderTypeMap } from "@injectivelabs/sdk-ts";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { inspect } from "util";
 
-import { OptimalOrderbookTrade } from "../../../core/arbitrage/optimizers/orderbookOptimizer";
 import {
 	isMatchingAssetInfos,
 	isNativeAsset,
@@ -14,6 +13,7 @@ import {
 } from "../../../core/types/base/asset";
 import { OrderSequence } from "../../../core/types/base/path";
 import { AmmDexName, outGivenIn, Pool } from "../../../core/types/base/pool";
+import { OptimalOrderbookTrade } from "../../../core/types/base/trades";
 import { IncreaseAllowanceMessage } from "../../../core/types/messages/allowance";
 import { FlashLoanMessage, WasmMessage } from "../../../core/types/messages/flashloanmessage";
 import { SendMessage } from "../../../core/types/messages/sendmessages";
@@ -76,7 +76,7 @@ function getOrderbookFlashArbMessage(arbTrade: OptimalOrderbookTrade, publicAddr
 	} else {
 		const offerAsset1 = {
 			amount: String(
-				Math.floor(arbTrade.outGivenIn / arbTrade.path.orderbook.minQuantityIncrement) *
+				Math.floor(arbTrade.outGivenInOrderbook / arbTrade.path.orderbook.minQuantityIncrement) *
 					arbTrade.path.orderbook.minQuantityIncrement,
 			),
 			info: arbTrade.path.orderbook.baseAssetInfo,

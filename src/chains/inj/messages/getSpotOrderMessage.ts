@@ -1,8 +1,8 @@
 import { MsgCreateSpotMarketOrder, OrderType, spotPriceToChainPriceToFixed } from "@injectivelabs/sdk-ts";
 import { BigNumberInBase } from "@injectivelabs/utils/dist/cjs/classes";
 
-import { OptimalOrderbookTrade } from "../../../core/arbitrage/optimizers/orderbookOptimizer";
 import { Asset, isMatchingAssetInfos } from "../../../core/types/base/asset";
+import { OptimalOrderbookTrade } from "../../../core/types/base/trades";
 import { SpotMarketOrderMessage } from "../../../core/types/messages/spotorders";
 
 /**

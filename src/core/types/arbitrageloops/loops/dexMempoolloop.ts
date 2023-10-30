@@ -2,7 +2,7 @@
 
 import { sha256 } from "@cosmjs/crypto";
 import { toHex } from "@cosmjs/encoding";
-import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
+import { tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
@@ -18,8 +18,9 @@ import {
 import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { Orderbook } from "../../base/orderbook";
-import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
+
 import { inspect } from "util";
+import { OptimalOrderbookTrade, OptimalTrade } from "../../base/trades";
 
 /**
  *

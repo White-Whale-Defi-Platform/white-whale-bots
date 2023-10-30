@@ -2,7 +2,6 @@ import { toBase64, toUtf8 } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
-import { OptimalTrade } from "../../../core/arbitrage/arbitrage";
 import {
 	isMatchingAssetInfos,
 	isNativeAsset,
@@ -12,6 +11,7 @@ import {
 } from "../../../core/types/base/asset";
 import { Path } from "../../../core/types/base/path";
 import { AmmDexName, outGivenIn, Pool } from "../../../core/types/base/pool";
+import { OptimalTrade } from "../../../core/types/base/trades";
 import { IncreaseAllowanceMessage } from "../../../core/types/messages/allowance";
 import { FlashLoanMessage, WasmMessage } from "../../../core/types/messages/flashloanmessage";
 import { SendMessage } from "../../../core/types/messages/sendmessages";

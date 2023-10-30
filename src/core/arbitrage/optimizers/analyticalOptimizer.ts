@@ -1,7 +1,7 @@
 import { AssetInfo } from "../../types/base/asset";
 import { Path } from "../../types/base/path";
 import { getAssetsOrder, outGivenIn } from "../../types/base/pool";
-import { OptimalTrade } from "../arbitrage";
+import { OptimalTrade, TradeType } from "../../types/base/trades";
 
 /** Function to calculate the optimal path, tradesize and profit given an Array of paths and a starting asset.
  * @param paths Type `Array<Path>` to check for arbitrage.
@@ -22,6 +22,7 @@ export function getOptimalTrade(paths: Array<Path>, offerAssetInfo: AssetInfo): 
 	});
 	if (maxPath) {
 		return {
+			tradeType: TradeType.AMM,
 			path: maxPath,
 			offerAsset: { amount: String(maxTradesize), info: offerAssetInfo, decimals: 6 },
 			profit: maxProfit,

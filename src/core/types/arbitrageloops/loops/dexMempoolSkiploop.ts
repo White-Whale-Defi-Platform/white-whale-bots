@@ -4,7 +4,7 @@ import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { inspect } from "util";
 
 import { getSendMessage } from "../../../../chains/defaults/messages/getSendMessage";
-import { OptimalTrade } from "../../../arbitrage/arbitrage";
+import {} from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { SkipResult } from "../../../chainOperator/skipclients";
 import { Logger } from "../../../logging";
@@ -13,6 +13,7 @@ import { LogType } from "../../base/logging";
 import { decodeMempool, MempoolTx } from "../../base/mempool";
 import { Orderbook } from "../../base/orderbook";
 import { applyMempoolMessagesOnPools, Pool } from "../../base/pool";
+import { OptimalTrade } from "../../base/trades";
 import { DexMempoolLoop } from "./dexMempoolloop";
 /**
  *

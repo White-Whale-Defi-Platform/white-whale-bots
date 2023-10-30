@@ -1,9 +1,9 @@
 import { EncodeObject } from "@cosmjs/proto-signing";
 
-import { OptimalOrderbookTrade } from "../../../core/arbitrage/optimizers/orderbookOptimizer";
 import { toChainAsset, toChainPrice } from "../../../core/types/base/asset";
 import { OrderSequence } from "../../../core/types/base/path";
 import { caclulateSpread, outGivenIn } from "../../../core/types/base/pool";
+import { OptimalOrderbookTrade } from "../../../core/types/base/trades";
 import { getSwapMessage } from "../../defaults/messages/getSwapMessage";
 import { getMarketSpotOrderMessage } from "./getSpotOrderMessage";
 
@@ -35,7 +35,7 @@ export function getOrderbookArbMessages(
 	} else {
 		const offerAsset1 = {
 			amount: String(
-				Math.floor(arbTrade.outGivenIn / arbTrade.path.orderbook.minQuantityIncrement) *
+				Math.floor(arbTrade.outGivenInOrderbook / arbTrade.path.orderbook.minQuantityIncrement) *
 					arbTrade.path.orderbook.minQuantityIncrement,
 			),
 			info: arbTrade.path.orderbook.baseAssetInfo,

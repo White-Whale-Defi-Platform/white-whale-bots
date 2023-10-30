@@ -1,7 +1,7 @@
 import * as chains from "../../../../chains";
 import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
-import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
-import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
+import { tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
+import {} from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
@@ -9,6 +9,7 @@ import { LogType } from "../../base/logging";
 import { Orderbook } from "../../base/orderbook";
 import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
 import { Pool, removedUnusedPools } from "../../base/pool";
+import { OptimalOrderbookTrade, OptimalTrade } from "../../base/trades";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { DexMempoolLoop } from "./dexMempoolloop";
 import { DexMempoolSkipLoop } from "./dexMempoolSkiploop";
