@@ -12,7 +12,7 @@ import {
 	toChainPrice,
 } from "../../../core/types/base/asset";
 import { OrderSequence } from "../../../core/types/base/path";
-import { AmmDexName, outGivenIn, Pool } from "../../../core/types/base/pool";
+import { AmmDexName, caclulateSpread, outGivenIn, Pool } from "../../../core/types/base/pool";
 import { OptimalOrderbookTrade } from "../../../core/types/base/trades";
 import { IncreaseAllowanceMessage } from "../../../core/types/messages/allowance";
 import { FlashLoanMessage, WasmMessage } from "../../../core/types/messages/flashloanmessage";
@@ -107,14 +107,16 @@ function getOrderbookFlashArbMessage(arbTrade: OptimalOrderbookTrade, publicAddr
  */
 function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 	const outAsset = outGivenIn(pool, _offerAsset);
-	const offerAssetChain = toChainAsset(_offerAsset); //will be compensated for 18 decimals if needed
 	const beliefPriceChain = toChainPrice(_offerAsset, outAsset); //will be compensated for 18 decimals if needed
+	const spread = caclulateSpread(pool, _offerAsset, beliefPriceChain);
+	const offerAssetChain = toChainAsset(_offerAsset); //will be compensated for 18 decimals if needed
+
 	let msg: DefaultSwapMessage | JunoSwapMessage | SendMessage;
 	if (pool.dexname === AmmDexName.default || pool.dexname === AmmDexName.wyndex) {
 		if (isNativeAsset(offerAssetChain.info)) {
 			msg = <DefaultSwapMessage>{
 				swap: {
-					max_spread: "0.1",
+					max_spread: String(spread),
 					offer_asset: {
 						amount: offerAssetChain.amount,
 						info:
@@ -130,7 +132,7 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 			const innerSwapMsg: InnerSwapMessage = {
 				swap: {
 					belief_price: beliefPriceChain,
-					max_spread: "0.1",
+					max_spread: String(spread),
 				},
 			};
 			const objJsonStr = JSON.stringify(innerSwapMsg);

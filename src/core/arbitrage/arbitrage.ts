@@ -1,4 +1,5 @@
 import { DexConfig, LiquidationConfig } from "../types/base/configs";
+import { OptimizerInterface } from "../types/base/optimizers";
 import { AnchorOverseer } from "../types/base/overseer";
 import { isOrderbookPath, OrderbookPath, Path } from "../types/base/path";
 import { OptimalOrderbookTrade, OptimalTrade } from "../types/base/trades";
@@ -8,7 +9,10 @@ import { getOptimalTrade as getOptimalOrderbookTrade } from "./optimizers/orderb
 /**
  *
  */
-export function tryAmmArb(paths: Array<Path>, botConfig: DexConfig): OptimalTrade | undefined {
+export const tryAmmArb: OptimizerInterface<Path, OptimalTrade> = (
+	paths: Array<Path>,
+	botConfig: DexConfig,
+): OptimalTrade | undefined => {
 	const optimalTrade: OptimalTrade | undefined = getOptimalAmmTrade(
 		paths,
 		botConfig.offerAssetInfo,
@@ -24,12 +28,15 @@ export function tryAmmArb(paths: Array<Path>, botConfig: DexConfig): OptimalTrad
 			return optimalTrade;
 		}
 	}
-}
+};
 
 /**
  *
  */
-export function tryOrderbookArb(paths: Array<OrderbookPath>, botConfig: DexConfig): OptimalOrderbookTrade | undefined {
+export const tryOrderbookArb: OptimizerInterface<OrderbookPath, OptimalOrderbookTrade> = (
+	paths: Array<OrderbookPath>,
+	botConfig: DexConfig,
+): OptimalOrderbookTrade | undefined => {
 	const optimalTrade: OptimalOrderbookTrade | undefined = getOptimalOrderbookTrade(
 		paths,
 		botConfig.offerAssetInfo,
@@ -45,7 +52,7 @@ export function tryOrderbookArb(paths: Array<OrderbookPath>, botConfig: DexConfi
 			return optimalTrade;
 		}
 	}
-}
+};
 
 /**
  *

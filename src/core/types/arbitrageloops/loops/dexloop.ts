@@ -9,7 +9,7 @@ import { LogType } from "../../base/logging";
 import { Orderbook } from "../../base/orderbook";
 import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
 import { Pool, removedUnusedPools } from "../../base/pool";
-import { OptimalOrderbookTrade, OptimalTrade } from "../../base/trades";
+import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { DexMempoolLoop } from "./dexMempoolloop";
 import { DexMempoolSkipLoop } from "./dexMempoolSkiploop";
@@ -32,8 +32,8 @@ export class DexLoop implements DexLoopInterface {
 	updatePoolStates: DexLoopInterface["updatePoolStates"];
 	updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"];
 	messageFactory: DexLoopInterface["messageFactory"];
-	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
-	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
+	ammArb: DexLoopInterface["ammArb"];
+	orderbookArb: DexLoopInterface["orderbookArb"];
 
 	/**
 	 *
@@ -143,11 +143,18 @@ export class DexLoop implements DexLoopInterface {
 		this.iterations++;
 
 		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
-		const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
+		const arbTradeOB: OptimalOrderbookTrade | undefined = this.orderbookArb(this.orderbookPaths, this.botConfig);
 
-		if (arbTrade || arbtradeOB) {
-			await this.trade(arbTrade, arbtradeOB);
-			await this.chainOperator.reset();
+		if (arbTrade && arbTradeOB) {
+			if (arbTrade.profit > arbTradeOB.profit) {
+				await this.trade(arbTrade);
+			} else if (arbTrade.profit <= arbTradeOB.profit) {
+				await this.trade(arbTradeOB);
+			}
+		} else if (arbTrade) {
+			await this.trade(arbTrade);
+		} else if (arbTradeOB) {
+			await this.trade(arbTradeOB);
 		}
 	}
 
@@ -165,26 +172,18 @@ export class DexLoop implements DexLoopInterface {
 	/**
 	 *
 	 */
-	public async trade(arbTrade: OptimalTrade | undefined, arbTradeOB: OptimalOrderbookTrade | undefined) {
-		if (arbTrade && arbTradeOB) {
-			if (arbTrade.profit > arbTradeOB.profit) {
-				await this.tradeAmm(arbTrade);
-				this.cdPaths(arbTrade.path);
-			} else if (arbTrade.profit <= arbTradeOB.profit) {
-				await this.tradeOrderbook(arbTradeOB);
-				this.cdPaths(arbTradeOB.path);
-			}
-		} else if (arbTrade) {
-			await this.tradeAmm(arbTrade);
-			this.cdPaths(arbTrade.path);
-		} else if (arbTradeOB) {
-			await this.tradeOrderbook(arbTradeOB);
-			this.cdPaths(arbTradeOB.path);
+	public async trade(trade: Trade) {
+		if (trade.tradeType === TradeType.AMM) {
+			await this.tradeAmm(<OptimalTrade>trade);
+		} else if (trade.tradeType === TradeType.COMBINED) {
+			await this.tradeOrderbook(<OptimalOrderbookTrade>trade);
 		}
+		this.cdPaths(trade.path);
 
 		await delay(6000);
-		// await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
 	}
+	// await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
+
 	/**
 	 *
 	 */
