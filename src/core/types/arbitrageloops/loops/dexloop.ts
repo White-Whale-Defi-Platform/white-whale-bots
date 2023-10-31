@@ -230,12 +230,12 @@ export class DexLoop implements DexLoopInterface {
 		for (const equalpath of path.equalpaths) {
 			this.CDpaths.set(equalpath.identifier, {
 				timeoutIteration: this.iterations,
-				timeoutDuration: 5,
+				timeoutDuration: 30,
 				path: equalpath,
 			});
 		}
 		//add self to the CDPath array
-		this.CDpaths.set(path.identifier, { timeoutIteration: this.iterations, timeoutDuration: 10, path: path });
+		this.CDpaths.set(path.identifier, { timeoutIteration: this.iterations, timeoutDuration: 60, path: path });
 
 		//remove all paths on cooldown from active paths
 		this.paths = this.paths.filter((pathToCheck) => this.CDpaths.get(pathToCheck.identifier) === undefined);
