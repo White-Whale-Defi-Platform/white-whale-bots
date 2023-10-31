@@ -108,7 +108,7 @@ function getProfitForTradesize(
 		const outAsset1 = outGivenIn(path.pool, offerAsset1);
 
 		const actualOfferAsset: RichAsset = {
-			amount: String(Math.ceil(outGivenInOrderbook * worstPrice * (1 + path.orderbook.takerFeeRate))),
+			amount: String(Math.ceil(outGivenInOrderbook * worstPrice * (1 + path.orderbook.takerFeeRate * 2))),
 			info: path.orderbook.quoteAssetInfo,
 			decimals: 6,
 		};
