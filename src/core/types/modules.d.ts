@@ -26,6 +26,11 @@ declare namespace NodeJS {
 		 */
 		GAS_DENOM: string;
 		/**
+		 * The price of GAS_DENOM denoted in BASE denom.
+		 */
+		GAS_TO_BASE_RATIO: string;
+
+		/**
 		 * The http endpoint to the RPC.
 		 */
 		RPC_URL: string;

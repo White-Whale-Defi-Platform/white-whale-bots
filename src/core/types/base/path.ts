@@ -106,8 +106,14 @@ export function getFeeAndThresholdForAmmPath(
 			flashloanCompensator
 		).toFixed(),
 	};
+	//threshold has to be set threshold + paid fees for specific path in BASE_DENOM
 	const threshold =
-		botConfig.profitThreshold + botConfig.gasPerHop * pathPools.length * botConfig.gasPrice * flashloanCompensator;
+		botConfig.profitThreshold +
+		botConfig.gasPerHop *
+			pathPools.length *
+			botConfig.gasPrice *
+			flashloanCompensator *
+			botConfig.gasDenomToBaseRato;
 	return {
 		fee: { amount: [gasFee], gas: String(botConfig.gasPerHop * pathPools.length * flashloanCompensator) },
 		threshold: threshold,
@@ -128,7 +134,10 @@ export function getFeeAndThresholdForOrderbookPath(
 		denom: botConfig.gasDenom,
 		amount: (botConfig.gasPerHop * 2 * botConfig.gasPrice * decimalCompensator * flashloanCompensator).toFixed(),
 	};
-	const threshold = botConfig.profitThreshold + botConfig.gasPerHop * 2 * botConfig.gasPrice;
+	//threshold has to be set threshold + paid fees for specific path in BASE_DENOM
+	const threshold =
+		botConfig.profitThreshold +
+		botConfig.gasPerHop * 2 * botConfig.gasPrice * flashloanCompensator * botConfig.gasDenomToBaseRato;
 	return {
 		fee: { amount: [gasFee], gas: String(botConfig.gasPerHop * 2 * flashloanCompensator) },
 		threshold: threshold,
