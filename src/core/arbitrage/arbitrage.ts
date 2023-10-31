@@ -74,24 +74,14 @@ export function tryLiquidationArb(
  *
  */
 function isAboveThreshold(botConfig: DexConfig, optimalTrade: OptimalTrade | OptimalOrderbookTrade): boolean {
+	console.log(optimalTrade.profit, optimalTrade.path.fee, optimalTrade.path.threshold);
 	if (isOrderbookPath(optimalTrade.path)) {
-		return (
-			optimalTrade.profit - (botConfig.flashloanFee / 100) * +optimalTrade.offerAsset.amount >=
-			optimalTrade.path.threshold
-		);
+		return optimalTrade.profit >= optimalTrade.path.threshold;
 	} else {
 		// We dont know the number of message required to execute the trade, so the profit threshold will be set to the most conservative value: nr_of_pools*2-1
 		if (botConfig.skipConfig) {
 			const skipBidRate = botConfig.skipConfig.skipBidRate;
-			return (
-				(1 - skipBidRate) * optimalTrade.profit -
-					(botConfig.flashloanFee / 100) * +optimalTrade.offerAsset.amount >
-				optimalTrade.path.threshold
-			); //profit - skipbid*profit - flashloanfee*tradesize must be bigger than the set PROFIT_THRESHOLD + TX_FEE. The TX fees dont depend on tradesize nor profit so are set in config
-		} else
-			return (
-				optimalTrade.profit - (botConfig.flashloanFee / 100) * +optimalTrade.offerAsset.amount >
-				optimalTrade.path.threshold
-			);
+			return (1 - skipBidRate) * optimalTrade.profit > optimalTrade.path.threshold; //profit - skipbid*profit - flashloanfee*tradesize must be bigger than the set PROFIT_THRESHOLD + TX_FEE. The TX fees dont depend on tradesize nor profit so are set in config
+		} else return optimalTrade.profit > optimalTrade.path.threshold;
 	}
 }
