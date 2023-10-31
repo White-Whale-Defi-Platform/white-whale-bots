@@ -7,13 +7,17 @@ import { OptimalTrade, TradeType } from "../../types/base/trades";
  * @param paths Type `Array<Path>` to check for arbitrage.
  * @param offerAssetInfo Type `AssetInfo` to start the arbitrage from.
  */
-export function getOptimalTrade(paths: Array<Path>, offerAssetInfo: AssetInfo): OptimalTrade | undefined {
+export function getOptimalTrade(
+	paths: Array<Path>,
+	offerAssetInfo: AssetInfo,
+	flashloanfee: number = 0,
+): OptimalTrade | undefined {
 	let maxTradesize = 0;
 	let maxProfit = 0;
 	let maxPath;
 
 	paths.map((path: Path) => {
-		const [tradesize, profit] = getOptimalTradeForPath(path, offerAssetInfo);
+		const [tradesize, profit] = getOptimalTradeForPath(path, offerAssetInfo, flashloanfee);
 		if (profit > maxProfit && tradesize > 0) {
 			maxProfit = profit;
 			maxTradesize = tradesize;
@@ -39,7 +43,11 @@ export function getOptimalTrade(paths: Array<Path>, offerAssetInfo: AssetInfo): 
 	@param offerAssetInfo OfferAsset type `AssetInfo` from which the arbitrage path starts. 
     @returns [optimal tradesize, expected profit] for this particular path.
  */
-export function getOptimalTradeForPath(path: Path, offerAssetInfo: AssetInfo): [number, number] {
+export function getOptimalTradeForPath(
+	path: Path,
+	offerAssetInfo: AssetInfo,
+	flashloanfee: number = 0,
+): [number, number] {
 	const assetBalances = [];
 	let offerAssetNext = offerAssetInfo;
 	for (let i = 0; i < path.pools.length; i++) {
@@ -73,7 +81,8 @@ export function getOptimalTradeForPath(path: Path, offerAssetInfo: AssetInfo): [
 		const outAsset = outGivenIn(path.pools[i], currentOfferAsset);
 		currentOfferAsset = outAsset;
 	}
-	const profit = +currentOfferAsset.amount - delta_a;
+	//if using flashloans, we subtract the loaned amount (delta_a) + its fee (loaned_amount * feeRate) from the profit
+	const profit = +currentOfferAsset.amount - (1 + flashloanfee / 100) * delta_a;
 
 	// # Return the floor of delta_a
 	return [delta_a, profit];

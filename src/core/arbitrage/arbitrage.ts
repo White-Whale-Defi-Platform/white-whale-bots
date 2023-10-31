@@ -9,7 +9,11 @@ import { getOptimalTrade as getOptimalOrderbookTrade } from "./optimizers/orderb
  *
  */
 export function tryAmmArb(paths: Array<Path>, botConfig: DexConfig): OptimalTrade | undefined {
-	const optimalTrade: OptimalTrade | undefined = getOptimalAmmTrade(paths, botConfig.offerAssetInfo);
+	const optimalTrade: OptimalTrade | undefined = getOptimalAmmTrade(
+		paths,
+		botConfig.offerAssetInfo,
+		botConfig.flashloanFee,
+	);
 
 	if (!optimalTrade) {
 		return undefined;
@@ -26,7 +30,11 @@ export function tryAmmArb(paths: Array<Path>, botConfig: DexConfig): OptimalTrad
  *
  */
 export function tryOrderbookArb(paths: Array<OrderbookPath>, botConfig: DexConfig): OptimalOrderbookTrade | undefined {
-	const optimalTrade: OptimalOrderbookTrade | undefined = getOptimalOrderbookTrade(paths, botConfig.offerAssetInfo);
+	const optimalTrade: OptimalOrderbookTrade | undefined = getOptimalOrderbookTrade(
+		paths,
+		botConfig.offerAssetInfo,
+		botConfig.flashloanFee,
+	);
 
 	if (!optimalTrade) {
 		return undefined;
