@@ -114,6 +114,7 @@ function getProfitForTradesize(
 		};
 
 		const profit = +outAsset1.amount - (1 + flashloanfee / 100) * +actualOfferAsset.amount;
+
 		return [profit, actualOfferAsset, worstPrice, averagePrice, outGivenInOrderbook];
 	}
 }

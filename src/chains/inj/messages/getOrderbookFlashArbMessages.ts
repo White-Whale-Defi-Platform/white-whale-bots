@@ -2,7 +2,6 @@ import { toBase64, toUtf8 } from "@cosmjs/encoding";
 import { EncodeObject } from "@cosmjs/proto-signing";
 import { OrderTypeMap } from "@injectivelabs/sdk-ts";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
-import { inspect } from "util";
 
 import {
 	isMatchingAssetInfos,
@@ -65,7 +64,6 @@ function getOrderbookFlashArbMessage(arbTrade: OptimalOrderbookTrade, publicAddr
 		);
 
 		const msg1 = getMarketSpotOrderMessage(arbTrade, publicAddress, offerAsset, OrderTypeMap.SELL_ATOMIC);
-		console.log(inspect(msg1, true, null, true));
 		const nestedMsg1 = {
 			stargate: {
 				type_url: msg1.typeUrl,
@@ -83,7 +81,6 @@ function getOrderbookFlashArbMessage(arbTrade: OptimalOrderbookTrade, publicAddr
 			decimals: arbTrade.path.orderbook.baseAssetDecimals,
 		};
 		const msg0 = getMarketSpotOrderMessage(arbTrade, publicAddress, offerAsset1, OrderTypeMap.BUY_ATOMIC);
-		console.log(inspect(msg0, true, null, true));
 		const nestedMsg0 = {
 			stargate: {
 				type_url: msg0.typeUrl,

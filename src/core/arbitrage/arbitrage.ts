@@ -74,7 +74,6 @@ export function tryLiquidationArb(
  *
  */
 function isAboveThreshold(botConfig: DexConfig, optimalTrade: OptimalTrade | OptimalOrderbookTrade): boolean {
-	console.log(optimalTrade.profit, optimalTrade.path.fee, optimalTrade.path.threshold);
 	if (isOrderbookPath(optimalTrade.path)) {
 		return optimalTrade.profit >= optimalTrade.path.threshold;
 	} else {
