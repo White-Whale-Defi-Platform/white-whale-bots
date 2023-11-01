@@ -13,7 +13,7 @@ import { OptimalOrderbookTrade, TradeType } from "../../types/base/trades";
 export function getOptimalTrade(
 	paths: Array<OrderbookPath>,
 	offerAssetInfo: AssetInfo,
-	flashloanfee: number = 0,
+	flashloanfee = 0,
 ): OptimalOrderbookTrade | undefined {
 	let optimalOrderbookTrade: OptimalOrderbookTrade = {
 		tradeType: TradeType.COMBINED,

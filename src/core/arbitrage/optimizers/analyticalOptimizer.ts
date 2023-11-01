@@ -10,7 +10,7 @@ import { OptimalTrade, TradeType } from "../../types/base/trades";
 export function getOptimalTrade(
 	paths: Array<Path>,
 	offerAssetInfo: AssetInfo,
-	flashloanfee: number = 0,
+	flashloanfee = 0,
 ): OptimalTrade | undefined {
 	let maxTradesize = 0;
 	let maxProfit = 0;
@@ -43,11 +43,7 @@ export function getOptimalTrade(
 	@param offerAssetInfo OfferAsset type `AssetInfo` from which the arbitrage path starts. 
     @returns [optimal tradesize, expected profit] for this particular path.
  */
-export function getOptimalTradeForPath(
-	path: Path,
-	offerAssetInfo: AssetInfo,
-	flashloanfee: number = 0,
-): [number, number] {
+export function getOptimalTradeForPath(path: Path, offerAssetInfo: AssetInfo, flashloanfee = 0): [number, number] {
 	const assetBalances = [];
 	let offerAssetNext = offerAssetInfo;
 	for (let i = 0; i < path.pools.length; i++) {

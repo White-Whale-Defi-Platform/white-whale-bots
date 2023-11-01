@@ -227,22 +227,17 @@ class InjectiveAdapter implements ChainOperatorInterface {
     injectiveAddress: string;
     ethereumAddress?: string;
     memo?: string;
-    gas?: {
-        gasPrice?: string;
-        gas?: number; /** gas limit 
-		
-        feePayer?: string;
-        granter?: string;
+    feePrice?: string;
+    feeDenom?: string;
+    gasLimit?: number;
     };
 }
 				*/
 				const broadcasterOptions = {
 					msgs: preppedMsgs,
 					injectiveAddress: this._publicAddress,
-					gas: {
-						gasPrice: String(+fee.amount[0].amount / +fee.gas),
-						gas: +fee.gas,
-					},
+					feePrice: String(+fee.amount[0].amount / +fee.gas),
+					gasLimit: +fee.gas,
 				};
 
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
