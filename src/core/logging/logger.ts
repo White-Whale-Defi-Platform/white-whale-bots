@@ -105,13 +105,13 @@ export class Logger {
 		 *
 		 */
 		async logLiqLoop(loop: LiquidationLoop) {
-			let allLoans: Array<any> = [];
+			const allLoans: Array<any> = [];
 			loop.overseers.map((overseer) => {
 				for (const loan of Object.values(overseer.loans)) {
 					allLoans.push(loan);
 				}
 			});
-			let maxRisk = allLoans.sort((a, b) => b.riskRatio - a.riskRatio);
+			const maxRisk = allLoans.sort((a, b) => b.riskRatio - a.riskRatio);
 			const totalLoan = allLoans.map((loan) => loan.loanAmt).reduce((sum, current) => (sum += current), 0);
 			let setupMessage = "---".repeat(30);
 			setupMessage += `**\nDerived Overseers: ${Object.keys(loop.allOverseerAddresses)}`;
@@ -144,14 +144,19 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				}
 			});
 			const maxRisk = allLoans.sort((a, b) => b.riskRatio - a.riskRatio);
-			setupMessage += `**\nMax Risk ratio: ${maxRisk[0].riskRatio.toPrecision(3)}**`
-			setupMessage+= `\nLoans above 0.85 Risk Score: `
-			setupMessage+= `\nBorrower Address | Loan Amount ($) | Risk Ratio`
-			allLoans.forEach((elem:Loan) => setupMessage+=`\n${elem.borrowerAddress} | ${(elem.loanAmt/ 1_000_000).toFixed(3)} | ${elem.riskRatio.toFixed(9)}` )
+			setupMessage += `**\nMax Risk ratio: ${maxRisk[0].riskRatio.toPrecision(3)}**`;
+			setupMessage += `\nLoans above 0.85 Risk Score: `;
+			setupMessage += `\nBorrower Address | Loan Amount ($) | Risk Ratio`;
+			allLoans.forEach(
+				(elem: Loan) =>
+					(setupMessage += `\n${elem.borrowerAddress} | ${(elem.loanAmt / 1_000_000).toFixed(
+						3,
+					)} | ${elem.riskRatio.toFixed(9)}`),
+			);
 
-			setupMessage+= `\n${allLoans.length} Loans >= 0.85 Risk Ratio\n`
-			setupMessage+= "---".repeat(30);
-			await this._sendMessage(setupMessage)
+			setupMessage += `\n${allLoans.length} Loans >= 0.85 Risk Ratio\n`;
+			setupMessage += "---".repeat(30);
+			await this._sendMessage(setupMessage);
 		},
 	};
 	public tradeLogging = {

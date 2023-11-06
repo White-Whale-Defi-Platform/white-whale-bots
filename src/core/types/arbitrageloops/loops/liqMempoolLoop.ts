@@ -121,7 +121,7 @@ export class LiquidationLoop {
 					toLiquidate[i][1],
 				);
 				const TX_FEE: StdFee = {
-					amount: [{ amount: String(42000), denom: this.botConfig.gasDenom }],
+					amount: [{ amount: String(Number(this.botConfig.gasPrice)*2800000), denom: this.botConfig.gasDenom }],
 					gas: "2800000",
 				};
 
@@ -129,7 +129,8 @@ export class LiquidationLoop {
 				if (txResponse.code === 0) {
 					this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
 				}
-				console.log(txResponse);
+				const logMessage = `Send Liquidation: ${toLiquidate[i][1]} on ${toLiquidate[i][0].overseerAddress}\n Hash: ${txResponse.transactionHash} Code: ${txResponse.code}`
+				await this.logger?.sendMessage(logMessage, LogType.All, txResponse.code);
 				await delay(5000);
 			}
 		}
