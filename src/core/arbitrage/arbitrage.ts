@@ -50,14 +50,16 @@ export function tryOrderbookArb(paths: Array<OrderbookPath>, botConfig: DexConfi
 export function tryLiquidationArb(
 	overseers: Array<AnchorOverseer>,
 	botConfig: LiquidationConfig,
-): [AnchorOverseer, string] | undefined {
+): Array<[AnchorOverseer, string]> | undefined {
+	const out: Array<[AnchorOverseer, string]> = [];
 	for (const overseer of overseers) {
 		for (const loan of Object.entries(overseer.loans)) {
 			if (loan[1].riskRatio >= 1) {
-				return [overseer, loan[0]];
+				out.push([overseer, loan[0]]);
 			}
 		}
 	}
+	return out;
 }
 
 /**

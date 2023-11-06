@@ -105,27 +105,34 @@ export class LiquidationLoop {
 			this.applyMempoolMessagesOnLiquidation(mempoolTxs);
 		}
 		const toLiquidate = tryLiquidationArb(this.overseers, this.botConfig);
-		if (toLiquidate) {
-			await this.liquidate(...toLiquidate);
+		if (toLiquidate?.length !== 0) {
+			await this.liquidate(toLiquidate!);
 		}
 	}
 	/**
 	 *
 	 */
-	async liquidate(overseer: AnchorOverseer, address: string) {
-		const liquidationMessage = getliqudationMessage(
-			this.chainOperator.client.publicAddress,
-			overseer.overseerAddress,
-			address,
-		);
-		const TX_FEE: StdFee = { amount: [{ amount: String(42000), denom: this.botConfig.gasDenom }], gas: "2800000" };
+	async liquidate(toLiquidate: Array<[AnchorOverseer, string]>) {
+		if (toLiquidate) {
+			for (let i = 0; i < toLiquidate.length; i++) {
+				const liquidationMessage = getliqudationMessage(
+					this.chainOperator.client.publicAddress,
+					toLiquidate[i][0].overseerAddress,
+					toLiquidate[i][1],
+				);
+				const TX_FEE: StdFee = {
+					amount: [{ amount: String(42000), denom: this.botConfig.gasDenom }],
+					gas: "2800000",
+				};
 
-		const txResponse = await this.chainOperator.signAndBroadcast([liquidationMessage], TX_FEE);
-		if (txResponse.code === 0) {
-			this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
+				const txResponse = await this.chainOperator.signAndBroadcast([liquidationMessage], TX_FEE);
+				if (txResponse.code === 0) {
+					this.chainOperator.client.sequence = this.chainOperator.client.sequence + 1;
+				}
+				console.log(txResponse);
+				await delay(5000);
+			}
 		}
-		console.log(txResponse);
-		await delay(5000);
 	}
 	/**
 	 *
