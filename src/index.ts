@@ -58,8 +58,8 @@ async function main() {
 				await chainOperator.client.getNewClients();
 			}
 			await logger.sendMessage(message);
-			if (botConfig.setupType == SetupType.LIQUIDATION){ 
-				await logger.signOfLifeLogging.logLiqLoop(loop)
+			if (botConfig.setupType == SetupType.LIQUIDATION) {
+				await logger.stateLogging.liqudationLoop(loop);
 			}
 		}
 	}

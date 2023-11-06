@@ -123,7 +123,7 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			await this._sendMessage(setupMessage, LogType.All);
 		},
 	};
-	public signOfLifeLogging = {
+	public stateLogging = {
 		/**
 		 *
 		 */
@@ -133,8 +133,8 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 		/**
 		 *
 		 */
-		async logLiqLoop(loop: any) {
-			const allLoans: Array<any> = [];
+		async liqudationLoop(loop: any) {
+			const allLoans: Array<Loan> = [];
 			let setupMessage = "---".repeat(30);
 			loop.overseers.map((overseer: AnchorOverseer) => {
 				for (const loan of Object.values(overseer.loans)) {
@@ -158,6 +158,10 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			setupMessage += "---".repeat(30);
 			await this._sendMessage(setupMessage);
 		},
+
+		/**
+		 *	TODO: Add for DEXLOOP.
+		 */
 	};
 	public tradeLogging = {
 		/**
