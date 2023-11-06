@@ -1,8 +1,6 @@
 /* eslint-disable simple-import-sort/imports */
 
-import { sha256 } from "@cosmjs/crypto";
-import { toHex } from "@cosmjs/encoding";
-import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
+import { tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
@@ -18,8 +16,9 @@ import {
 import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { Orderbook } from "../../base/orderbook";
-import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
+
 import { inspect } from "util";
+import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
 
 /**
  *
@@ -39,9 +38,8 @@ export class DexMempoolLoop implements DexLoopInterface {
 	updatePoolStates: DexLoopInterface["updatePoolStates"];
 	updateOrderbookStates?: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>;
 	messageFactory: DexLoopInterface["messageFactory"];
-	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
-	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
-	// CACHE VALUES
+	ammArb: DexLoopInterface["ammArb"];
+	orderbookArb: DexLoopInterface["orderbookArb"]; // CACHE VALUES
 	totalBytes = 0;
 	mempool!: Mempool;
 	ignoreAddresses!: IgnoredAddresses;
@@ -98,11 +96,18 @@ export class DexMempoolLoop implements DexLoopInterface {
 
 		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 
-		const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
+		const arbTradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
 
-		if (arbTrade || arbtradeOB) {
-			await this.trade(arbTrade, arbtradeOB);
-			return;
+		if (arbTrade && arbTradeOB) {
+			if (arbTrade.profit > arbTradeOB.profit) {
+				await this.trade(arbTrade);
+			} else if (arbTrade.profit <= arbTradeOB.profit) {
+				await this.trade(arbTradeOB);
+			}
+		} else if (arbTrade) {
+			await this.trade(arbTrade);
+		} else if (arbTradeOB) {
+			await this.trade(arbTradeOB);
 		}
 
 		while (true) {
@@ -131,15 +136,18 @@ export class DexMempoolLoop implements DexLoopInterface {
 			}
 
 			const arbTrade = this.ammArb(this.paths, this.botConfig);
-			const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
+			const arbTradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
 
-			if (arbTrade || arbtradeOB) {
-				await this.trade(arbTrade, arbtradeOB);
-				console.log("mempool transactions to backrun:");
-				mempoolTxs.map((mpt) => {
-					console.log(toHex(sha256(mpt.txBytes)));
-				});
-				break;
+			if (arbTrade && arbTradeOB) {
+				if (arbTrade.profit > arbTradeOB.profit) {
+					await this.trade(arbTrade);
+				} else if (arbTrade.profit <= arbTradeOB.profit) {
+					await this.trade(arbTradeOB);
+				}
+			} else if (arbTrade) {
+				await this.trade(arbTrade);
+			} else if (arbTradeOB) {
+				await this.trade(arbTradeOB);
 			}
 		}
 		return;
@@ -158,25 +166,15 @@ export class DexMempoolLoop implements DexLoopInterface {
 	/**
 	 *
 	 */
-	public async trade(arbTrade: OptimalTrade | undefined, arbTradeOB: OptimalOrderbookTrade | undefined) {
-		if (arbTrade && arbTradeOB) {
-			if (arbTrade.profit > arbTradeOB.profit) {
-				await this.tradeAmm(arbTrade);
-				this.cdPaths(arbTrade.path);
-			} else if (arbTrade.profit <= arbTradeOB.profit) {
-				await this.tradeOrderbook(arbTradeOB);
-				this.cdPaths(arbTradeOB.path);
-			}
-		} else if (arbTrade) {
-			await this.tradeAmm(arbTrade);
-			this.cdPaths(arbTrade.path);
-		} else if (arbTradeOB) {
-			await this.tradeOrderbook(arbTradeOB);
-			this.cdPaths(arbTradeOB.path);
+	public async trade(trade: Trade) {
+		if (trade.tradeType === TradeType.AMM) {
+			await this.tradeAmm(<OptimalTrade>trade);
+		} else if (trade.tradeType === TradeType.COMBINED) {
+			await this.tradeOrderbook(<OptimalOrderbookTrade>trade);
 		}
+		this.cdPaths(trade.path);
 
 		await delay(6000);
-		// await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
 	}
 
 	/**

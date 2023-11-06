@@ -14,6 +14,8 @@ export interface Orderbook {
 	minQuantityIncrement: number;
 	buys: Array<Order>;
 	sells: Array<Order>;
+	makerFeeRate: number;
+	takerFeeRate: number;
 }
 
 /**
@@ -34,7 +36,8 @@ export function OrderbookMarketSell(orderbook: Orderbook, offerAsset: Asset) {
 		result = result + Math.floor(currentOrderSize * currentBuy.price);
 		buyIndex = buyIndex + 1;
 	}
-	return [Math.floor(0.999 * result), orderbook.buys[buyIndex].price, (0.999 * result) / +offerAsset.amount];
+	result = Math.floor((1 - orderbook.takerFeeRate * 2) * result);
+	return [result, orderbook.buys[buyIndex].price, result / +offerAsset.amount];
 }
 
 /**
@@ -54,5 +57,5 @@ export function OrderbookMarketBuy(orderbook: Orderbook, offerAsset: Asset) {
 		result = result + Math.floor(currentOrderSize / currentSell.price);
 		sellIndex = sellIndex + 1;
 	}
-	return [Math.floor(0.999 * result), orderbook.sells[sellIndex].price, +offerAsset.amount / (0.999 * result)];
+	return [result, orderbook.sells[sellIndex].price, +offerAsset.amount / result];
 }

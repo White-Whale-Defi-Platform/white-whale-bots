@@ -4,7 +4,7 @@ import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { inspect } from "util";
 
 import { getSendMessage } from "../../../../chains/defaults/messages/getSendMessage";
-import { OptimalTrade } from "../../../arbitrage/arbitrage";
+import {} from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { SkipResult } from "../../../chainOperator/skipclients";
 import { Logger } from "../../../logging";
@@ -13,6 +13,7 @@ import { LogType } from "../../base/logging";
 import { decodeMempool, MempoolTx } from "../../base/mempool";
 import { Orderbook } from "../../base/orderbook";
 import { applyMempoolMessagesOnPools, Pool } from "../../base/pool";
+import { OptimalTrade } from "../../base/trades";
 import { DexMempoolLoop } from "./dexMempoolloop";
 /**
  *
@@ -52,7 +53,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
 
 		if (arbTrade) {
-			await this.trade(arbTrade, undefined);
+			await this.trade(arbTrade);
 			this.cdPaths(arbTrade.path);
 			return;
 		}
@@ -164,7 +165,7 @@ export class DexMempoolSkipLoop extends DexMempoolLoop {
 		}
 		if (this.botConfig.skipConfig.tryWithoutSkip && res.result.code === 4) {
 			await this.logger?.sendMessage("no skip validator up, trying default broadcast", LogType.Console);
-			await this.trade(arbTrade, undefined);
+			await this.trade(arbTrade);
 		}
 
 		if (res.result.result_check_txs != undefined) {

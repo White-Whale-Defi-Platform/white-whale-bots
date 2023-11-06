@@ -124,6 +124,10 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			this._skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
 			this._skipSigningAddress = (await this._signer.getAccounts())[0].address;
 		}
+		// const markets = await this._spotQueryClient.fetchMarkets();
+		// for (const market of markets) {
+		// 	console.log(market.marketId, market.baseDenom, market.quoteDenom, market.ticker);
+		// }
 	}
 	/**
 	 *
@@ -217,13 +221,25 @@ class InjectiveAdapter implements ChainOperatorInterface {
 					rawLog: res.rawLog,
 				};
 			} else {
+				/*
+				interface MsgBroadcasterTxOptions {
+    msgs: Msgs | Msgs[];
+    injectiveAddress: string;
+    ethereumAddress?: string;
+    memo?: string;
+    feePrice?: string;
+    feeDenom?: string;
+    gasLimit?: number;
+    };
+}
+				*/
 				const broadcasterOptions = {
 					msgs: preppedMsgs,
 					injectiveAddress: this._publicAddress,
-					gasLimit: +fee.gas,
 					feePrice: String(+fee.amount[0].amount / +fee.gas),
-					feeDenom: "inj",
+					gasLimit: +fee.gas,
 				};
+
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
 				return {
 					height: res.height,

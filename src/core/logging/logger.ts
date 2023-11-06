@@ -1,5 +1,3 @@
-import { OptimalTrade } from "../arbitrage/arbitrage";
-import { OptimalOrderbookTrade } from "../arbitrage/optimizers/orderbookOptimizer";
 import { TxResponse } from "../chainOperator/chainOperatorInterface";
 import { DexLoopInterface } from "../types/arbitrageloops/interfaces/dexloopInterface";
 import { LiquidationLoop } from "../types/arbitrageloops/loops/liqMempoolLoop";
@@ -9,6 +7,7 @@ import { LogType } from "../types/base/logging";
 import { Loan } from "../types/base/overseer";
 import { OrderSequence } from "../types/base/path";
 import { outGivenIn } from "../types/base/pool";
+import { OptimalOrderbookTrade, OptimalTrade } from "../types/base/trades";
 import { DiscordLogger } from "./discordLogger";
 import { SlackLogger } from "./slackLogger";
 import { TelegramLogger } from "./telegramLogger";
@@ -148,10 +147,10 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				tradeMsg += `\n**Orderbook: ${
 					(<NativeAssetInfo>arbtradeOB.path.orderbook.baseAssetInfo).native_token.denom
 				} / USDT`;
-				tradeMsg += `\n**OutGivenInOrderbook: ${arbtradeOB.outGivenIn}`;
+				tradeMsg += `\n**OutGivenInOrderbook: ${arbtradeOB.outGivenInOrderbook}`;
 			} else {
 				const outGivenInOrderbook =
-					Math.floor(arbtradeOB.outGivenIn / arbtradeOB.path.orderbook.minQuantityIncrement) *
+					Math.floor(arbtradeOB.outGivenInOrderbook / arbtradeOB.path.orderbook.minQuantityIncrement) *
 					arbtradeOB.path.orderbook.minQuantityIncrement;
 
 				const offerAssetPool = {

@@ -1,8 +1,8 @@
-import { MsgCreateSpotMarketOrder, spotPriceToChainPriceToFixed } from "@injectivelabs/sdk-ts";
+import { MsgCreateSpotMarketOrder, OrderType, spotPriceToChainPriceToFixed } from "@injectivelabs/sdk-ts";
 import { BigNumberInBase } from "@injectivelabs/utils/dist/cjs/classes";
 
-import { OptimalOrderbookTrade } from "../../../core/arbitrage/optimizers/orderbookOptimizer";
 import { Asset, isMatchingAssetInfos } from "../../../core/types/base/asset";
+import { OptimalOrderbookTrade } from "../../../core/types/base/trades";
 import { SpotMarketOrderMessage } from "../../../core/types/messages/spotorders";
 
 /**
@@ -12,7 +12,7 @@ export function getMarketSpotOrderMessage(
 	arbTrade: OptimalOrderbookTrade,
 	injectiveAddress: string,
 	offerAsset: Asset,
-	orderType: 1 | 2 | 9 | 10,
+	orderType: OrderType,
 ) {
 	let decimals = 6;
 	if (isMatchingAssetInfos(offerAsset.info, arbTrade.path.orderbook.baseAssetInfo)) {

@@ -2,14 +2,8 @@ import { AssetInfo, RichAsset } from "../../types/base/asset";
 import { OrderbookMarketBuy, OrderbookMarketSell } from "../../types/base/orderbook";
 import { OrderbookPath, OrderSequence } from "../../types/base/path";
 import { outGivenIn } from "../../types/base/pool";
-import { OptimalTrade } from "../arbitrage";
+import { OptimalOrderbookTrade, TradeType } from "../../types/base/trades";
 
-export interface OptimalOrderbookTrade extends Omit<OptimalTrade, "path"> {
-	worstPrice: number; //worst price for the market order to accept to fill the order
-	averagePrice: number; //average price obtained by the order
-	path: OrderbookPath;
-	outGivenIn: number;
-}
 /**
  *Calculates the optimal tradesize given a CLOB and a AMM xy=k pool.
  *@param orderbook Orderbook type to arb against.
@@ -19,14 +13,16 @@ export interface OptimalOrderbookTrade extends Omit<OptimalTrade, "path"> {
 export function getOptimalTrade(
 	paths: Array<OrderbookPath>,
 	offerAssetInfo: AssetInfo,
+	flashloanfee = 0,
 ): OptimalOrderbookTrade | undefined {
 	let optimalOrderbookTrade: OptimalOrderbookTrade = {
+		tradeType: TradeType.COMBINED,
 		path: paths[0],
 		offerAsset: { amount: "0", info: offerAssetInfo, decimals: 6 },
 		profit: 0,
 		worstPrice: 0,
 		averagePrice: 0,
-		outGivenIn: 0,
+		outGivenInOrderbook: 0,
 	};
 	let optimalProfit = 0;
 	for (const path of paths) {
@@ -36,15 +32,16 @@ export function getOptimalTrade(
 			optimalWorstPricePath,
 			optimalAveragePricePath,
 			optimalOutGivenInPath,
-		] = getOptimalTradeForPath(path, offerAssetInfo);
+		] = getOptimalTradeForPath(path, offerAssetInfo, flashloanfee);
 		if (optimalProfitPath > optimalProfit) {
 			optimalOrderbookTrade = {
+				tradeType: TradeType.COMBINED,
 				path: path,
 				offerAsset: optimalOfferAssetPath,
 				profit: optimalProfitPath,
 				worstPrice: optimalWorstPricePath,
 				averagePrice: optimalAveragePricePath,
-				outGivenIn: optimalOutGivenInPath,
+				outGivenInOrderbook: optimalOutGivenInPath,
 			};
 			optimalProfit = optimalProfitPath;
 		}
@@ -58,11 +55,12 @@ export function getOptimalTrade(
 function getOptimalTradeForPath(
 	path: OrderbookPath,
 	offerAssetInfo: AssetInfo,
+	flashloanfee: number,
 ): [number, RichAsset, number, number, number] {
-	let tradesizes = [...Array(500).keys()];
+	let tradesizes = [...Array(1400).keys()];
 	tradesizes = tradesizes.map((x) => x * 1e6);
 
-	return binarySearch(path, offerAssetInfo, tradesizes, 0, tradesizes.length - 1);
+	return binarySearch(path, offerAssetInfo, flashloanfee, tradesizes, 0, tradesizes.length - 1);
 	/**
 	 *
 	 */
@@ -78,6 +76,7 @@ function getProfitForTradesize(
 	path: OrderbookPath,
 	tradesize: number,
 	offerAssetInfo: AssetInfo,
+	flashloanfee: number,
 ): [number, RichAsset, number, number, number] {
 	if (path.orderSequence === OrderSequence.AmmFirst) {
 		const offerAsset: RichAsset = { amount: String(tradesize), info: offerAssetInfo, decimals: 6 };
@@ -90,19 +89,33 @@ function getProfitForTradesize(
 
 		const [outGivenIn1, worstPrice, averagePrice] = OrderbookMarketSell(path.orderbook, outAsset0);
 		//we have to compensate for the precision of the market stated by the minQuantityIncrement
-		const outGivenInReturned =
+		const outGivenInOrderbook =
 			Math.floor(outGivenIn1 / path.orderbook.minQuantityIncrement) * path.orderbook.minQuantityIncrement;
 
-		return [outGivenInReturned - +offerAsset.amount, offerAsset, worstPrice, averagePrice, outGivenInReturned];
+		const profit = outGivenInOrderbook - (1 + flashloanfee / 100) * +offerAsset.amount;
+		return [profit, offerAsset, worstPrice, averagePrice, outGivenInOrderbook];
 	} else {
-		const offerAsset: RichAsset = { amount: String(tradesize), info: path.orderbook.quoteAssetInfo, decimals: 6 };
+		const offerAsset: RichAsset = {
+			amount: String(tradesize),
+			info: path.orderbook.quoteAssetInfo,
+			decimals: 6,
+		};
 		const [outGivenIn0, worstPrice, averagePrice] = OrderbookMarketBuy(path.orderbook, offerAsset);
 		const outGivenInOrderbook =
 			Math.floor(outGivenIn0 / path.orderbook.minQuantityIncrement) * path.orderbook.minQuantityIncrement;
 		const outInfo0 = path.orderbook.baseAssetInfo;
 		const offerAsset1 = { amount: String(outGivenInOrderbook), info: outInfo0 };
 		const outAsset1 = outGivenIn(path.pool, offerAsset1);
-		return [+outAsset1.amount - +offerAsset.amount, offerAsset, worstPrice, averagePrice, outGivenInOrderbook];
+
+		const actualOfferAsset: RichAsset = {
+			amount: String(Math.ceil(outGivenInOrderbook * worstPrice * (1 + path.orderbook.takerFeeRate * 2))),
+			info: path.orderbook.quoteAssetInfo,
+			decimals: 6,
+		};
+
+		const profit = +outAsset1.amount - (1 + flashloanfee / 100) * +actualOfferAsset.amount;
+
+		return [profit, actualOfferAsset, worstPrice, averagePrice, outGivenInOrderbook];
 	}
 }
 
@@ -112,30 +125,31 @@ function getProfitForTradesize(
 function binarySearch(
 	path: OrderbookPath,
 	offerAssetInfo: AssetInfo,
+	flashloanfee: number,
 	arr: Array<number>,
 	low: number,
 	high: number,
 ): [number, RichAsset, number, number, number] {
 	if (low === high || low > high) {
-		return getProfitForTradesize(path, arr[low], offerAssetInfo);
+		return getProfitForTradesize(path, arr[low], offerAssetInfo, flashloanfee);
 	}
 	const mid = Math.floor((low + high) / 2);
-	const midValue = getProfitForTradesize(path, arr[mid], offerAssetInfo)[0];
-	const leftOfMidValue = getProfitForTradesize(path, arr[mid - 1], offerAssetInfo)[0];
-	const rightOfMidValue = getProfitForTradesize(path, arr[mid + 1], offerAssetInfo)[0];
+	const midValue = getProfitForTradesize(path, arr[mid], offerAssetInfo, flashloanfee)[0];
+	const leftOfMidValue = getProfitForTradesize(path, arr[mid - 1], offerAssetInfo, flashloanfee)[0];
+	const rightOfMidValue = getProfitForTradesize(path, arr[mid + 1], offerAssetInfo, flashloanfee)[0];
 	try {
 		if (midValue > rightOfMidValue && midValue > leftOfMidValue) {
-			return getProfitForTradesize(path, arr[mid], offerAssetInfo);
+			return getProfitForTradesize(path, arr[mid], offerAssetInfo, flashloanfee);
 		}
 		if (midValue > rightOfMidValue && midValue < leftOfMidValue) {
-			return binarySearch(path, offerAssetInfo, arr, low, mid - 1);
+			return binarySearch(path, offerAssetInfo, flashloanfee, arr, low, mid - 1);
 		} else {
-			return binarySearch(path, offerAssetInfo, arr, mid + 1, high);
+			return binarySearch(path, offerAssetInfo, flashloanfee, arr, mid + 1, high);
 		}
 	} catch (e) {
 		console.log(e);
 		console.log(low, mid, high);
 		console.log(leftOfMidValue, midValue, rightOfMidValue);
 	}
-	return binarySearch(path, offerAssetInfo, arr, low, high);
+	return binarySearch(path, offerAssetInfo, flashloanfee, arr, low, high);
 }

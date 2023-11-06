@@ -1,21 +1,15 @@
 import * as chains from "../../../../chains";
 import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
-import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
-import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
+import { tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
+import {} from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
 import { Orderbook } from "../../base/orderbook";
-import {
-	getAmmPaths,
-	getOrderbookAmmPaths,
-	isOrderbookPath,
-	OrderbookPath,
-	OrderSequence,
-	Path,
-} from "../../base/path";
+import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
 import { Pool, removedUnusedPools } from "../../base/pool";
+import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { DexMempoolLoop } from "./dexMempoolloop";
 import { DexMempoolSkipLoop } from "./dexMempoolSkiploop";
@@ -38,8 +32,8 @@ export class DexLoop implements DexLoopInterface {
 	updatePoolStates: DexLoopInterface["updatePoolStates"];
 	updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"];
 	messageFactory: DexLoopInterface["messageFactory"];
-	ammArb: (paths: Array<Path>, botConfig: DexConfig) => OptimalTrade | undefined;
-	orderbookArb: (paths: Array<OrderbookPath>, botConfig: DexConfig) => OptimalOrderbookTrade | undefined;
+	ammArb: DexLoopInterface["ammArb"];
+	orderbookArb: DexLoopInterface["orderbookArb"];
 
 	/**
 	 *
@@ -149,11 +143,18 @@ export class DexLoop implements DexLoopInterface {
 		this.iterations++;
 
 		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
-		const arbtradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
+		const arbTradeOB: OptimalOrderbookTrade | undefined = this.orderbookArb(this.orderbookPaths, this.botConfig);
 
-		if (arbTrade || arbtradeOB) {
-			await this.trade(arbTrade, arbtradeOB);
-			await this.chainOperator.reset();
+		if (arbTrade && arbTradeOB) {
+			if (arbTrade.profit > arbTradeOB.profit) {
+				await this.trade(arbTrade);
+			} else if (arbTrade.profit <= arbTradeOB.profit) {
+				await this.trade(arbTradeOB);
+			}
+		} else if (arbTrade) {
+			await this.trade(arbTrade);
+		} else if (arbTradeOB) {
+			await this.trade(arbTradeOB);
 		}
 	}
 
@@ -171,48 +172,34 @@ export class DexLoop implements DexLoopInterface {
 	/**
 	 *
 	 */
-	public async trade(arbTrade: OptimalTrade | undefined, arbTradeOB: OptimalOrderbookTrade | undefined) {
-		if (arbTrade && arbTradeOB) {
-			if (arbTrade.profit > arbTradeOB.profit) {
-				await this.tradeAmm(arbTrade);
-				this.cdPaths(arbTrade.path);
-			} else if (arbTrade.profit <= arbTradeOB.profit) {
-				await this.tradeOrderbook(arbTradeOB);
-				this.cdPaths(arbTradeOB.path);
-			}
-		} else if (arbTrade) {
-			await this.tradeAmm(arbTrade);
-			this.cdPaths(arbTrade.path);
-		} else if (arbTradeOB) {
-			await this.tradeOrderbook(arbTradeOB);
-			this.cdPaths(arbTradeOB.path);
+	public async trade(trade: Trade) {
+		if (trade.tradeType === TradeType.AMM) {
+			await this.tradeAmm(<OptimalTrade>trade);
+		} else if (trade.tradeType === TradeType.COMBINED) {
+			await this.tradeOrderbook(<OptimalOrderbookTrade>trade);
 		}
+		this.cdPaths(trade.path);
 
 		await delay(6000);
-		// await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
 	}
+	// await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
+
 	/**
 	 *
 	 */
 	private async tradeOrderbook(arbTradeOB: OptimalOrderbookTrade) {
-		const messages = this.messageFactory(arbTradeOB, this.chainOperator.client.publicAddress, undefined);
+		const messages = this.messageFactory(
+			arbTradeOB,
+			this.chainOperator.client.publicAddress,
+			this.botConfig.flashloanRouterAddress,
+		);
 		if (!messages) {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		if (arbTradeOB.path.orderSequence === OrderSequence.AmmFirst) {
-			const txResponse = await this.chainOperator.signAndBroadcast(messages[0]);
-			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
-		} else {
-			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]]);
-			if (txResponse.code == 0) {
-				const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]]);
-				await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
-					txResponse,
-					txResponse2,
-				]);
-			}
-		}
+
+		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTradeOB.path.fee);
+		await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
 	}
 
 	/**
@@ -228,7 +215,7 @@ export class DexLoop implements DexLoopInterface {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		const txResponse = await this.chainOperator.signAndBroadcast(messages[0]);
+		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTrade.path.fee);
 
 		await this.logger?.tradeLogging.logAmmTrade(arbTrade, [txResponse]);
 	}
@@ -243,12 +230,12 @@ export class DexLoop implements DexLoopInterface {
 		for (const equalpath of path.equalpaths) {
 			this.CDpaths.set(equalpath.identifier, {
 				timeoutIteration: this.iterations,
-				timeoutDuration: 5,
+				timeoutDuration: 30,
 				path: equalpath,
 			});
 		}
 		//add self to the CDPath array
-		this.CDpaths.set(path.identifier, { timeoutIteration: this.iterations, timeoutDuration: 10, path: path });
+		this.CDpaths.set(path.identifier, { timeoutIteration: this.iterations, timeoutDuration: 60, path: path });
 
 		//remove all paths on cooldown from active paths
 		this.paths = this.paths.filter((pathToCheck) => this.CDpaths.get(pathToCheck.identifier) === undefined);

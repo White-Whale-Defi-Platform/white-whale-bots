@@ -30,6 +30,7 @@ export interface BaseConfig {
 	chainPrefix: string;
 	gasDenom: string;
 	gasPrice: number;
+	gasDenomToBaseRato: number;
 	gasPerHop: number;
 	profitThreshold: number;
 	// Logger specific config.
@@ -153,6 +154,7 @@ async function getBaseConfig(envs: NodeJS.ProcessEnv): Promise<BaseConfig> {
 	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
 	const GAS_UNIT_PRICE = +envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
 	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
+	const GAS_TO_BASE_RATIO = +envs.GAS_TO_BASE_RATIO ?? 1;
 
 	return {
 		setupType: setupType,
@@ -160,6 +162,7 @@ async function getBaseConfig(envs: NodeJS.ProcessEnv): Promise<BaseConfig> {
 		chainPrefix: envs.CHAIN_PREFIX,
 		gasDenom: envs.GAS_DENOM,
 		gasPrice: GAS_UNIT_PRICE,
+		gasDenomToBaseRato: GAS_TO_BASE_RATIO,
 		gasPerHop: GAS_USAGE_PER_HOP,
 		profitThreshold: PROFIT_THRESHOLD,
 		loggerConfig: loggerConfig,

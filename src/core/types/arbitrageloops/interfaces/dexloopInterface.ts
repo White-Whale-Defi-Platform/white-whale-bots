@@ -1,14 +1,14 @@
 import { getPoolStates } from "../../../../chains/defaults";
 import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
 import { getOrderbookState } from "../../../../chains/inj";
-import { OptimalTrade, tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
-import { OptimalOrderbookTrade } from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
+import { OptimizerInterface } from "../../base/optimizers";
 import { Orderbook } from "../../base/orderbook";
 import { OrderbookPath, Path } from "../../base/path";
 import { Pool } from "../../base/pool";
+import { OptimalOrderbookTrade, OptimalTrade, Trade } from "../../base/trades";
 /**
  *
  */
@@ -28,8 +28,8 @@ export interface DexLoopInterface {
 	/*
 	 * Optimizers to use during loop runtime
 	 */
-	ammArb: typeof tryAmmArb | undefined; //Optimizer to calculate AMM arbitrage opportunities
-	orderbookArb: typeof tryOrderbookArb | undefined; //Optimizer to calculate Orderbook <> AMM arbitrage opportunities
+	ammArb: OptimizerInterface<Path, OptimalTrade>; //Optimizer to calculate AMM arbitrage opportunities
+	orderbookArb: OptimizerInterface<OrderbookPath, OptimalOrderbookTrade>; //Optimizer to calculate Orderbook <> AMM arbitrage opportunities
 
 	/*
 	 * State updaters to use during loop runtime
@@ -52,5 +52,5 @@ export interface DexLoopInterface {
 	/*
 	 * Trade Functions
 	 */
-	trade: (arbTrade: OptimalTrade | undefined, arbTradeOB: OptimalOrderbookTrade | undefined) => void; //function to execute messages in a transaction on-chain
+	trade: (arbTrade: Trade) => void; //function to execute messages in a transaction on-chain
 }
