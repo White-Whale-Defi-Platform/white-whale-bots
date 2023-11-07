@@ -6,7 +6,7 @@ import { DexLoop } from "./core/types/arbitrageloops/loops/dexloop";
 import { LiquidationLoop } from "./core/types/arbitrageloops/loops/liqMempoolLoop";
 import { DexConfig, LiquidationConfig, setBotConfig, SetupType } from "./core/types/base/configs";
 // load env files
-dotenv.config({ path: "./src/envs/terra.env" });
+dotenv.config({ path: "./src/envs/migaloo.env" });
 
 /**
  * Runs the main program.
@@ -58,6 +58,9 @@ async function main() {
 				await chainOperator.client.getNewClients();
 			}
 			await logger.sendMessage(message);
+			if (botConfig.setupType == SetupType.LIQUIDATION) {
+				await logger.stateLogging.liqudationLoop(loop);
+			}
 		}
 	}
 }

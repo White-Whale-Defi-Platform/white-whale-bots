@@ -8,7 +8,7 @@ import { LiquidationLoop } from "../types/arbitrageloops/loops/liqMempoolLoop";
 import { isNativeAsset, NativeAssetInfo } from "../types/base/asset";
 import { BotConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";
-import { Loan } from "../types/base/overseer";
+import { AnchorOverseer, Loan } from "../types/base/overseer";
 import { OrderSequence } from "../types/base/path";
 import { DiscordLogger } from "./discordLogger";
 import { SlackLogger } from "./slackLogger";
@@ -105,7 +105,7 @@ export class Logger {
 		 *
 		 */
 		async logLiqLoop(loop: LiquidationLoop) {
-			const allLoans: Array<Loan> = [];
+			const allLoans: Array<any> = [];
 			loop.overseers.map((overseer) => {
 				for (const loan of Object.values(overseer.loans)) {
 					allLoans.push(loan);
@@ -123,7 +123,46 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			await this._sendMessage(setupMessage, LogType.All);
 		},
 	};
+	public stateLogging = {
+		/**
+		 *
+		 */
+		_sendMessage: async (message: string, type: LogType = LogType.All, code = -1) =>
+			this.sendMessage(message, type, code),
 
+		/**
+		 *
+		 */
+		async liqudationLoop(loop: any) {
+			const allLoans: Array<Loan> = [];
+			let setupMessage = "---".repeat(30);
+			loop.overseers.map((overseer: AnchorOverseer) => {
+				for (const loan of Object.values(overseer.loans)) {
+					if (loan.riskRatio > 0.85) {
+						allLoans.push(loan);
+					}
+				}
+			});
+			const maxRisk = allLoans.sort((a, b) => b.riskRatio - a.riskRatio);
+			setupMessage += `**\nMax Risk ratio: ${maxRisk[0].riskRatio.toPrecision(3)}**`;
+			setupMessage += `\nLoans above 0.85 Risk Score: `;
+			setupMessage += `\nBorrower Address | Loan Amount ($) | Risk Ratio`;
+			allLoans.forEach(
+				(elem: Loan) =>
+					(setupMessage += `\n${elem.borrowerAddress} | ${(elem.loanAmt / 1_000_000).toFixed(
+						3,
+					)} | ${elem.riskRatio.toFixed(9)}`),
+			);
+
+			setupMessage += `\n${allLoans.length} Loans >= 0.85 Risk Ratio\n`;
+			setupMessage += "---".repeat(30);
+			await this._sendMessage(setupMessage);
+		},
+
+		/**
+		 *	TODO: Add for DEXLOOP.
+		 */
+	};
 	public tradeLogging = {
 		/**
 		 *
