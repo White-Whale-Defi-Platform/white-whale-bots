@@ -199,7 +199,7 @@ export class DexLoop implements DexLoopInterface {
 		}
 
 		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTradeOB.path.fee);
-		await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
+		await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, txResponse);
 	}
 
 	/**
@@ -217,7 +217,7 @@ export class DexLoop implements DexLoopInterface {
 		}
 		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTrade.path.fee);
 
-		await this.logger?.tradeLogging.logAmmTrade(arbTrade, [txResponse]);
+		await this.logger?.tradeLogging.logAmmTrade(arbTrade, txResponse);
 	}
 
 	/**

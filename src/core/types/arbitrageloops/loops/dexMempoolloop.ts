@@ -5,19 +5,11 @@ import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
 import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } from "../../base/mempool";
-import {
-	getAmmPaths,
-	getOrderbookAmmPaths,
-	isOrderbookPath,
-	OrderbookPath,
-	OrderSequence,
-	Path,
-} from "../../base/path";
+import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
 import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { Orderbook } from "../../base/orderbook";
 
-import { inspect } from "util";
 import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
 
 /**
@@ -181,26 +173,17 @@ export class DexMempoolLoop implements DexLoopInterface {
 	 *
 	 */
 	private async tradeOrderbook(arbTradeOB: OptimalOrderbookTrade) {
-		const messages = this.messageFactory(arbTradeOB, this.chainOperator.client.publicAddress);
+		const messages = this.messageFactory(
+			arbTradeOB,
+			this.chainOperator.client.publicAddress,
+			this.botConfig.flashloanRouterAddress,
+		);
 		if (!messages) {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		console.log("derived flashloan message: ", inspect(messages, true, null, true));
-
-		if (arbTradeOB.path.orderSequence === OrderSequence.AmmFirst || messages[0].length === 1) {
-			const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTradeOB.path.fee);
-			await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [txResponse]);
-		} else {
-			const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], arbTradeOB.path.fee);
-			if (txResponse.code == 0) {
-				const txResponse2 = await this.chainOperator.signAndBroadcast([messages[0][1]], arbTradeOB.path.fee);
-				await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, [
-					txResponse,
-					txResponse2,
-				]);
-			}
-		}
+		const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], arbTradeOB.path.fee);
+		await this.logger?.tradeLogging.logOrderbookTrade(arbTradeOB, txResponse);
 	}
 
 	/**
@@ -218,7 +201,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 		}
 		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTrade.path.fee);
 
-		await this.logger?.tradeLogging.logAmmTrade(arbTrade, [txResponse]);
+		await this.logger?.tradeLogging.logAmmTrade(arbTrade, txResponse);
 	}
 
 	/**

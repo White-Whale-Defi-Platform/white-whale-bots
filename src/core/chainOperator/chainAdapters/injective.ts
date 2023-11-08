@@ -5,6 +5,7 @@ import { QueryClient, StdFee } from "@cosmjs/stargate";
 import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
 import { HttpBatchClient } from "@cosmjs/tendermint-rpc";
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
+import { TransactionException } from "@injectivelabs/exceptions/dist/cjs/exceptions/TransactionException";
 import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
 import {
 	BaseAccount,
@@ -236,8 +237,10 @@ class InjectiveAdapter implements ChainOperatorInterface {
 				const broadcasterOptions = {
 					msgs: preppedMsgs,
 					injectiveAddress: this._publicAddress,
-					feePrice: String(+fee.amount[0].amount / +fee.gas),
-					gasLimit: +fee.gas,
+					gas: {
+						gasPrice: String(+fee.amount[0].amount / +fee.gas),
+						gas: +fee.gas,
+					},
 				};
 
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
@@ -249,16 +252,23 @@ class InjectiveAdapter implements ChainOperatorInterface {
 				};
 			}
 		} catch (e) {
-			console.log("error in broadcasting:\n");
-			console.log(e);
-
-			return {
-				height: 0,
-				code: 1,
-				transactionHash: "",
-				rawLog: "",
-			}; // console.log("simres: \n", simRes);
+			if (e instanceof TransactionException) {
+				console.log("error in broadcasting:\n");
+				console.log(e.message);
+				return {
+					height: 0,
+					code: e.code,
+					transactionHash: "",
+					rawLog: e.originalMessage,
+				};
+			}
 		}
+		return {
+			height: 0,
+			code: 1,
+			transactionHash: "",
+			rawLog: "",
+		};
 	}
 
 	/**

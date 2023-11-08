@@ -1,7 +1,7 @@
 import { JsonObject, setupWasmExtension, SigningCosmWasmClient, WasmExtension } from "@cosmjs/cosmwasm-stargate";
 import { DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing";
 import { AccountData } from "@cosmjs/proto-signing/build/signer";
-import { GasPrice, QueryClient, setupAuthExtension, StdFee } from "@cosmjs/stargate";
+import { BroadcastTxError, GasPrice, QueryClient, setupAuthExtension, StdFee } from "@cosmjs/stargate";
 import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { HttpBatchClient, HttpClient } from "@cosmjs/tendermint-rpc/build/rpcclients";
@@ -122,25 +122,44 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		fee: StdFee | "auto" = "auto",
 		memo?: string | undefined,
 	): Promise<TxResponse> {
-		if (fee === "auto") {
-			return await this._signingCWClient.signAndBroadcast(this.publicAddress, msgs, fee, memo);
-		} else {
-			const signerData = {
-				accountNumber: this._accountNumber,
-				sequence: this._sequence,
-				chainId: this._chainId,
-			};
-			const txRaw = await this._signingCWClient.sign(this.publicAddress, msgs, fee, "memo", signerData);
-			const txBytes = TxRaw.encode(txRaw).finish();
-			const res = await this._tmClient.broadcastTxSync({ tx: txBytes });
-			console.log(res);
-			return {
-				height: 0,
-				code: res.code,
-				transactionHash: res.hash.toString(),
-				rawLog: res.log,
-			};
+		try {
+			if (fee === "auto") {
+				return await this._signingCWClient.signAndBroadcast(this.publicAddress, msgs, fee, memo);
+			} else {
+				const signerData = {
+					accountNumber: this._accountNumber,
+					sequence: this._sequence,
+					chainId: this._chainId,
+				};
+				const txRaw = await this._signingCWClient.sign(this.publicAddress, msgs, fee, "memo", signerData);
+				const txBytes = TxRaw.encode(txRaw).finish();
+				const res = await this._tmClient.broadcastTxSync({ tx: txBytes });
+
+				return {
+					height: 0,
+					code: res.code,
+					transactionHash: res.hash.toString(),
+					rawLog: res.log,
+				};
+			}
+		} catch (e) {
+			if (e instanceof BroadcastTxError) {
+				console.log("error in broadcasting:\n");
+				console.log(e.message);
+				return {
+					height: 0,
+					code: e.code,
+					transactionHash: "",
+					rawLog: e.log,
+				};
+			}
 		}
+		return {
+			height: 0,
+			code: 1,
+			transactionHash: "",
+			rawLog: "",
+		};
 	}
 	/**
 	 *
