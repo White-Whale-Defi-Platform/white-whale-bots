@@ -24,6 +24,7 @@ export enum SetupType {
 	DEX = "DEX",
 	LIQUIDATION = "LIQUIDATION",
 	IBC = "IBC",
+	PMM = "PMM",
 }
 export interface BaseConfig {
 	baseDenom: string;
@@ -64,6 +65,23 @@ export interface LiquidationConfig extends BaseConfig {
 	overseerAddresses: Array<string>;
 }
 
+export interface PMMConfig extends BaseConfig {
+	orderbooks: Array<string>;
+	bidSpread: number;
+	askSpread: number;
+	minSpread: number;
+	orderRefreshTime: number; //in ms
+	maxOrderAge: number;
+	orderRefreshTolerancePct: number;
+	orderAmount: number;
+	priceCeiling: number;
+	priceFloor: number;
+	priceCeilingPct: number;
+	priceFloorPct: number;
+	orderLevels: number;
+	filledOrderDelay: number;
+}
+
 export type BotConfig = DexConfig | LiquidationConfig | BaseConfig;
 /**
  *
@@ -84,6 +102,9 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	} else if (bc.setupType === SetupType.IBC) {
 		return bc;
 		//do something
+	} else if (bc.setupType === SetupType.PMM) {
+		validatePMMEnvs(envs);
+		const botConfig: PMMConfig = getPMMConfig(envs, bc);
 	} else {
 		return bc;
 	}
@@ -264,7 +285,17 @@ function validateSkipEnvs(envs: NodeJS.ProcessEnv) {
 	assert(envs.SKIP_BID_WALLET, `Please set SKIP_BID_WALLET in env or ".env" file`);
 	assert(envs.SKIP_BID_RATE, `Please set SKIP_BID_RATE in env or ".env" file`);
 }
-
+/**
+ *
+ */
+function validatePMMEnvs(envs: NodeJS.ProcessEnv) {
+	assert(envs.FLASHLOAN_ROUTER_ADDRESS, `Please set the "FLASHLOAN_ROUTER_ADDRESS" in the env or .env file`);
+	assert(envs.FLASHLOAN_FEE, `Please set the "FLASHLOAN_FEE" in the env or .env file`);
+	assert(envs.MAX_PATH_HOPS, `Please set the "MAX_PATH_HOPS" in the env or .env file`);
+	assert(envs.USE_RPC_URL_SCRAPER, `Please set the "USE_RPC_URL_SCRAPER" in the env or .env file`);
+	assert(envs.POOLS, `Please set the "POOLS" in the env or .env file`);
+	assert(envs.FACTORIES_TO_ROUTERS_MAPPING, `Please set the "FACTORIES_TO_ROUTERS_MAPPING" in the env or .env file`);
+}
 /**
  *
  */

@@ -1,14 +1,14 @@
-import { getPoolStates } from "../../../../chains/defaults";
-import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
-import { getOrderbookState } from "../../../../chains/inj";
-import { ChainOperator } from "../../../chainOperator/chainoperator";
-import { Logger } from "../../../logging";
-import { DexConfig } from "../../base/configs";
-import { OptimizerInterface } from "../../base/optimizers";
-import { Orderbook } from "../../base/orderbook";
-import { OrderbookPath, Path } from "../../base/path";
-import { Pool } from "../../base/pool";
-import { OptimalOrderbookTrade, OptimalTrade, Trade } from "../../base/trades";
+import { getPoolStates } from "../../../../../chains/defaults";
+import { messageFactory } from "../../../../../chains/defaults/messages/messageFactory";
+import { getOrderbookState } from "../../../../../chains/inj";
+import { ChainOperator } from "../../../../chainOperator/chainoperator";
+import { Logger } from "../../../../logging";
+import { DexConfig } from "../../../../types/base/configs";
+import { OptimizerInterface } from "../../../../types/base/optimizers";
+import { Orderbook } from "../../../../types/base/orderbook";
+import { OrderbookPath, Path } from "../../../../types/base/path";
+import { Pool } from "../../../../types/base/pool";
+import { OptimalOrderbookTrade, OptimalTrade, Trade } from "../../../../types/base/trades";
 /**
  *
  */

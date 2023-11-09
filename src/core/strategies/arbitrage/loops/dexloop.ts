@@ -1,21 +1,23 @@
-/* eslint-disable simple-import-sort/imports */
-
-import { tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
+import * as chains from "../../../../chains";
+import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
-import { Logger } from "../../../logging/logger";
-import { DexConfig } from "../../base/configs";
-import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } from "../../base/mempool";
-import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
-import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
-import { DexLoopInterface } from "../interfaces/dexloopInterface";
-import { Orderbook } from "../../base/orderbook";
-
-import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
+import { Logger } from "../../../logging";
+import { DexConfig } from "../../../types/base/configs";
+import { LogType } from "../../../types/base/logging";
+import { Orderbook } from "../../../types/base/orderbook";
+import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../../types/base/path";
+import { Pool, removedUnusedPools } from "../../../types/base/pool";
+import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../../types/base/trades";
+import { tryAmmArb, tryOrderbookArb } from "../arbitrage";
+import {} from "../optimizers/orderbookOptimizer";
+import { DexMempoolLoop } from "./dexMempoolloop";
+import { DexMempoolSkipLoop } from "./dexMempoolSkiploop";
+import { DexLoopInterface } from "./loopinterfaces/dexloopInterface";
 
 /**
  *
  */
-export class DexMempoolLoop implements DexLoopInterface {
+export class DexLoop implements DexLoopInterface {
 	pools: Array<Pool>;
 	orderbooks: Array<Orderbook>;
 	paths: Array<Path>; //holds all known paths minus cooldowned paths
@@ -28,14 +30,10 @@ export class DexMempoolLoop implements DexLoopInterface {
 	logger: Logger | undefined;
 	iterations = 0;
 	updatePoolStates: DexLoopInterface["updatePoolStates"];
-	updateOrderbookStates?: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>;
+	updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"];
 	messageFactory: DexLoopInterface["messageFactory"];
 	ammArb: DexLoopInterface["ammArb"];
-	orderbookArb: DexLoopInterface["orderbookArb"]; // CACHE VALUES
-	totalBytes = 0;
-	mempool!: Mempool;
-	ignoreAddresses!: IgnoredAddresses;
-	blockHeight = 0;
+	orderbookArb: DexLoopInterface["orderbookArb"];
 
 	/**
 	 *
@@ -46,16 +44,17 @@ export class DexMempoolLoop implements DexLoopInterface {
 		logger: Logger | undefined,
 		allPools: Array<Pool>,
 		orderbooks: Array<Orderbook>,
-		updateState: (chainOperator: ChainOperator, pools: Array<Pool>) => Promise<void>,
+		updatePoolStates: DexLoopInterface["updatePoolStates"],
 		messageFactory: DexLoopInterface["messageFactory"],
 		updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"],
 	) {
 		const paths = getAmmPaths(allPools, botConfig);
 		const filteredPools = removedUnusedPools(allPools, paths);
 		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks, botConfig);
+
 		this.orderbookPaths = orderbookPaths;
-		this.pools = filteredPools;
 		this.orderbooks = orderbooks;
+		this.pools = filteredPools;
 		this.CDpaths = new Map<
 			string,
 			{ timeoutIteration: number; timeoutDuration: number; path: OrderbookPath | Path }
@@ -63,13 +62,79 @@ export class DexMempoolLoop implements DexLoopInterface {
 		this.paths = paths;
 		this.ammArb = tryAmmArb;
 		this.orderbookArb = tryOrderbookArb;
+		this.updatePoolStates = updatePoolStates;
 		this.updateOrderbookStates = updateOrderbookStates;
-		this.updatePoolStates = updateState;
 		this.messageFactory = messageFactory;
 		this.chainOperator = chainOperator;
 		this.botConfig = botConfig;
 		this.logger = logger;
-		this.ignoreAddresses = botConfig.ignoreAddresses ?? {};
+	}
+	/**
+	 *
+	 */
+	static async createLoop(
+		chainOperator: ChainOperator,
+		botConfig: DexConfig,
+		logger: Logger,
+	): Promise<DexLoopInterface> {
+		let msgFactory = chains.defaults.messageFactory;
+		let getPoolStates = chains.defaults.getPoolStates;
+		let initPools = chains.defaults.initPools;
+		const initOrderbook = chains.injective.initOrderbooks;
+		const getOrderbookState = chains.injective.getOrderbookState;
+		await import("../../../../chains/" + botConfig.chainPrefix).then(async (chainSetups) => {
+			if (chainSetups === undefined) {
+				await logger.sendMessage("Unable to resolve specific chain imports, using defaults", LogType.Console);
+			}
+			msgFactory = chainSetups.messageFactory;
+			getPoolStates = chainSetups.getPoolStates;
+			initPools = chainSetups.initPools;
+			return;
+		});
+		const orderbooks: Array<Orderbook> = [];
+		if (botConfig.chainPrefix === "inj" && botConfig.orderbooks.length > 0) {
+			const obs = await initOrderbook(chainOperator, botConfig);
+			if (obs) {
+				orderbooks.push(...obs);
+			}
+		}
+		const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
+			console.log("spinning up mempool loop");
+			return new DexMempoolLoop(
+				chainOperator,
+				botConfig,
+				logger,
+				allPools,
+				orderbooks,
+				getPoolStates,
+				msgFactory,
+				getOrderbookState,
+			);
+		} else if (botConfig.useMempool && botConfig.skipConfig?.useSkip) {
+			console.log("spinning up skip mempool loop");
+			return new DexMempoolSkipLoop(
+				chainOperator,
+				botConfig,
+				logger,
+				allPools,
+				orderbooks,
+				getPoolStates,
+				msgFactory,
+				getOrderbookState,
+			);
+		}
+		console.log("spinning up no-mempool loop");
+		return new DexLoop(
+			chainOperator,
+			botConfig,
+			logger,
+			allPools,
+			orderbooks,
+			getPoolStates,
+			messageFactory,
+			getOrderbookState,
+		);
 	}
 	/**
 	 *
@@ -77,18 +142,8 @@ export class DexMempoolLoop implements DexLoopInterface {
 	public async step() {
 		this.iterations++;
 
-		if (this.updateOrderbookStates) {
-			await Promise.all([
-				this.updatePoolStates(this.chainOperator, this.pools),
-				this.updateOrderbookStates(this.chainOperator, this.orderbooks),
-			]);
-		} else {
-			await this.updatePoolStates(this.chainOperator, this.pools);
-		}
-
 		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
-
-		const arbTradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
+		const arbTradeOB: OptimalOrderbookTrade | undefined = this.orderbookArb(this.orderbookPaths, this.botConfig);
 
 		if (arbTrade && arbTradeOB) {
 			if (arbTrade.profit > arbTradeOB.profit) {
@@ -101,58 +156,17 @@ export class DexMempoolLoop implements DexLoopInterface {
 		} else if (arbTradeOB) {
 			await this.trade(arbTradeOB);
 		}
-
-		while (true) {
-			this.mempool = await this.chainOperator.queryMempool();
-
-			if (+this.mempool.total_bytes < this.totalBytes) {
-				break;
-			} else if (+this.mempool.total_bytes === this.totalBytes) {
-				continue;
-			} else {
-				this.totalBytes = +this.mempool.total_bytes;
-			}
-
-			const mempoolTxs: Array<MempoolTx> = decodeMempool(
-				this.mempool,
-				this.ignoreAddresses,
-				this.botConfig.timeoutDuration,
-				this.iterations,
-			);
-
-			// Checks if there is a SendMsg from a blacklisted Address, if so add the reciever to the timeouted addresses
-			if (mempoolTxs.length === 0) {
-				continue;
-			} else {
-				applyMempoolMessagesOnPools(this.pools, mempoolTxs);
-			}
-
-			const arbTrade = this.ammArb(this.paths, this.botConfig);
-			const arbTradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
-
-			if (arbTrade && arbTradeOB) {
-				if (arbTrade.profit > arbTradeOB.profit) {
-					await this.trade(arbTrade);
-				} else if (arbTrade.profit <= arbTradeOB.profit) {
-					await this.trade(arbTradeOB);
-				}
-			} else if (arbTrade) {
-				await this.trade(arbTrade);
-			} else if (arbTradeOB) {
-				await this.trade(arbTradeOB);
-			}
-		}
-		return;
 	}
 
 	/**
 	 *
 	 */
 	async reset() {
-		await this.chainOperator.reset();
 		this.unCDPaths();
-		this.totalBytes = 0;
-		flushTxMemory();
+		await this.updatePoolStates(this.chainOperator, this.pools);
+		if (this.updateOrderbookStates) {
+			await this.updateOrderbookStates(this.chainOperator, this.orderbooks);
+		}
 	}
 
 	/**
@@ -168,6 +182,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 
 		await delay(6000);
 	}
+	// await this.logger?.sendMessage(JSON.stringify(msgs), LogType.Console);
 
 	/**
 	 *
@@ -182,8 +197,9 @@ export class DexMempoolLoop implements DexLoopInterface {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], arbTradeOB.path.fee);
-		await this.logger?.tradeLogging.logOrderbookTrade(arbTradeOB, txResponse);
+
+		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTradeOB.path.fee);
+		await this.logger?.tradeLogging.logOrderbookTrade(<OptimalOrderbookTrade>arbTradeOB, txResponse);
 	}
 
 	/**
@@ -214,12 +230,12 @@ export class DexMempoolLoop implements DexLoopInterface {
 		for (const equalpath of path.equalpaths) {
 			this.CDpaths.set(equalpath.identifier, {
 				timeoutIteration: this.iterations,
-				timeoutDuration: 5,
+				timeoutDuration: 30,
 				path: equalpath,
 			});
 		}
 		//add self to the CDPath array
-		this.CDpaths.set(path.identifier, { timeoutIteration: this.iterations, timeoutDuration: 10, path: path });
+		this.CDpaths.set(path.identifier, { timeoutIteration: this.iterations, timeoutDuration: 60, path: path });
 
 		//remove all paths on cooldown from active paths
 		this.paths = this.paths.filter((pathToCheck) => this.CDpaths.get(pathToCheck.identifier) === undefined);
@@ -251,15 +267,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 	 *
 	 */
 	public clearIgnoreAddresses() {
-		const keys = Object.keys(this.ignoreAddresses);
-		for (let i = 0; i < keys.length; i++) {
-			if (
-				this.ignoreAddresses[keys[i]].timeoutAt > 0 &&
-				this.ignoreAddresses[keys[i]].timeoutAt + this.ignoreAddresses[keys[i]].duration <= this.iterations
-			) {
-				delete this.ignoreAddresses[keys[i]];
-			}
-		}
+		return;
 	}
 }
 

@@ -13,7 +13,7 @@ import { OrderType } from "@injectivelabs/sdk-ts/";
   BUY_ATOMIC: 9;
   SELL_ATOMIC: 10;
 */
-export declare type SpotMarketOrderMessage = {
+export declare type SpotOrderMessage = {
 	marketId: string;
 	subaccountId: string;
 	injectiveAddress: string;

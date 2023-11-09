@@ -5,7 +5,7 @@ import { OrderSequence } from "../../../core/types/base/path";
 import { caclulateSpread, outGivenIn } from "../../../core/types/base/pool";
 import { OptimalOrderbookTrade } from "../../../core/types/base/trades";
 import { getSwapMessage } from "../../defaults/messages/getSwapMessage";
-import { getMarketSpotOrderMessage } from "./getSpotOrderMessage";
+import { getMarketSpotOrderMessage } from "./getSpotMarketOrderMessage";
 
 /**
  *

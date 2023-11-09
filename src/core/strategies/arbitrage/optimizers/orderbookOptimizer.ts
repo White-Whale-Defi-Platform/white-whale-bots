@@ -1,8 +1,8 @@
-import { AssetInfo, RichAsset } from "../../types/base/asset";
-import { OrderbookMarketBuy, OrderbookMarketSell } from "../../types/base/orderbook";
-import { OrderbookPath, OrderSequence } from "../../types/base/path";
-import { outGivenIn } from "../../types/base/pool";
-import { OptimalOrderbookTrade, TradeType } from "../../types/base/trades";
+import { AssetInfo, RichAsset } from "../../../types/base/asset";
+import { OrderbookMarketBuy, OrderbookMarketSell } from "../../../types/base/orderbook";
+import { OrderbookPath, OrderSequence } from "../../../types/base/path";
+import { outGivenIn } from "../../../types/base/pool";
+import { OptimalOrderbookTrade, TradeType } from "../../../types/base/trades";
 
 /**
  *Calculates the optimal tradesize given a CLOB and a AMM xy=k pool.

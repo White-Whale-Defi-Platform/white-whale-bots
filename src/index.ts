@@ -2,8 +2,8 @@ import dotenv from "dotenv";
 
 import { ChainOperator } from "./core/chainOperator/chainoperator";
 import { Logger } from "./core/logging";
-import { DexLoop } from "./core/types/arbitrageloops/loops/dexloop";
-import { LiquidationLoop } from "./core/types/arbitrageloops/loops/liqMempoolLoop";
+import { DexLoop } from "./core/strategies/arbitrage/loops/dexloop";
+import { LiquidationLoop } from "./core/strategies/arbitrage/loops/liqMempoolLoop";
 import { DexConfig, LiquidationConfig, setBotConfig, SetupType } from "./core/types/base/configs";
 // load env files
 dotenv.config({ path: "./src/envs/chains/injective.env" });

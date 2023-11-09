@@ -3,7 +3,7 @@ import { BigNumberInBase } from "@injectivelabs/utils/dist/cjs/classes";
 
 import { Asset, isMatchingAssetInfos } from "../../../core/types/base/asset";
 import { OptimalOrderbookTrade } from "../../../core/types/base/trades";
-import { SpotMarketOrderMessage } from "../../../core/types/messages/spotorders";
+import { SpotOrderMessage } from "../../../core/types/messages/spotorders";
 
 /**
  *'/injective.exchange.v1beta1.MsgCreateSpotMarketOrder'.
@@ -29,7 +29,7 @@ export function getMarketSpotOrderMessage(
 
 	const orderSize = +new BigNumberInBase(offerAsset.amount).toWei(decimals).toFixed();
 
-	const marketSpotOrderMsg: SpotMarketOrderMessage = {
+	const marketSpotOrderMsg: SpotOrderMessage = {
 		marketId: arbTrade.path.orderbook.marketId,
 		subaccountId: "",
 		injectiveAddress: injectiveAddress,

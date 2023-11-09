@@ -4,16 +4,16 @@ import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { inspect } from "util";
 
 import { getSendMessage } from "../../../../chains/defaults/messages/getSendMessage";
-import {} from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { SkipResult } from "../../../chainOperator/skipclients";
 import { Logger } from "../../../logging";
-import { DexConfig } from "../../base/configs";
-import { LogType } from "../../base/logging";
-import { decodeMempool, MempoolTx } from "../../base/mempool";
-import { Orderbook } from "../../base/orderbook";
-import { applyMempoolMessagesOnPools, Pool } from "../../base/pool";
-import { OptimalTrade } from "../../base/trades";
+import { DexConfig } from "../../../types/base/configs";
+import { LogType } from "../../../types/base/logging";
+import { decodeMempool, MempoolTx } from "../../../types/base/mempool";
+import { Orderbook } from "../../../types/base/orderbook";
+import { applyMempoolMessagesOnPools, Pool } from "../../../types/base/pool";
+import { OptimalTrade } from "../../../types/base/trades";
+import {} from "../arbitrage";
 import { DexMempoolLoop } from "./dexMempoolloop";
 /**
  *

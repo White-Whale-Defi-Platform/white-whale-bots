@@ -1,6 +1,6 @@
 import { StdFee } from "@cosmjs/stargate";
 
-import { getPaths, newGraph } from "../../arbitrage/graph";
+import { getPaths, newGraph } from "../../strategies/arbitrage/graph";
 import { identity } from "../identity";
 import { isMatchingAssetInfos } from "./asset";
 import { DexConfig } from "./configs";

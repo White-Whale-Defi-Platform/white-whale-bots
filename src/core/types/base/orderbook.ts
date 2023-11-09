@@ -59,3 +59,17 @@ export function OrderbookMarketBuy(orderbook: Orderbook, offerAsset: Asset) {
 	}
 	return [result, orderbook.sells[sellIndex].price, +offerAsset.amount / result];
 }
+
+/**
+ *
+ */
+export const OrderbookMidPrice = (orderbook: Orderbook) => {
+	return (orderbook.sells[0].price + orderbook.buys[0].price) / 2.0;
+};
+
+/**
+ *
+ */
+export const OrderbookSpread = (orderbook: Orderbook) => {
+	return orderbook.sells[0].price - orderbook.buys[0].price;
+};

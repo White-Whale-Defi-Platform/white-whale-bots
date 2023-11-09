@@ -50,6 +50,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	private _sequence = 0;
 	private _skipBundleClient?: SkipBundleClient;
 	private _skipSigningAddress!: string;
+	private _subaccountId!: string;
 
 	/**
 	 *
@@ -72,6 +73,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		this._chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
 		this._publicKey = privateKey.toPublicKey();
 		this.publicAddress = privateKey.toPublicKey().toAddress().address;
+		this.subaccountId = privateKey.toPublicKey().toAddress().getSubaccountId();
 	}
 	/**
 	 *
@@ -84,6 +86,19 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 */
 	public set sequence(value) {
 		this._sequence = value;
+	}
+
+	/**
+	 *
+	 */
+	public set subaccountId(value) {
+		this._subaccountId = value;
+	}
+	/**
+	 *
+	 */
+	public get subaccountId(): string {
+		return this._subaccountId;
 	}
 	/**
 	 *
@@ -179,6 +194,16 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		}>
 	> {
 		return await this._spotQueryClient.fetchOrderbooksV2(marketIds);
+	}
+
+	/**
+	 *
+	 */
+	async queryOrderbookOrder(marketId: string, subaccountId: string = this.subaccountId) {
+		return await this._spotQueryClient.fetchSubaccountOrdersList({
+			subaccountId: subaccountId,
+			marketId: marketId,
+		});
 	}
 
 	/**

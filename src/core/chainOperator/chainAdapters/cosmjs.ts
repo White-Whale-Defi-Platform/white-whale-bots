@@ -29,7 +29,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	private _signer!: DirectSecp256k1HdWallet;
 	private _skipBundleClient?: SkipBundleClient;
 	private _timeoutRPCs: Map<string, number>;
-
+	private _subaccountId!: string;
 	private _rpcUrls!: Array<string>;
 	private _denom!: string;
 	private _gasPrice!: number;
@@ -48,6 +48,19 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		this._rpcUrls = botConfig.rpcUrls;
 		this._denom = botConfig.baseDenom;
 		this._gasPrice = botConfig.gasPrice;
+		this.subaccountId = "";
+	}
+	/**
+	 *
+	 */
+	public set subaccountId(value) {
+		this._subaccountId = value;
+	}
+	/**
+	 *
+	 */
+	public get subaccountId(): string {
+		return this._subaccountId;
 	}
 	/**
 	 *
@@ -258,6 +271,12 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	 *
 	 */
 	public async queryOrderbooks(marketIds: Array<string>) {
+		console.log("orderbook query not yet implemented for cosmjs");
+	}
+	/**
+	 *
+	 */
+	async queryOrderbookOrders(marketId: string, subaccountId: string = this.subaccountId) {
 		console.log("orderbook query not yet implemented for cosmjs");
 	}
 	/**

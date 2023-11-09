@@ -1,6 +1,6 @@
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
 import { AssetInfo } from "../../../core/types/base/asset";
-import { DexConfig } from "../../../core/types/base/configs";
+import { DexConfig, PMMConfig } from "../../../core/types/base/configs";
 import { Orderbook } from "../../../core/types/base/orderbook";
 import { identity } from "../../../core/types/identity";
 import { getOrderbookState } from "./getOrderbookState";
@@ -9,7 +9,7 @@ import { getOrderbookState } from "./getOrderbookState";
  */
 export async function initOrderbooks(
 	chainoperator: ChainOperator,
-	botConfig: DexConfig,
+	botConfig: DexConfig | PMMConfig,
 ): Promise<Array<Orderbook> | undefined> {
 	const orderbooks: Array<Orderbook> = [];
 	for (const orderbookAddress of botConfig.orderbooks) {

@@ -3,12 +3,11 @@ import { StdFee } from "@cosmjs/stargate";
 
 import { getliqudationMessage } from "../../../../chains/defaults/messages/getLiquidationMessage";
 import { initLiquidationOverseers } from "../../../../chains/defaults/queries/initOverseers";
-import { tryLiquidationArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
-import { LiquidationConfig } from "../../base/configs";
-import { LogType } from "../../base/logging";
-import { decodeMempool, IgnoredAddresses, Mempool, MempoolTx } from "../../base/mempool";
+import { LiquidationConfig } from "../../../types/base/configs";
+import { LogType } from "../../../types/base/logging";
+import { decodeMempool, IgnoredAddresses, Mempool, MempoolTx } from "../../../types/base/mempool";
 import {
 	adjustCollateral,
 	AnchorOverseer,
@@ -16,14 +15,15 @@ import {
 	repayStable,
 	setBorrowLimits,
 	setPriceFeed,
-} from "../../base/overseer";
+} from "../../../types/base/overseer";
 import {
 	isBorrowStableMessage,
 	isLockCollateralMessage,
 	isRepayStableMessage,
 	isUnlockCollateralMessage,
 	PriceFeedMessage,
-} from "../../messages/liquidationmessages";
+} from "../../../types/messages/liquidationmessages";
+import { tryLiquidationArb } from "../arbitrage";
 /*
  *
  */
