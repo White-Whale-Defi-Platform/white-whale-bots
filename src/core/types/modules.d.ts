@@ -160,5 +160,19 @@ declare namespace NodeJS {
 		 * Timeout added addresses for this amount of blocks.
 		 */
 		TIMEOUT_DURATION: string | undefined;
+
+		BID_SPREAD: string;
+		ASK_SPREAD: string;
+		MIN_SPREAD: string;
+		ORDER_REFRESH_TIME: string; //in ms
+		MAX_ORDER_AGE: string;
+		ORDER_REFRESH_TOLERANCE_PCT: string;
+		ORDER_AMOUNT: string;
+		PRICE_CEILING: string;
+		PRICE_FLOOR: string;
+		PRICE_CEILING_PCT: string;
+		PRICE_FLOOR_PCT: string;
+		ORDER_LEVELS: string;
+		FILLED_ORDER_DELAY: string;
 	}
 }

@@ -1,8 +1,8 @@
-import { DexConfig, LiquidationConfig } from "../../types/base/configs";
-import { OptimizerInterface } from "../../types/base/optimizers";
-import { AnchorOverseer } from "../../types/base/overseer";
-import { isOrderbookPath, OrderbookPath, Path } from "../../types/base/path";
-import { OptimalOrderbookTrade, OptimalTrade } from "../../types/base/trades";
+import { DexConfig, LiquidationConfig } from "../../../types/base/configs";
+import { OptimizerInterface } from "../../../types/base/optimizers";
+import { AnchorOverseer } from "../../../types/base/overseer";
+import { isOrderbookPath, OrderbookPath, Path } from "../../../types/base/path";
+import { OptimalOrderbookTrade, OptimalTrade } from "../../../types/base/trades";
 import { getOptimalTrade as getOptimalAmmTrade } from "./optimizers/analyticalOptimizer";
 import { getOptimalTrade as getOptimalOrderbookTrade } from "./optimizers/orderbookOptimizer";
 

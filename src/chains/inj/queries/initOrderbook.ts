@@ -23,12 +23,14 @@ export async function initOrderbooks(
 
 		const decimalAdjustment = (marketInfo.baseToken?.decimals ?? 6) - (marketInfo.quoteToken?.decimals ?? 6);
 		const quantityIncrement = marketInfo.minQuantityTickSize / 10 ** decimalAdjustment;
+		const priceIncrement = marketInfo.minPriceTickSize / 10 ** decimalAdjustment;
 		const ob = identity<Orderbook>({
 			baseAssetInfo: baseAssetInfo,
 			quoteAssetInfo: quoteAssetInfo,
 			baseAssetDecimals: marketInfo.baseToken?.decimals ?? 6,
 			quoteAssetDecimals: marketInfo.quoteToken?.decimals ?? 6,
 			minQuantityIncrement: quantityIncrement,
+			minPriceIncrement: priceIncrement,
 			buys: [],
 			sells: [],
 			marketId: orderbookAddress,

@@ -1,7 +1,7 @@
-import { AssetInfo, isNativeAsset } from "../../types/base/asset";
-import { DexConfig } from "../../types/base/configs";
-import { getFeeAndThresholdForAmmPath, Path } from "../../types/base/path";
-import { Pool } from "../../types/base/pool";
+import { AssetInfo, isNativeAsset } from "./asset";
+import { DexConfig } from "./configs";
+import { getFeeAndThresholdForAmmPath, Path } from "./path";
+import { Pool } from "./pool";
 
 export interface Graph {
 	vertices: Map<string, Vertex>;

@@ -1,6 +1,6 @@
 import { TxResponse } from "../chainOperator/chainOperatorInterface";
+import { LiquidationLoop } from "../strategies/arbitrage/loops/liqMempoolLoop";
 import { DexLoopInterface } from "../strategies/arbitrage/loops/loopinterfaces/dexloopInterface";
-import { LiquidationLoop } from "../strategies/arbitrage/loops/loops/liqMempoolLoop";
 import { isNativeAsset, NativeAssetInfo } from "../types/base/asset";
 import { BotConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";

@@ -23,7 +23,7 @@ import {
 	isUnlockCollateralMessage,
 	PriceFeedMessage,
 } from "../../../types/messages/liquidationmessages";
-import { tryLiquidationArb } from "../arbitrage";
+import { tryLiquidationArb } from "../operations/arbitrage";
 /*
  *
  */

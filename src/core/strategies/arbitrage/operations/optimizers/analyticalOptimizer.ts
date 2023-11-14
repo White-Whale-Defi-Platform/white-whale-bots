@@ -1,7 +1,7 @@
-import { AssetInfo } from "../../../types/base/asset";
-import { Path } from "../../../types/base/path";
-import { getAssetsOrder, outGivenIn } from "../../../types/base/pool";
-import { OptimalTrade, TradeType } from "../../../types/base/trades";
+import { AssetInfo } from "../../../../types/base/asset";
+import { Path } from "../../../../types/base/path";
+import { getAssetsOrder, outGivenIn } from "../../../../types/base/pool";
+import { OptimalTrade, TradeType } from "../../../../types/base/trades";
 
 /** Function to calculate the optimal path, tradesize and profit given an Array of paths and a starting asset.
  * @param paths Type `Array<Path>` to check for arbitrage.

@@ -199,7 +199,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	async queryOrderbookOrder(marketId: string, subaccountId: string = this.subaccountId) {
+	async queryOrderbookOrders(marketId: string, subaccountId: string = this.subaccountId) {
 		return await this._spotQueryClient.fetchSubaccountOrdersList({
 			subaccountId: subaccountId,
 			marketId: marketId,
@@ -397,6 +397,9 @@ class InjectiveAdapter implements ChainOperatorInterface {
 					encodedExecuteMsgs.push(msgSendInjective);
 				}
 				if (msg.typeUrl === "/injective.exchange.v1beta1.MsgCreateSpotMarketOrder") {
+					encodedExecuteMsgs.push(msg.value);
+				}
+				if (msg.typeUrl === "/injective.exchange.v1beta1.MsgBatchUpdateOrders") {
 					encodedExecuteMsgs.push(msg.value);
 				}
 			});

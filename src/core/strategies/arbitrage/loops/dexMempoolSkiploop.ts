@@ -13,7 +13,7 @@ import { decodeMempool, MempoolTx } from "../../../types/base/mempool";
 import { Orderbook } from "../../../types/base/orderbook";
 import { applyMempoolMessagesOnPools, Pool } from "../../../types/base/pool";
 import { OptimalTrade } from "../../../types/base/trades";
-import {} from "../arbitrage";
+import {} from "../operations/arbitrage";
 import { DexMempoolLoop } from "./dexMempoolloop";
 /**
  *

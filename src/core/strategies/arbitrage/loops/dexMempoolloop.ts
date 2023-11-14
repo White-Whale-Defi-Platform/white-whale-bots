@@ -1,6 +1,6 @@
 /* eslint-disable simple-import-sort/imports */
 
-import { tryAmmArb, tryOrderbookArb } from "../arbitrage";
+import { tryAmmArb, tryOrderbookArb } from "../operations/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../../types/base/configs";

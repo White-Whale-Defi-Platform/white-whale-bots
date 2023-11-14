@@ -82,7 +82,7 @@ export interface PMMConfig extends BaseConfig {
 	filledOrderDelay: number;
 }
 
-export type BotConfig = DexConfig | LiquidationConfig | BaseConfig;
+export type BotConfig = DexConfig | LiquidationConfig | BaseConfig | PMMConfig;
 /**
  *
  */
@@ -105,6 +105,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 	} else if (bc.setupType === SetupType.PMM) {
 		validatePMMEnvs(envs);
 		const botConfig: PMMConfig = getPMMConfig(envs, bc);
+		return botConfig;
 	} else {
 		return bc;
 	}
@@ -124,6 +125,9 @@ async function getBaseConfig(envs: NodeJS.ProcessEnv): Promise<BaseConfig> {
 			break;
 		case "ibc":
 			setupType = SetupType.IBC;
+			break;
+		case "pmm":
+			setupType = SetupType.PMM;
 			break;
 		default:
 			console.error("Please set the SETUP_TYPE in the env file");
@@ -246,6 +250,33 @@ function getDexConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): DexConfi
 		useRpcUrlScraper: envs.USE_RPC_URL_SCRAPER == "1" ? true : false,
 	};
 }
+
+/**
+ *
+ */
+function getPMMConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): PMMConfig {
+	let orderbooks;
+	if (envs.ORDERBOOKS) {
+		orderbooks = JSON.parse(envs.ORDERBOOKS);
+	}
+	return {
+		...baseConfig,
+		orderbooks: orderbooks,
+		bidSpread: +envs.BID_SPREAD,
+		askSpread: +envs.ASK_SPREAD,
+		minSpread: +envs.BID_SPREAD,
+		orderRefreshTime: +envs.ORDER_REFRESH_TIME, //in ms
+		maxOrderAge: +envs.MAX_ORDER_AGE,
+		orderRefreshTolerancePct: +envs.ORDER_REFRESH_TOLERANCE_PCT,
+		orderAmount: +envs.ORDER_AMOUNT,
+		priceCeiling: +envs.PRICE_CEILING,
+		priceFloor: +envs.PRICE_FLOOR,
+		priceCeilingPct: +envs.PRICE_CEILING_PCT,
+		priceFloorPct: +envs.PRICE_FLOOR_PCT,
+		orderLevels: +envs.ORDER_LEVELS,
+		filledOrderDelay: +envs.FILLED_ORDER_DELAY,
+	};
+}
 /**
  *
  */
@@ -289,12 +320,19 @@ function validateSkipEnvs(envs: NodeJS.ProcessEnv) {
  *
  */
 function validatePMMEnvs(envs: NodeJS.ProcessEnv) {
-	assert(envs.FLASHLOAN_ROUTER_ADDRESS, `Please set the "FLASHLOAN_ROUTER_ADDRESS" in the env or .env file`);
-	assert(envs.FLASHLOAN_FEE, `Please set the "FLASHLOAN_FEE" in the env or .env file`);
-	assert(envs.MAX_PATH_HOPS, `Please set the "MAX_PATH_HOPS" in the env or .env file`);
-	assert(envs.USE_RPC_URL_SCRAPER, `Please set the "USE_RPC_URL_SCRAPER" in the env or .env file`);
-	assert(envs.POOLS, `Please set the "POOLS" in the env or .env file`);
-	assert(envs.FACTORIES_TO_ROUTERS_MAPPING, `Please set the "FACTORIES_TO_ROUTERS_MAPPING" in the env or .env file`);
+	assert(envs.BID_SPREAD, `Please set the "BID_SPREAD" in the env or .env file`);
+	assert(envs.ASK_SPREAD, `Please set the "ASK_SPREAD" in the env or .env file`);
+	assert(envs.MIN_SPREAD, `Please set the "MIN_SPREAD" in the env or .env file`);
+	assert(envs.ORDER_REFRESH_TIME, `Please set the "ORDER_REFRESH_TIME" in the env or .env file`);
+	assert(envs.MAX_ORDER_AGE, `Please set the "MAX_ORDER_AGE" in the env or .env file`);
+	assert(envs.ORDER_REFRESH_TOLERANCE_PCT, `Please set the "ORDER_REFRESH_TOLERANCE_PCT" in the env or .env file`);
+	assert(envs.ORDER_AMOUNT, `Please set the "ORDER_AMOUNT" in the env or .env file`);
+	assert(envs.PRICE_CEILING, `Please set the "PRICE_CEILING" in the env or .env file`);
+	assert(envs.PRICE_FLOOR, `Please set the "PRICE_FLOOR" in the env or .env file`);
+	assert(envs.PRICE_CEILING_PCT, `Please set the "PRICE_CEILING_PCT" in the env or .env file`);
+	assert(envs.PRICE_FLOOR_PCT, `Please set the "PRICE_FLOOR_PCT" in the env or .env file`);
+	assert(envs.ORDER_LEVELS, `Please set the "ORDER_LEVELS" in the env or .env file`);
+	assert(envs.FILLED_ORDER_DELAY, `Please set the "ORDER_LEVELS" in the env or .env file`);
 }
 /**
  *

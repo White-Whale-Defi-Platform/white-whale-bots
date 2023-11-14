@@ -1,5 +1,4 @@
 import { Asset, NativeAssetInfo } from "./asset";
-
 export interface Order {
 	price: number;
 	quantity: number;
@@ -12,6 +11,7 @@ export interface Orderbook {
 	baseAssetDecimals: number;
 	quoteAssetDecimals: number;
 	minQuantityIncrement: number;
+	minPriceIncrement: number;
 	buys: Array<Order>;
 	sells: Array<Order>;
 	makerFeeRate: number;
@@ -63,13 +63,16 @@ export function OrderbookMarketBuy(orderbook: Orderbook, offerAsset: Asset) {
 /**
  *
  */
-export const OrderbookMidPrice = (orderbook: Orderbook) => {
-	return (orderbook.sells[0].price + orderbook.buys[0].price) / 2.0;
-};
+export function getOrderbookMidPrice(orderbook: Orderbook) {
+	return (
+		Math.round(((orderbook.sells[0].price + orderbook.buys[0].price) / 2.0) * (1 / orderbook.minPriceIncrement)) /
+		(1 / orderbook.minPriceIncrement)
+	);
+}
 
 /**
  *
  */
-export const OrderbookSpread = (orderbook: Orderbook) => {
+export function getOrderbookSpread(orderbook: Orderbook) {
 	return orderbook.sells[0].price - orderbook.buys[0].price;
-};
+}
