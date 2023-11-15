@@ -20,6 +20,7 @@ import {
 	PrivateKey,
 	PublicKey,
 	SpotMarket,
+	TradeExecutionSide,
 } from "@injectivelabs/sdk-ts";
 import { ChainId } from "@injectivelabs/ts-types";
 import { SkipBundleClient } from "@skip-mev/skipjs";
@@ -55,7 +56,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	constructor(botConfig: BotConfig, network: Network = Network.Mainnet) {
+	constructor(botConfig: BotConfig, network: Network = Network.MainnetSentry) {
 		const endpoints = getNetworkEndpoints(network);
 		const privateKey = PrivateKey.fromMnemonic(botConfig.mnemonic, "m/44'/60'/0'/0/0");
 		this._privateKey = privateKey;
@@ -203,6 +204,28 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		return await this._spotQueryClient.fetchSubaccountOrdersList({
 			subaccountId: subaccountId,
 			marketId: marketId,
+		});
+	}
+
+	/**
+	 *
+	 */
+	async queryOrderbookOrderHistory(marketid: string, subaccountId: string = this.subaccountId) {
+		return await this._spotQueryClient.fetchOrderHistory({
+			subaccountId: subaccountId,
+			marketId: marketid,
+			pagination: { reverse: false },
+		});
+	}
+
+	/**
+	 *
+	 */
+	async queryOrderbookTrades(marketid: string, subaccountId: string = this.subaccountId) {
+		return await this._spotQueryClient.fetchTrades({
+			subaccountId: subaccountId,
+			marketId: marketid,
+			executionSide: TradeExecutionSide.Maker,
 		});
 	}
 

@@ -27,10 +27,10 @@ export class ChainOperator {
 	 */
 	static async connectWithSigner(botConfig: BotConfig): Promise<ChainOperator> {
 		if (botConfig.chainPrefix.includes("inj")) {
-			const injectiveClient = new InjectiveAdapter(botConfig, Network.Mainnet);
+			const injectiveClient = new InjectiveAdapter(botConfig, Network.MainnetSentry);
 			await injectiveClient.init(botConfig);
 			return new Promise((resolve, reject) => {
-				resolve(new ChainOperator(injectiveClient, Network.Mainnet));
+				resolve(new ChainOperator(injectiveClient, Network.MainnetSentry));
 			});
 		}
 
@@ -102,6 +102,21 @@ export class ChainOperator {
 	async queryOrderbookOrders(marketid: string, subaccountId: string) {
 		return this.client.queryOrderbookOrders(marketid, subaccountId);
 	}
+
+	/**
+	 *
+	 */
+	async queryOrderbookOrderHistory(marketid: string, subaccountId: string) {
+		return this.client.queryOrderbookOrderHistory(marketid, subaccountId);
+	}
+
+	/**
+	 *
+	 */
+	async queryOrderbookTrades(marketid: string, subaccountId: string) {
+		return this.client.queryOrderbookTrades(marketid, subaccountId);
+	}
+
 	/**
 	 *
 	 */

@@ -7,8 +7,15 @@
 	orderType: OrderType,
     */
 
-import { MsgBatchUpdateOrders, OrderType, OrderTypeMap, SpotLimitOrder } from "@injectivelabs/sdk-ts";
+import {
+	MsgBatchUpdateOrders,
+	OrderType,
+	OrderTypeMap,
+	SpotLimitOrder,
+	spotPriceToChainPriceToFixed,
+} from "@injectivelabs/sdk-ts";
 import { OrderSide } from "@injectivelabs/ts-types";
+import { BigNumberInBase } from "@injectivelabs/utils/dist/cjs/classes";
 
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
 import { OrderOperation } from "../../../core/strategies/pmm/operations/validateOrders";
@@ -49,14 +56,23 @@ export function getBatchUpdateOrdersMessage(
 		quantity: string;
 	}> = [];
 
+	const decimalAdjustment = orderbook.baseAssetDecimals - orderbook.quoteAssetDecimals;
+
 	if (ordersToCreate) {
 		ordersToCreate.forEach((order) => {
+			const orderSize = +new BigNumberInBase(order.quantity).toWei(decimalAdjustment).toFixed();
+			const beliefPriceOrderbook = spotPriceToChainPriceToFixed({
+				value: order.price,
+				baseDecimals: orderbook.baseAssetDecimals,
+				quoteDecimals: orderbook.quoteAssetDecimals,
+				decimalPlaces: 3,
+			});
 			spotOrdersToCreate.push({
 				orderType: order.orderSide === OrderSide.Buy ? OrderTypeMap.BUY : OrderTypeMap.SELL,
 				marketId: order.marketid,
 				feeRecipient: chainOperator.client.publicAddress,
-				price: String(order.price),
-				quantity: String(order.quantity),
+				price: String(beliefPriceOrderbook),
+				quantity: String(orderSize),
 			});
 		});
 	}

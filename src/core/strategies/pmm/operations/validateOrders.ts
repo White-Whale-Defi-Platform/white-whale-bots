@@ -21,7 +21,6 @@ export function validateOrders(
 	buys: Map<string, SpotLimitOrder> | undefined,
 	sells: Map<string, SpotLimitOrder> | undefined,
 ) {
-	console.log(buys, sells);
 	const midPrice = getOrderbookMidPrice(orderbook);
 	const spread = getOrderbookSpread(orderbook);
 
@@ -29,10 +28,10 @@ export function validateOrders(
 	const ordersToCreate: Array<OrderOperation> = [];
 	if (buys) {
 		for (const buyOrder of buys.values()) {
-			if (+buyOrder.price < +midPrice - botConfig.bidSpread) {
+			if (+buyOrder.price < +midPrice * (1 - botConfig.bidSpread / 10000)) {
 				ordersToCancel.push(buyOrder);
 				ordersToCreate.push({
-					price: BigNumber(midPrice - botConfig.bidSpread).toFixed(3),
+					price: BigNumber(+midPrice * (1 - botConfig.bidSpread / 10000)).toFixed(3),
 					quantity: botConfig.orderAmount,
 					marketid: orderbook.marketId,
 					orderSide: OrderSide.Buy,
@@ -41,7 +40,7 @@ export function validateOrders(
 		}
 	} else {
 		ordersToCreate.push({
-			price: BigNumber(midPrice - botConfig.bidSpread).toFixed(3),
+			price: BigNumber(+midPrice * (1 - botConfig.bidSpread / 10000)).toFixed(3),
 			quantity: botConfig.orderAmount,
 			marketid: orderbook.marketId,
 			orderSide: OrderSide.Buy,
@@ -49,10 +48,10 @@ export function validateOrders(
 	}
 	if (sells) {
 		for (const sellOrder of sells.values()) {
-			if (+sellOrder.price > +midPrice + botConfig.askSpread) {
+			if (+sellOrder.price > +midPrice * (1 + botConfig.askSpread / 10000)) {
 				ordersToCancel.push(sellOrder);
 				ordersToCreate.push({
-					price: BigNumber(midPrice + botConfig.bidSpread).toFixed(3),
+					price: BigNumber(+midPrice * (1 + botConfig.askSpread / 10000)).toFixed(3),
 					quantity: botConfig.orderAmount,
 					marketid: sellOrder.marketId,
 					orderSide: sellOrder.orderSide,
@@ -61,7 +60,7 @@ export function validateOrders(
 		}
 	} else {
 		ordersToCreate.push({
-			price: BigNumber(midPrice + botConfig.bidSpread).toFixed(3),
+			price: BigNumber(+midPrice * (1 + botConfig.askSpread / 10000)).toFixed(3),
 			quantity: botConfig.orderAmount,
 			marketid: orderbook.marketId,
 			orderSide: OrderSide.Sell,

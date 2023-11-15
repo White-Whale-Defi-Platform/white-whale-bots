@@ -282,6 +282,18 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
+	async queryOrderbookOrderHistory(marketid: string, subaccountId: string = this.subaccountId) {
+		console.log("orderbook query not yet implemented for cosmjs");
+	}
+	/**
+	 *
+	 */
+	async queryOrderbookTrades(marketid: string, subaccountId: string = this.subaccountId) {
+		console.log("orderbook query not yet implemented for cosmjs");
+	}
+	/**
+	 *
+	 */
 	async queryMarket(marketId: string) {
 		console.log("market query not yet implemented for cosmjs");
 	}
