@@ -140,6 +140,7 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 						10e6,
 				) / 10e6
 			}`;
+			logmsg += `\n**GROSS GAIN:** \t${loop.tradeHistory.summary.grossGainInQuote}`;
 			logmsg += `\n ${"---".repeat(20)}**Active Orders**${"---".repeat(20)}`;
 			loop.activeOrders.buys.forEach((buyOrder) => {
 				logmsg += `\nbuy: ${buyOrder.quantity} @ ${buyOrder.price}, ${buyOrder.orderHash}`;

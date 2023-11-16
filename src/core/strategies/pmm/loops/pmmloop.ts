@@ -1,11 +1,6 @@
 import { StdFee } from "@cosmjs/stargate";
 import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
-import {
-	AccountPortfolioV2,
-	SpotLimitOrder,
-	spotQuantityFromChainQuantityToFixed,
-	SpotTrade,
-} from "@injectivelabs/sdk-ts";
+import { SpotLimitOrder, SpotTrade } from "@injectivelabs/sdk-ts";
 import { IndexerRestMarketChronosApi } from "@injectivelabs/sdk-ts";
 import { OrderSide } from "@injectivelabs/ts-types";
 
@@ -16,8 +11,9 @@ import { getSubaccountOrders } from "../../../../chains/inj/queries/getOrderbook
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { PMMConfig } from "../../../types/base/configs";
-import { getOrderbookMidPrice, Orderbook } from "../../../types/base/orderbook";
+import { Orderbook } from "../../../types/base/orderbook";
 import Scheduler from "../operations/scheduling";
+import { calculatePortfolioValue, calculateTradeHistoryProfit } from "../operations/tradeHistoryProfit";
 import { validateOrders } from "../operations/validateOrders";
 
 /**
@@ -47,7 +43,10 @@ export class PMMLoop {
 		buys: new Map(),
 		sells: new Map(),
 	};
-	tradeHistory: { summary: { startingValueInQuote: number; currentValueInQuote: number }; trades: Array<SpotTrade> };
+	tradeHistory: {
+		summary: { startingValueInQuote: number; currentValueInQuote: number; grossGainInQuote: number };
+		trades: Array<SpotTrade>;
+	};
 	scheduler: Scheduler;
 	updateOrderbookStates: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>;
 
@@ -67,7 +66,10 @@ export class PMMLoop {
 			(this.logger = logger),
 			(this.updateOrderbookStates = updateOrderbookStates);
 		this.scheduler = new Scheduler();
-		this.tradeHistory = { summary: { startingValueInQuote: 0, currentValueInQuote: 0 }, trades: [] };
+		this.tradeHistory = {
+			summary: { startingValueInQuote: 0, currentValueInQuote: 0, grossGainInQuote: 0 },
+			trades: [],
+		};
 	}
 
 	/**
@@ -108,7 +110,7 @@ export class PMMLoop {
 				ordersToCancel,
 				ordersToCreate,
 			);
-			if (nrOfOperations > 3) {
+			if (nrOfOperations > 2) {
 				const decimalCompensator = this.botConfig.gasDenom === "inj" ? 1e12 : 1;
 				const gasFee = {
 					denom: this.botConfig.gasDenom,
@@ -176,12 +178,16 @@ export class PMMLoop {
 		);
 		if (tradeHistory) {
 			this.tradeHistory.trades = tradeHistory.trades;
+			this.tradeHistory.summary.grossGainInQuote = calculateTradeHistoryProfit(
+				this.orderbooks[0],
+				tradeHistory.trades,
+			);
 		}
 
 		const portfolio = await this.chainOperator.queryAccountPortfolio();
 
 		if (portfolio) {
-			this.tradeHistory.summary.currentValueInQuote = this.calculatePortfolioValue(portfolio);
+			this.tradeHistory.summary.currentValueInQuote = calculatePortfolioValue(this.orderbooks[0], portfolio);
 		}
 		await this.logger?.loopLogging.logPMMLoop(this, new Date());
 	};
@@ -210,34 +216,11 @@ export class PMMLoop {
 		const portfolio = await this.chainOperator.queryAccountPortfolio();
 
 		if (portfolio) {
-			this.tradeHistory.summary.startingValueInQuote = this.calculatePortfolioValue(portfolio);
+			this.tradeHistory.summary.startingValueInQuote = calculatePortfolioValue(this.orderbooks[0], portfolio);
 		}
 		await delay(5000);
 	}
 
-	/**
-	 *
-	 */
-	private calculatePortfolioValue(portfolio: AccountPortfolioV2): number {
-		const midPrice = getOrderbookMidPrice(this.orderbooks[0]);
-		let accountValueInQuote = 0;
-		for (const balance of portfolio.bankBalancesList) {
-			if (balance.denom === this.orderbooks[0].baseAssetInfo.native_token.denom) {
-				accountValueInQuote +=
-					+spotQuantityFromChainQuantityToFixed({
-						value: balance.amount,
-						baseDecimals: this.orderbooks[0].baseAssetDecimals,
-					}) * midPrice;
-			}
-			if (balance.denom === this.orderbooks[0].quoteAssetInfo.native_token.denom) {
-				accountValueInQuote += +spotQuantityFromChainQuantityToFixed({
-					value: balance.amount,
-					baseDecimals: this.orderbooks[0].quoteAssetDecimals,
-				});
-			}
-		}
-		return accountValueInQuote;
-	}
 	/**
 	 *
 	 */

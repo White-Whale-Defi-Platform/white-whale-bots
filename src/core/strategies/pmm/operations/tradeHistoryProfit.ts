@@ -1,11 +1,24 @@
-import { SpotTrade, TradeDirection } from "@injectivelabs/sdk-ts";
+import {
+	AccountPortfolioV2,
+	spotQuantityFromChainQuantityToFixed,
+	SpotTrade,
+	TradeDirection,
+} from "@injectivelabs/sdk-ts";
+
+import { getOrderbookMidPrice, Orderbook } from "../../../types/base/orderbook";
 
 /**
  *
  */
-export function calculateTradeHistoryProfit(tradeHistory: Array<SpotTrade>): number {
+export function calculateTradeHistoryProfit(orderbook: Orderbook, tradeHistory: Array<SpotTrade>): number {
 	let profit = 0;
-	for (const trade of tradeHistory) {
+	const buys = tradeHistory.filter((st) => st.tradeDirection === TradeDirection.Buy);
+	const sells = tradeHistory.filter((st) => st.tradeDirection === TradeDirection.Sell);
+	const leastTrades = Math.min(buys.length, sells.length);
+
+	const buysToUse = buys.slice(buys.length - leastTrades, buys.length - 1);
+	const sellsToUse = sells.slice(sells.length - leastTrades, sells.length - 1);
+	for (const trade of [...buysToUse, ...sellsToUse]) {
 		if (trade.tradeDirection === TradeDirection.Buy) {
 			profit -= +trade.quantity * +trade.price;
 		}
@@ -13,5 +26,33 @@ export function calculateTradeHistoryProfit(tradeHistory: Array<SpotTrade>): num
 			profit += +trade.quantity * +trade.price;
 		}
 	}
-	return profit;
+	return +spotQuantityFromChainQuantityToFixed({
+		value: profit,
+		baseDecimals: orderbook.quoteAssetDecimals,
+		decimalPlaces: 4,
+	});
+}
+
+/**
+ *
+ */
+export function calculatePortfolioValue(orderbook: Orderbook, portfolio: AccountPortfolioV2): number {
+	const midPrice = getOrderbookMidPrice(orderbook);
+	let accountValueInQuote = 0;
+	for (const balance of portfolio.bankBalancesList) {
+		if (balance.denom === orderbook.baseAssetInfo.native_token.denom) {
+			accountValueInQuote +=
+				+spotQuantityFromChainQuantityToFixed({
+					value: balance.amount,
+					baseDecimals: orderbook.baseAssetDecimals,
+				}) * midPrice;
+		}
+		if (balance.denom === orderbook.quoteAssetInfo.native_token.denom) {
+			accountValueInQuote += +spotQuantityFromChainQuantityToFixed({
+				value: balance.amount,
+				baseDecimals: orderbook.quoteAssetDecimals,
+			});
+		}
+	}
+	return accountValueInQuote;
 }
