@@ -53,8 +53,8 @@ async function main() {
 			const hours = ~~((botConfig.signOfLife * timeIt) / 60);
 			startupTime = now;
 			const message = `**chain:** ${chainOperator.client.chainId} **wallet:**  **status:** running for ${
-				loop.iterations
-			} blocks or ${hours === 0 ? "" : hours + " Hour(s) and "}${mins} Minutes`;
+				hours === 0 ? "" : hours + " Hour(s) and "
+			}${mins} Minutes`;
 			loop.clearIgnoreAddresses();
 
 			//switching RPCS every 6 Hrs

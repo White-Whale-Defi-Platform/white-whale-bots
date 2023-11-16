@@ -1,4 +1,4 @@
-import { SpotLimitOrder } from "@injectivelabs/sdk-ts";
+import { SpotLimitOrder, spotPriceToChainPriceToFixed } from "@injectivelabs/sdk-ts";
 import { OrderSide } from "@injectivelabs/ts-types";
 import { BigNumber } from "bignumber.js";
 
@@ -28,7 +28,14 @@ export function validateOrders(
 	const ordersToCreate: Array<OrderOperation> = [];
 	if (buys) {
 		for (const buyOrder of buys.values()) {
-			if (+buyOrder.price < +midPrice * (1 - botConfig.bidSpread / 10000)) {
+			if (
+				+buyOrder.price <
+				+spotPriceToChainPriceToFixed({
+					value: +midPrice * (1 - botConfig.bidSpread / 10000),
+					baseDecimals: orderbook.baseAssetDecimals,
+					quoteDecimals: orderbook.quoteAssetDecimals,
+				})
+			) {
 				ordersToCancel.push(buyOrder);
 				ordersToCreate.push({
 					price: BigNumber(+midPrice * (1 - botConfig.bidSpread / 10000)).toFixed(3),
@@ -48,7 +55,14 @@ export function validateOrders(
 	}
 	if (sells) {
 		for (const sellOrder of sells.values()) {
-			if (+sellOrder.price > +midPrice * (1 + botConfig.askSpread / 10000)) {
+			if (
+				+sellOrder.price >
+				+spotPriceToChainPriceToFixed({
+					value: +midPrice * (1 + botConfig.bidSpread / 10000),
+					baseDecimals: orderbook.baseAssetDecimals,
+					quoteDecimals: orderbook.quoteAssetDecimals,
+				})
+			) {
 				ordersToCancel.push(sellOrder);
 				ordersToCreate.push({
 					price: BigNumber(+midPrice * (1 + botConfig.askSpread / 10000)).toFixed(3),

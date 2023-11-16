@@ -1,8 +1,13 @@
+import { StdFee } from "@cosmjs/stargate";
 import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
-import { SpotLimitOrder, SpotTrade } from "@injectivelabs/sdk-ts";
+import {
+	AccountPortfolioV2,
+	SpotLimitOrder,
+	spotQuantityFromChainQuantityToFixed,
+	SpotTrade,
+} from "@injectivelabs/sdk-ts";
 import { IndexerRestMarketChronosApi } from "@injectivelabs/sdk-ts";
 import { OrderSide } from "@injectivelabs/ts-types";
-import { inspect } from "util";
 
 import * as chains from "../../../../chains";
 import { initOrderbooks } from "../../../../chains/inj";
@@ -37,12 +42,12 @@ export class PMMLoop {
 	logger: Logger | undefined;
 	chainOperator: ChainOperator;
 	botConfig: PMMConfig;
-	iterations = 0;
+	startTimestamp = Date.now();
 	activeOrders: { buys: Map<string, SpotLimitOrder>; sells: Map<string, SpotLimitOrder> } = {
 		buys: new Map(),
 		sells: new Map(),
 	};
-	tradeHistory: Array<SpotTrade>;
+	tradeHistory: { summary: { startingValueInQuote: number; currentValueInQuote: number }; trades: Array<SpotTrade> };
 	scheduler: Scheduler;
 	updateOrderbookStates: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>;
 
@@ -62,25 +67,14 @@ export class PMMLoop {
 			(this.logger = logger),
 			(this.updateOrderbookStates = updateOrderbookStates);
 		this.scheduler = new Scheduler();
-		this.scheduler.addListener("updateOrders", this.executeOrderOperations);
-		this.scheduler.addListener("logTrigger", this.logState);
-		this.tradeHistory = [];
+		this.tradeHistory = { summary: { startingValueInQuote: 0, currentValueInQuote: 0 }, trades: [] };
 	}
 
 	/**
 	 *
 	 */
 	public async step() {
-		await this.setMyOrders();
-		await this.setMyTrades();
-		await this.logState(new Date());
-		await this.executeOrderOperations();
-
-		this.scheduler.startOrderUpdates(this.botConfig.orderRefreshTime * 1000);
-		this.scheduler.startLogTimer(this.botConfig.signOfLife * 60 * 1000);
-
 		while (true) {
-			this.iterations++;
 			const checkTradeUpdates = await this.setMyOrders();
 			if (checkTradeUpdates) {
 				await this.setMyTrades();
@@ -107,17 +101,25 @@ export class PMMLoop {
 			this.activeOrders.buys.size === 0 ? undefined : this.activeOrders.buys,
 			this.activeOrders.sells.size === 0 ? undefined : this.activeOrders.sells,
 		);
-		console.log(time ?? "", ordersToCancel, ordersToCreate);
 		if (ordersToCancel || ordersToCreate) {
-			const msgBatchUpdateOrders = getBatchUpdateOrdersMessage(
+			const [msgBatchUpdateOrders, nrOfOperations] = getBatchUpdateOrdersMessage(
 				this.chainOperator,
 				this.orderbooks[0],
 				ordersToCancel,
 				ordersToCreate,
 			);
-			console.log(inspect(msgBatchUpdateOrders, true, null, true));
-			const txRes = await this.chainOperator.signAndBroadcast([msgBatchUpdateOrders]);
-			console.log(txRes.transactionHash);
+			if (nrOfOperations > 3) {
+				const decimalCompensator = this.botConfig.gasDenom === "inj" ? 1e12 : 1;
+				const gasFee = {
+					denom: this.botConfig.gasDenom,
+					amount: (250000 * this.botConfig.gasPrice * decimalCompensator).toFixed(),
+				};
+				const fee: StdFee = { amount: [gasFee], gas: String(250000) };
+				const txRes = await this.chainOperator.signAndBroadcast([msgBatchUpdateOrders], fee);
+			} else {
+				const txRes = await this.chainOperator.signAndBroadcast([msgBatchUpdateOrders]);
+			}
+			await this.logger?.tradeLogging.logOrderbookPositionUpdate(this, ordersToCancel, ordersToCreate);
 		}
 		if (ordersToCancel) {
 			for (const orderToCancel of ordersToCancel) {
@@ -149,6 +151,10 @@ export class PMMLoop {
 			}
 
 			for (const myOrder of activeOrders.orders) {
+				if (!this.activeOrders.buys.has(myOrder.orderHash) && !this.activeOrders.sells.has(myOrder.orderHash)) {
+					// new order
+					checkTradeUpdates = true;
+				}
 				if (myOrder.orderSide === OrderSide.Buy) {
 					this.activeOrders.buys.set(myOrder.orderHash, myOrder);
 				} else if (myOrder.orderSide === OrderSide.Sell) {
@@ -163,38 +169,23 @@ export class PMMLoop {
 	 *
 	 */
 	setMyTrades = async () => {
-		console.log("updating trade history");
 		const tradeHistory = await this.chainOperator.client.queryOrderbookTrades(
 			this.orderbooks[0].marketId,
 			this.chainOperator.client.subaccountId,
+			this.startTimestamp,
 		);
 		if (tradeHistory) {
-			this.tradeHistory = tradeHistory.trades;
+			this.tradeHistory.trades = tradeHistory.trades;
 		}
-		await this.logState(new Date());
+
+		const portfolio = await this.chainOperator.queryAccountPortfolio();
+
+		if (portfolio) {
+			this.tradeHistory.summary.currentValueInQuote = this.calculatePortfolioValue(portfolio);
+		}
+		await this.logger?.loopLogging.logPMMLoop(this, new Date());
 	};
 
-	/**
-	 *
-	 */
-	logState = async (date: Date) => {
-		let logmsg = ``;
-		logmsg += `**${date}**`;
-		logmsg += `\n**MARKET:** \t${this.orderbooks[0].baseAssetInfo.native_token.denom} / USDT`;
-		logmsg += `\n**MID PRICE:** \t${getOrderbookMidPrice(this.orderbooks[0])}`;
-		logmsg += `\n ${"---".repeat(20)}**Active Orders**${"---".repeat(20)}`;
-		this.activeOrders.buys.forEach((buyOrder) => {
-			logmsg += `\nbuy: ${buyOrder.quantity} @ ${buyOrder.price}, ${buyOrder.orderHash}`;
-		});
-		this.activeOrders.sells.forEach((sellOrder) => {
-			logmsg += `\nsell: ${sellOrder.quantity} @ ${sellOrder.price}, ${sellOrder.orderHash}`;
-		});
-		logmsg += `\n ${"---".repeat(20)}**Recent Trades**${"---".repeat(20)}`;
-		for (const trade of this.tradeHistory.slice(0, 5)) {
-			logmsg += `\n${trade.tradeDirection}: ${trade.quantity} @ ${trade.price}, ${trade.orderHash}`;
-		}
-		await this.logger?.sendMessage(logmsg);
-	};
 	/**
 	 *
 	 */
@@ -202,6 +193,50 @@ export class PMMLoop {
 		await this.setMyOrders();
 		await this.setMyTrades();
 		//do something later
+	}
+
+	/**
+	 *
+	 */
+	public async init() {
+		if (this.logger) {
+			this.scheduler.addListener("logTrigger", this.logger.loopLogging.logPMMLoop);
+		}
+		this.scheduler.addListener("updateOrders", this.executeOrderOperations);
+		await this.setMyOrders();
+		await this.executeOrderOperations();
+		this.scheduler.startOrderUpdates(this.botConfig.orderRefreshTime * 1000);
+		this.scheduler.startLogTimer(this.botConfig.signOfLife * 60 * 1000, this);
+		const portfolio = await this.chainOperator.queryAccountPortfolio();
+
+		if (portfolio) {
+			this.tradeHistory.summary.startingValueInQuote = this.calculatePortfolioValue(portfolio);
+		}
+		await delay(5000);
+	}
+
+	/**
+	 *
+	 */
+	private calculatePortfolioValue(portfolio: AccountPortfolioV2): number {
+		const midPrice = getOrderbookMidPrice(this.orderbooks[0]);
+		let accountValueInQuote = 0;
+		for (const balance of portfolio.bankBalancesList) {
+			if (balance.denom === this.orderbooks[0].baseAssetInfo.native_token.denom) {
+				accountValueInQuote +=
+					+spotQuantityFromChainQuantityToFixed({
+						value: balance.amount,
+						baseDecimals: this.orderbooks[0].baseAssetDecimals,
+					}) * midPrice;
+			}
+			if (balance.denom === this.orderbooks[0].quoteAssetInfo.native_token.denom) {
+				accountValueInQuote += +spotQuantityFromChainQuantityToFixed({
+					value: balance.amount,
+					baseDecimals: this.orderbooks[0].quoteAssetDecimals,
+				});
+			}
+		}
+		return accountValueInQuote;
 	}
 	/**
 	 *
@@ -215,7 +250,7 @@ export class PMMLoop {
 		const getOrderbookState = chains.injective.getOrderbookState;
 
 		const loop = new PMMLoop(chainOperator, botConfig, logger, orderbooks, getOrderbookState);
-		await loop.setMyOrders();
+		await loop.init();
 		return loop;
 	}
 }

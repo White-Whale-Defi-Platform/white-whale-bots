@@ -113,10 +113,15 @@ export class ChainOperator {
 	/**
 	 *
 	 */
-	async queryOrderbookTrades(marketid: string, subaccountId: string) {
-		return this.client.queryOrderbookTrades(marketid, subaccountId);
+	async queryOrderbookTrades(marketid: string, subaccountId: string, sinceTimestamp?: number) {
+		return this.client.queryOrderbookTrades(marketid, subaccountId, sinceTimestamp);
 	}
-
+	/**
+	 *
+	 */
+	async queryAccountPortfolio() {
+		return await this.client.queryAccountPortfolio();
+	}
 	/**
 	 *
 	 */

@@ -7,6 +7,7 @@
 	orderType: OrderType,
     */
 
+import { EncodeObject } from "@cosmjs/proto-signing";
 import {
 	MsgBatchUpdateOrders,
 	OrderType,
@@ -29,7 +30,7 @@ export function getBatchUpdateOrdersMessage(
 	orderbook: Orderbook,
 	ordersToCancel: Array<SpotLimitOrder> | undefined,
 	ordersToCreate: Array<OrderOperation> | undefined,
-) {
+): [EncodeObject, number] {
 	const subaccountId = chainOperator.client.subaccountId;
 	const publicAddress = chainOperator.client.publicAddress;
 	const spotOrdersToCancel: Array<{
@@ -84,8 +85,11 @@ export function getBatchUpdateOrdersMessage(
 		spotOrdersToCreate: spotOrdersToCreate,
 	});
 
-	return {
-		typeUrl: "/injective.exchange.v1beta1.MsgBatchUpdateOrders",
-		value: msgBatchUpdateOrders,
-	};
+	return [
+		{
+			typeUrl: "/injective.exchange.v1beta1.MsgBatchUpdateOrders",
+			value: msgBatchUpdateOrders,
+		},
+		spotOrdersToCancel.length + spotOrdersToCreate.length,
+	];
 }

@@ -11,6 +11,7 @@ import {
 	BaseAccount,
 	ChainRestAuthApi,
 	createTransaction,
+	IndexerGrpcAccountPortfolioApi,
 	IndexerGrpcSpotApi,
 	MsgBroadcasterWithPk,
 	MsgCreateSpotMarketOrder,
@@ -42,7 +43,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	private _httpClient!: HttpBatchClient;
 	private _authClient: ChainRestAuthApi;
 	private _chainId: ChainId;
-
+	private _portfolioClient!: IndexerGrpcAccountPortfolioApi;
 	private _publicKey: PublicKey;
 	private _publicAddress!: string;
 
@@ -69,6 +70,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 				rest: botConfig.restUrl ?? endpoints.rest,
 			},
 		});
+		this._portfolioClient = new IndexerGrpcAccountPortfolioApi(endpoints.indexer);
 		this._spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
 		this._authClient = new ChainRestAuthApi(botConfig.restUrl ?? endpoints.rest);
 		this._chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
@@ -141,6 +143,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			this._skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
 			this._skipSigningAddress = (await this._signer.getAccounts())[0].address;
 		}
+
 		// const markets = await this._spotQueryClient.fetchMarkets();
 		// for (const market of markets) {
 		// 	console.log(market.marketId, market.baseDenom, market.quoteDenom, market.ticker);
@@ -221,14 +224,20 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	async queryOrderbookTrades(marketid: string, subaccountId: string = this.subaccountId) {
+	async queryOrderbookTrades(marketid: string, subaccountId: string = this.subaccountId, sinceTimestamp?: number) {
 		return await this._spotQueryClient.fetchTrades({
 			subaccountId: subaccountId,
 			marketId: marketid,
 			executionSide: TradeExecutionSide.Maker,
+			startTime: sinceTimestamp,
 		});
 	}
-
+	/**
+	 *
+	 */
+	async queryAccountPortfolio() {
+		return await this._portfolioClient.fetchAccountPortfolio(this.publicAddress);
+	}
 	/**
 	 *
 	 */

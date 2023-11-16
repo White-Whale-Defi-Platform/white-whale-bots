@@ -1,9 +1,15 @@
+import { SpotLimitOrder } from "@injectivelabs/sdk-ts";
+import { OrderSide } from "@injectivelabs/ts-types";
+
 import { TxResponse } from "../chainOperator/chainOperatorInterface";
 import { LiquidationLoop } from "../strategies/arbitrage/loops/liqMempoolLoop";
 import { DexLoopInterface } from "../strategies/arbitrage/loops/loopinterfaces/dexloopInterface";
+import { PMMLoop } from "../strategies/pmm/loops/pmmloop";
+import { OrderOperation } from "../strategies/pmm/operations/validateOrders";
 import { isNativeAsset, NativeAssetInfo } from "../types/base/asset";
 import { BotConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";
+import { getOrderbookMidPrice } from "../types/base/orderbook";
 import { Loan } from "../types/base/overseer";
 import { OrderSequence } from "../types/base/path";
 import { outGivenIn } from "../types/base/pool";
@@ -119,6 +125,34 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 
 			await this._sendMessage(setupMessage, LogType.All);
 		},
+
+		/**
+		 *
+		 */
+		async logPMMLoop(loop: PMMLoop, date: Date) {
+			let logmsg = ``;
+			logmsg += `\n**${date}**`;
+			logmsg += `\n**MARKET:** \t${loop.orderbooks[0].baseAssetInfo.native_token.denom} / USDT`;
+			logmsg += `\n**MID PRICE:** \t${getOrderbookMidPrice(loop.orderbooks[0])}`;
+			logmsg += `\n**NET GAIN:** \t${
+				Math.round(
+					(loop.tradeHistory.summary.currentValueInQuote - loop.tradeHistory.summary.startingValueInQuote) *
+						10e6,
+				) / 10e6
+			}`;
+			logmsg += `\n ${"---".repeat(20)}**Active Orders**${"---".repeat(20)}`;
+			loop.activeOrders.buys.forEach((buyOrder) => {
+				logmsg += `\nbuy: ${buyOrder.quantity} @ ${buyOrder.price}, ${buyOrder.orderHash}`;
+			});
+			loop.activeOrders.sells.forEach((sellOrder) => {
+				logmsg += `\nsell: ${sellOrder.quantity} @ ${sellOrder.price}, ${sellOrder.orderHash}`;
+			});
+			logmsg += `\n ${"---".repeat(20)}**Recent Trades**${"---".repeat(20)}`;
+			for (const trade of loop.tradeHistory.trades.slice(0, 10)) {
+				logmsg += `\n${trade.tradeDirection}: ${trade.quantity} @ ${trade.price}, ${trade.orderHash}`;
+			}
+			await loop.logger?.sendMessage(logmsg);
+		},
 	};
 
 	public tradeLogging = {
@@ -178,6 +212,34 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				tradeMsg += `\nHash: ${txResponse.transactionHash ?? "unknown"}`;
 			}
 			await this._sendMessage(tradeMsg, LogType.All);
+		},
+		/**
+		 *
+		 */
+		async logOrderbookPositionUpdate(
+			loop: PMMLoop,
+			ordersToCancel: Array<SpotLimitOrder> | undefined,
+			ordersToCreate: Array<OrderOperation> | undefined,
+		) {
+			let logmsg = ``;
+			logmsg += `**${new Date()}**`;
+			logmsg += `\n**MARKET:** \t${loop.orderbooks[0].baseAssetInfo.native_token.denom} / USDT`;
+			logmsg += `\n**MID PRICE:** \t${getOrderbookMidPrice(loop.orderbooks[0])}`;
+			logmsg += `\n ${"---".repeat(20)}**Order Updates**${"---".repeat(20)}`;
+
+			for (const orderToCancel of ordersToCancel ?? []) {
+				logmsg += `\n**cancelling** ${orderToCancel.orderSide === OrderSide.Sell ? "sell" : "buy"}: ${
+					orderToCancel.quantity
+				} @ ${orderToCancel.price}, ${orderToCancel.orderHash}`;
+			}
+			for (const orderToCreate of ordersToCreate ?? []) {
+				logmsg += `\n**opening** ${orderToCreate.orderSide === OrderSide.Sell ? "sell" : "buy"}: ${
+					orderToCreate.quantity
+				} @ ${orderToCreate.price}`;
+			}
+
+			logmsg += `\n ${"---".repeat(20)}**-------------**${"---".repeat(20)}`;
+			await loop.logger?.sendMessage(logmsg);
 		},
 
 		/**
