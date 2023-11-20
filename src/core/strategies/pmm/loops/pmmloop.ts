@@ -1,7 +1,5 @@
 import { StdFee } from "@cosmjs/stargate";
-import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
 import { SpotLimitOrder, SpotTrade } from "@injectivelabs/sdk-ts";
-import { IndexerRestMarketChronosApi } from "@injectivelabs/sdk-ts";
 import { OrderSide } from "@injectivelabs/ts-types";
 
 import * as chains from "../../../../chains";
@@ -12,24 +10,11 @@ import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { PMMConfig } from "../../../types/base/configs";
 import { Orderbook } from "../../../types/base/orderbook";
+import { fetchPMMParameters } from "../operations/marketAnalysis";
 import Scheduler from "../operations/scheduling";
 import { calculatePortfolioValue, calculateTradeHistoryProfit } from "../operations/tradeHistoryProfit";
 import { validateOrders } from "../operations/validateOrders";
 
-/**
- *
- */
-export async function marketHistory() {
-	const network = Network.MainnetSentry;
-	const endpoints = getNetworkEndpoints(network);
-	const fetcher = new IndexerRestMarketChronosApi(`${endpoints.indexer}/api/chronos/v1/market`);
-	const res = await fetcher.fetchMarketsHistory({
-		marketIds: ["0x0511ddc4e6586f3bfe1acb2dd905f8b8a82c97e1edaef654b12ca7e6031ca0fa"],
-		resolution: "15",
-		countback: "48",
-	});
-	console.log(res);
-}
 /**
  *
  */
@@ -70,6 +55,10 @@ export class PMMLoop {
 			summary: { startingValueInQuote: 0, currentValueInQuote: 0, grossGainInQuote: 0 },
 			trades: [],
 		};
+		if (this.logger) {
+			this.scheduler.addListener("logTrigger", this.logger.loopLogging.logPMMLoop);
+		}
+		this.scheduler.addListener("updateOrders", this.executeOrderOperations);
 	}
 
 	/**
@@ -205,10 +194,9 @@ export class PMMLoop {
 	 *
 	 */
 	public async init() {
-		if (this.logger) {
-			this.scheduler.addListener("logTrigger", this.logger.loopLogging.logPMMLoop);
-		}
-		this.scheduler.addListener("updateOrders", this.executeOrderOperations);
+		const [bidspread, askspread] = await fetchPMMParameters(this.orderbooks[0], "15", "48");
+		(this.botConfig.bidSpread = bidspread), (this.botConfig.askSpread = askspread);
+
 		await this.setMyOrders();
 		await this.executeOrderOperations();
 		this.scheduler.startOrderUpdates(this.botConfig.orderRefreshTime * 1000);
@@ -218,7 +206,7 @@ export class PMMLoop {
 		if (portfolio) {
 			this.tradeHistory.summary.startingValueInQuote = calculatePortfolioValue(this.orderbooks[0], portfolio);
 		}
-		await delay(5000);
+		await delay(1000);
 	}
 
 	/**

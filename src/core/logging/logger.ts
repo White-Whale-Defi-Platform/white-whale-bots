@@ -1,5 +1,6 @@
-import { SpotLimitOrder } from "@injectivelabs/sdk-ts";
+import { SpotLimitOrder, spotPriceFromChainPrice } from "@injectivelabs/sdk-ts";
 import { OrderSide, TradeDirection } from "@injectivelabs/ts-types";
+import { BigNumber } from "bignumber.js";
 
 import { TxResponse } from "../chainOperator/chainOperatorInterface";
 import { LiquidationLoop } from "../strategies/arbitrage/loops/liqMempoolLoop";
@@ -135,10 +136,11 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				month: "numeric",
 				day: "numeric",
 			};
+			const midPrice = getOrderbookMidPrice(loop.orderbooks[0]);
 			let logmsg = ``;
 			logmsg += `\n**${date.toLocaleTimeString("nl-NL", formatOptions)}**`;
 			logmsg += `\n**MARKET:** \t${loop.orderbooks[0].ticker}`;
-			logmsg += `\n**MID PRICE:** \t${getOrderbookMidPrice(loop.orderbooks[0])}`;
+			logmsg += `\n**MID PRICE:** \t${midPrice}`;
 			logmsg += `\n**NET GAIN:** \t${
 				Math.round(
 					(loop.tradeHistory.summary.currentValueInQuote - loop.tradeHistory.summary.startingValueInQuote) *
@@ -148,10 +150,32 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			logmsg += `\n**GROSS GAIN:** \t${loop.tradeHistory.summary.grossGainInQuote}`;
 			logmsg += `\n${"---------"}**Active Orders**${"---------"}`;
 			loop.activeOrders.buys.forEach((buyOrder) => {
-				logmsg += `\nbuy : ${buyOrder.quantity} @ ${buyOrder.price}`;
+				logmsg += `\nbuy : ${buyOrder.quantity} @ ${buyOrder.price} (~ ${
+					Math.round(
+						((spotPriceFromChainPrice({
+							value: buyOrder.price,
+							baseDecimals: loop.orderbooks[0].baseAssetDecimals,
+							quoteDecimals: 6,
+						}).toNumber() -
+							midPrice) /
+							midPrice) *
+							100000,
+					) / 1000
+				}%)`;
 			});
 			loop.activeOrders.sells.forEach((sellOrder) => {
-				logmsg += `\nsell: ${sellOrder.quantity} @ ${sellOrder.price}`;
+				logmsg += `\nsell: ${sellOrder.quantity} @ ${sellOrder.price} (~ +${
+					Math.round(
+						((spotPriceFromChainPrice({
+							value: sellOrder.price,
+							baseDecimals: loop.orderbooks[0].baseAssetDecimals,
+							quoteDecimals: 6,
+						}).toNumber() -
+							midPrice) /
+							midPrice) *
+							100000,
+					) / 1000
+				}%)`;
 			});
 
 			const histBuys = Array.from(loop.tradeHistory.trades.values()).filter(
@@ -164,8 +188,12 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			);
 			const histSellsAvgPrice = histSells.map((buy) => +buy.price).reduce((a, b) => a + b, 0) / histSells.length;
 			logmsg += `\n${"---------"}**Recent Trades**${"---------"}`;
-			logmsg += `\n${histSells.length} sells ${histSellsAvgPrice ? `of average price ${histSellsAvgPrice}` : ""}`;
-			logmsg += `\n${histBuys.length} buys  ${histBuysAvgPrice ? `of average price ${histBuysAvgPrice}` : ""}`;
+			logmsg += `\n${histSells.length} sells ${
+				histSellsAvgPrice ? `of average price ${new BigNumber(histSellsAvgPrice).toFixed()}` : ""
+			}`;
+			logmsg += `\n${histBuys.length} buys  ${
+				histBuysAvgPrice ? `of average price ${new BigNumber(histBuysAvgPrice).toFixed()}` : ""
+			}`;
 
 			await loop.logger?.sendMessage(logmsg);
 		},
