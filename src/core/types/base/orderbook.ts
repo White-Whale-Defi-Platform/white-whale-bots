@@ -16,6 +16,7 @@ export interface Orderbook {
 	sells: Array<Order>;
 	makerFeeRate: number;
 	takerFeeRate: number;
+	ticker: string;
 }
 
 /**

@@ -36,6 +36,7 @@ export async function initOrderbooks(
 			marketId: orderbookAddress,
 			makerFeeRate: +marketInfo.makerFeeRate,
 			takerFeeRate: +marketInfo.takerFeeRate,
+			ticker: marketInfo.ticker,
 		});
 		orderbooks.push(ob);
 	}

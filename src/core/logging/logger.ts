@@ -1,5 +1,5 @@
 import { SpotLimitOrder } from "@injectivelabs/sdk-ts";
-import { OrderSide } from "@injectivelabs/ts-types";
+import { OrderSide, TradeDirection } from "@injectivelabs/ts-types";
 
 import { TxResponse } from "../chainOperator/chainOperatorInterface";
 import { LiquidationLoop } from "../strategies/arbitrage/loops/liqMempoolLoop";
@@ -130,9 +130,14 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 		 *
 		 */
 		async logPMMLoop(loop: PMMLoop, date: Date) {
+			const formatOptions: Intl.DateTimeFormatOptions = {
+				year: "numeric",
+				month: "numeric",
+				day: "numeric",
+			};
 			let logmsg = ``;
-			logmsg += `\n**${date}**`;
-			logmsg += `\n**MARKET:** \t${loop.orderbooks[0].baseAssetInfo.native_token.denom} / USDT`;
+			logmsg += `\n**${date.toLocaleTimeString("nl-NL", formatOptions)}**`;
+			logmsg += `\n**MARKET:** \t${loop.orderbooks[0].ticker}`;
 			logmsg += `\n**MID PRICE:** \t${getOrderbookMidPrice(loop.orderbooks[0])}`;
 			logmsg += `\n**NET GAIN:** \t${
 				Math.round(
@@ -141,17 +146,27 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				) / 10e6
 			}`;
 			logmsg += `\n**GROSS GAIN:** \t${loop.tradeHistory.summary.grossGainInQuote}`;
-			logmsg += `\n ${"---".repeat(20)}**Active Orders**${"---".repeat(20)}`;
+			logmsg += `\n${"---------"}**Active Orders**${"---------"}`;
 			loop.activeOrders.buys.forEach((buyOrder) => {
-				logmsg += `\nbuy: ${buyOrder.quantity} @ ${buyOrder.price}, ${buyOrder.orderHash}`;
+				logmsg += `\nbuy : ${buyOrder.quantity} @ ${buyOrder.price}`;
 			});
 			loop.activeOrders.sells.forEach((sellOrder) => {
-				logmsg += `\nsell: ${sellOrder.quantity} @ ${sellOrder.price}, ${sellOrder.orderHash}`;
+				logmsg += `\nsell: ${sellOrder.quantity} @ ${sellOrder.price}`;
 			});
-			logmsg += `\n ${"---".repeat(20)}**Recent Trades**${"---".repeat(20)}`;
-			for (const trade of loop.tradeHistory.trades.slice(0, 10)) {
-				logmsg += `\n${trade.tradeDirection}: ${trade.quantity} @ ${trade.price}, ${trade.orderHash}`;
-			}
+
+			const histBuys = Array.from(loop.tradeHistory.trades.values()).filter(
+				(trade) => trade.tradeDirection === TradeDirection.Buy,
+			);
+			const histBuysAvgPrice = histBuys.map((buy) => +buy.price).reduce((a, b) => a + b, 0) / histBuys.length;
+
+			const histSells = Array.from(loop.tradeHistory.trades.values()).filter(
+				(trade) => trade.tradeDirection === TradeDirection.Sell,
+			);
+			const histSellsAvgPrice = histSells.map((buy) => +buy.price).reduce((a, b) => a + b, 0) / histSells.length;
+			logmsg += `\n${"---------"}**Recent Trades**${"---------"}`;
+			logmsg += `\n${histSells.length} sells ${histSellsAvgPrice ? `of average price ${histSellsAvgPrice}` : ""}`;
+			logmsg += `\n${histBuys.length} buys  ${histBuysAvgPrice ? `of average price ${histBuysAvgPrice}` : ""}`;
+
 			await loop.logger?.sendMessage(logmsg);
 		},
 	};
@@ -222,16 +237,21 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			ordersToCancel: Array<SpotLimitOrder> | undefined,
 			ordersToCreate: Array<OrderOperation> | undefined,
 		) {
+			const formatOptions: Intl.DateTimeFormatOptions = {
+				year: "numeric",
+				month: "numeric",
+				day: "numeric",
+			};
 			let logmsg = ``;
-			logmsg += `**${new Date()}**`;
-			logmsg += `\n**MARKET:** \t${loop.orderbooks[0].baseAssetInfo.native_token.denom} / USDT`;
+			logmsg += `\n**${new Date().toLocaleTimeString("nl-NL", formatOptions)}**`;
+			logmsg += `\n**MARKET:** \t${loop.orderbooks[0].ticker}`;
 			logmsg += `\n**MID PRICE:** \t${getOrderbookMidPrice(loop.orderbooks[0])}`;
-			logmsg += `\n ${"---".repeat(20)}**Order Updates**${"---".repeat(20)}`;
+			logmsg += `\n${"---------"}**Order Updates**${"---------"}`;
 
 			for (const orderToCancel of ordersToCancel ?? []) {
 				logmsg += `\n**cancelling** ${orderToCancel.orderSide === OrderSide.Sell ? "sell" : "buy"}: ${
 					orderToCancel.quantity
-				} @ ${orderToCancel.price}, ${orderToCancel.orderHash}`;
+				} @ ${orderToCancel.price}`;
 			}
 			for (const orderToCreate of ordersToCreate ?? []) {
 				logmsg += `\n**opening** ${orderToCreate.orderSide === OrderSide.Sell ? "sell" : "buy"}: ${
@@ -239,7 +259,7 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				} @ ${orderToCreate.price}`;
 			}
 
-			logmsg += `\n ${"---".repeat(20)}**-------------**${"---".repeat(20)}`;
+			logmsg += `\n${"---------"}**-------------**${"---------"}`;
 			await loop.logger?.sendMessage(logmsg);
 		},
 
