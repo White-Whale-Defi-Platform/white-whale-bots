@@ -27,9 +27,11 @@ import { Orderbook } from "../../../core/types/base/orderbook";
  */
 export function getBatchUpdateOrdersMessage(
 	chainOperator: ChainOperator,
-	orderbook: Orderbook,
-	ordersToCancel: Array<SpotLimitOrder> | undefined,
-	ordersToCreate: Array<OrderOperation> | undefined,
+	allOrderbookUpdates: Array<{
+		orderbook: Orderbook;
+		ordersToCancel: Array<SpotLimitOrder>;
+		ordersToCreate: Array<OrderOperation>;
+	}>,
 ): [EncodeObject, number] {
 	const subaccountId = chainOperator.client.subaccountId;
 	const publicAddress = chainOperator.client.publicAddress;
@@ -38,15 +40,6 @@ export function getBatchUpdateOrdersMessage(
 		subaccountId: string;
 		orderHash: string;
 	}> = [];
-	if (ordersToCancel) {
-		ordersToCancel.forEach((slo) => {
-			spotOrdersToCancel.push({
-				marketId: orderbook.marketId,
-				subaccountId: subaccountId,
-				orderHash: slo.orderHash,
-			});
-		});
-	}
 
 	const spotOrdersToCreate: Array<{
 		orderType: OrderType;
@@ -57,25 +50,38 @@ export function getBatchUpdateOrdersMessage(
 		quantity: string;
 	}> = [];
 
-	const decimalAdjustment = orderbook.baseAssetDecimals - orderbook.quoteAssetDecimals;
+	for (const orderbookUpdate of allOrderbookUpdates) {
+		if (orderbookUpdate.ordersToCancel.length > 0) {
+			orderbookUpdate.ordersToCancel.forEach((slo) => {
+				spotOrdersToCancel.push({
+					marketId: orderbookUpdate.orderbook.marketId,
+					subaccountId: subaccountId,
+					orderHash: slo.orderHash,
+				});
+			});
+		}
 
-	if (ordersToCreate) {
-		ordersToCreate.forEach((order) => {
-			const orderSize = +new BigNumberInBase(order.quantity).toWei(decimalAdjustment).toFixed();
-			const beliefPriceOrderbook = spotPriceToChainPriceToFixed({
-				value: order.price,
-				baseDecimals: orderbook.baseAssetDecimals,
-				quoteDecimals: orderbook.quoteAssetDecimals,
-				decimalPlaces: 3,
+		const decimalAdjustment =
+			orderbookUpdate.orderbook.baseAssetDecimals - orderbookUpdate.orderbook.quoteAssetDecimals;
+
+		if (orderbookUpdate.ordersToCreate.length > 0) {
+			orderbookUpdate.ordersToCreate.forEach((order) => {
+				const orderSize = +new BigNumberInBase(order.quantity).toWei(decimalAdjustment).toFixed();
+				const beliefPriceOrderbook = spotPriceToChainPriceToFixed({
+					value: order.price,
+					baseDecimals: orderbookUpdate.orderbook.baseAssetDecimals,
+					quoteDecimals: orderbookUpdate.orderbook.quoteAssetDecimals,
+					decimalPlaces: 3,
+				});
+				spotOrdersToCreate.push({
+					orderType: order.orderSide === OrderSide.Buy ? OrderTypeMap.BUY : OrderTypeMap.SELL,
+					marketId: order.marketid,
+					feeRecipient: chainOperator.client.publicAddress,
+					price: String(beliefPriceOrderbook),
+					quantity: String(orderSize),
+				});
 			});
-			spotOrdersToCreate.push({
-				orderType: order.orderSide === OrderSide.Buy ? OrderTypeMap.BUY : OrderTypeMap.SELL,
-				marketId: order.marketid,
-				feeRecipient: chainOperator.client.publicAddress,
-				price: String(beliefPriceOrderbook),
-				quantity: String(orderSize),
-			});
-		});
+		}
 	}
 
 	const msgBatchUpdateOrders = MsgBatchUpdateOrders.fromJSON({

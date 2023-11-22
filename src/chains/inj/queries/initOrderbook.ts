@@ -1,7 +1,8 @@
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
+import { fetchPMMParameters } from "../../../core/strategies/pmm/operations/marketAnalysis";
 import { AssetInfo } from "../../../core/types/base/asset";
 import { DexConfig, PMMConfig } from "../../../core/types/base/configs";
-import { Orderbook } from "../../../core/types/base/orderbook";
+import { Orderbook, PMMOrderbook } from "../../../core/types/base/orderbook";
 import { identity } from "../../../core/types/identity";
 import { getOrderbookState } from "./getOrderbookState";
 /**
@@ -42,4 +43,56 @@ export async function initOrderbooks(
 	}
 	await getOrderbookState(chainoperator, orderbooks);
 	return orderbooks;
+}
+
+/**
+ *
+ */
+export async function initPMMOrderbooks(
+	orderbooks: Array<Orderbook>,
+	botConfig: PMMConfig,
+): Promise<Array<PMMOrderbook>> {
+	const pmmOrderbooks: Array<PMMOrderbook> = [];
+	for (const orderbook of orderbooks) {
+		const marketConfig = botConfig.marketConfigs.find((mc) => mc.marketId === orderbook.marketId);
+		const [bidspread, askspread] = await fetchPMMParameters(orderbook, "30", "24");
+
+		if (!marketConfig) {
+			console.log("cannot find market config for ", orderbook.marketId);
+			process.exit(1);
+		} else {
+			const pmmOrderbook: PMMOrderbook = {
+				...orderbook,
+				trading: {
+					activeOrders: {
+						buys: new Map(),
+						sells: new Map(),
+					},
+					tradeHistory: {
+						summary: {
+							grossGainInQuote: 0,
+						},
+						trades: [],
+					},
+					config: {
+						orderRefreshTime: 300,
+						bidSpread: bidspread,
+						askSpread: askspread,
+						minSpread: 0,
+						maxOrderAge: 0,
+						orderRefreshTolerancePct: 0,
+						orderAmount: marketConfig.orderAmount,
+						priceCeiling: 0,
+						priceFloor: 0,
+						priceCeilingPct: 0,
+						priceFloorPct: 0,
+						orderLevels: 0,
+						filledOrderDelay: 0,
+					},
+				},
+			};
+			pmmOrderbooks.push(pmmOrderbook);
+		}
+	}
+	return pmmOrderbooks;
 }

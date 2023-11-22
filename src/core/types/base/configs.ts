@@ -65,21 +65,27 @@ export interface LiquidationConfig extends BaseConfig {
 	overseerAddresses: Array<string>;
 }
 
-export interface PMMConfig extends BaseConfig {
-	orderbooks: Array<string>;
-	bidSpread: number;
-	askSpread: number;
-	minSpread: number;
-	orderRefreshTime: number; //in ms
-	maxOrderAge: number;
-	orderRefreshTolerancePct: number;
+export interface PMMMarketConfig {
+	marketId: string;
 	orderAmount: number;
-	priceCeiling: number;
-	priceFloor: number;
-	priceCeilingPct: number;
-	priceFloorPct: number;
-	orderLevels: number;
-	filledOrderDelay: number;
+}
+export interface PMMConfig extends BaseConfig {
+	marketConfigs: Array<PMMMarketConfig>;
+	orderbooks: Array<string>;
+	// orderbooks: Array<string>;
+	// bidSpread: number;
+	// askSpread: number;
+	// minSpread: number;
+	// orderRefreshTime: number; //in ms
+	// maxOrderAge: number;
+	// orderRefreshTolerancePct: number;
+	// orderAmount: number;
+	// priceCeiling: number;
+	// priceFloor: number;
+	// priceCeilingPct: number;
+	// priceFloorPct: number;
+	// orderLevels: number;
+	// filledOrderDelay: number;
 }
 
 export type BotConfig = DexConfig | LiquidationConfig | BaseConfig | PMMConfig;
@@ -103,7 +109,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
 		return bc;
 		//do something
 	} else if (bc.setupType === SetupType.PMM) {
-		validatePMMEnvs(envs);
+		// validatePMMEnvs(envs);
 		const botConfig: PMMConfig = getPMMConfig(envs, bc);
 		return botConfig;
 	} else {
@@ -255,26 +261,37 @@ function getDexConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): DexConfi
  *
  */
 function getPMMConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): PMMConfig {
-	let orderbooks;
-	if (envs.ORDERBOOKS) {
-		orderbooks = JSON.parse(envs.ORDERBOOKS);
+	const marketConfigs: Array<PMMMarketConfig> = [];
+	const orderbooks: Array<string> = [];
+	if (envs.PMM_SETUPS) {
+		marketConfigs.push(...JSON.parse(envs.PMM_SETUPS));
 	}
+
+	if (envs.ORDERBOOKS) {
+		orderbooks.push(...JSON.parse(envs.ORDERBOOKS));
+	} else {
+		if (marketConfigs.length > 0) {
+			orderbooks.push(...marketConfigs.map((mc: PMMMarketConfig) => mc.marketId));
+		}
+	}
+
 	return {
 		...baseConfig,
+		marketConfigs: marketConfigs,
 		orderbooks: orderbooks,
-		bidSpread: +envs.BID_SPREAD,
-		askSpread: +envs.ASK_SPREAD,
-		minSpread: +envs.BID_SPREAD,
-		orderRefreshTime: +envs.ORDER_REFRESH_TIME, //in ms
-		maxOrderAge: +envs.MAX_ORDER_AGE,
-		orderRefreshTolerancePct: +envs.ORDER_REFRESH_TOLERANCE_PCT,
-		orderAmount: +envs.ORDER_AMOUNT,
-		priceCeiling: +envs.PRICE_CEILING,
-		priceFloor: +envs.PRICE_FLOOR,
-		priceCeilingPct: +envs.PRICE_CEILING_PCT,
-		priceFloorPct: +envs.PRICE_FLOOR_PCT,
-		orderLevels: +envs.ORDER_LEVELS,
-		filledOrderDelay: +envs.FILLED_ORDER_DELAY,
+		// bidSpread: +envs.BID_SPREAD,
+		// askSpread: +envs.ASK_SPREAD,
+		// minSpread: +envs.BID_SPREAD,
+		// orderRefreshTime: +envs.ORDER_REFRESH_TIME, //in ms
+		// maxOrderAge: +envs.MAX_ORDER_AGE,
+		// orderRefreshTolerancePct: +envs.ORDER_REFRESH_TOLERANCE_PCT,
+		// orderAmount: +envs.ORDER_AMOUNT,
+		// priceCeiling: +envs.PRICE_CEILING,
+		// priceFloor: +envs.PRICE_FLOOR,
+		// priceCeilingPct: +envs.PRICE_CEILING_PCT,
+		// priceFloorPct: +envs.PRICE_FLOOR_PCT,
+		// orderLevels: +envs.ORDER_LEVELS,
+		// filledOrderDelay: +envs.FILLED_ORDER_DELAY,
 	};
 }
 /**

@@ -10,7 +10,7 @@ import { OrderOperation } from "../strategies/pmm/operations/validateOrders";
 import { isNativeAsset, NativeAssetInfo } from "../types/base/asset";
 import { BotConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";
-import { getOrderbookMidPrice } from "../types/base/orderbook";
+import { getOrderbookMidPrice, Orderbook } from "../types/base/orderbook";
 import { Loan } from "../types/base/overseer";
 import { OrderSequence } from "../types/base/path";
 import { outGivenIn } from "../types/base/pool";
@@ -136,64 +136,66 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				month: "numeric",
 				day: "numeric",
 			};
-			const midPrice = getOrderbookMidPrice(loop.orderbooks[0]);
+
 			let logmsg = ``;
-			logmsg += `\n**${date.toLocaleTimeString("nl-NL", formatOptions)}**`;
-			logmsg += `\n**MARKET:** \t${loop.orderbooks[0].ticker}`;
-			logmsg += `\n**MID PRICE:** \t${midPrice}`;
-			logmsg += `\n**NET GAIN:** \t${
-				Math.round(
-					(loop.tradeHistory.summary.currentValueInQuote - loop.tradeHistory.summary.startingValueInQuote) *
-						10e6,
-				) / 10e6
-			}`;
-			logmsg += `\n**GROSS GAIN:** \t${loop.tradeHistory.summary.grossGainInQuote}`;
-			logmsg += `\n${"---------"}**Active Orders**${"---------"}`;
-			loop.activeOrders.buys.forEach((buyOrder) => {
-				logmsg += `\nbuy : ${buyOrder.quantity} @ ${buyOrder.price} (~ ${
-					Math.round(
-						((spotPriceFromChainPrice({
-							value: buyOrder.price,
-							baseDecimals: loop.orderbooks[0].baseAssetDecimals,
-							quoteDecimals: 6,
-						}).toNumber() -
-							midPrice) /
-							midPrice) *
-							100000,
-					) / 1000
-				}%)`;
-			});
-			loop.activeOrders.sells.forEach((sellOrder) => {
-				logmsg += `\nsell: ${sellOrder.quantity} @ ${sellOrder.price} (~ +${
-					Math.round(
-						((spotPriceFromChainPrice({
-							value: sellOrder.price,
-							baseDecimals: loop.orderbooks[0].baseAssetDecimals,
-							quoteDecimals: 6,
-						}).toNumber() -
-							midPrice) /
-							midPrice) *
-							100000,
-					) / 1000
-				}%)`;
-			});
+			logmsg += `\n**${date.toLocaleTimeString("nl-NL", formatOptions)}**\n`;
+			logmsg += `==`.repeat(15);
+			for (const pmmOrderbook of loop.PMMOrderbooks) {
+				const midPrice = getOrderbookMidPrice(pmmOrderbook);
+				logmsg += `\n**MARKET:** \t${pmmOrderbook.ticker} (${midPrice})`;
+				logmsg += `\n**GROSS GAIN:** \t${pmmOrderbook.trading.tradeHistory.summary.grossGainInQuote}`;
+				logmsg += `\n${"---------"}**Active Orders**${"---------"}`;
+				pmmOrderbook.trading.activeOrders.buys.forEach((buyOrder) => {
+					logmsg += `\nbuy : ${buyOrder.quantity} @ ${buyOrder.price} (~ ${
+						Math.round(
+							((spotPriceFromChainPrice({
+								value: buyOrder.price,
+								baseDecimals: pmmOrderbook.baseAssetDecimals,
+								quoteDecimals: 6,
+							}).toNumber() -
+								midPrice) /
+								midPrice) *
+								100000,
+						) / 1000
+					}%)`;
+				});
+				pmmOrderbook.trading.activeOrders.sells.forEach((sellOrder) => {
+					logmsg += `\nsell: ${sellOrder.quantity} @ ${sellOrder.price} (~ +${
+						Math.round(
+							((spotPriceFromChainPrice({
+								value: sellOrder.price,
+								baseDecimals: pmmOrderbook.baseAssetDecimals,
+								quoteDecimals: 6,
+							}).toNumber() -
+								midPrice) /
+								midPrice) *
+								100000,
+						) / 1000
+					}%)`;
+				});
 
-			const histBuys = Array.from(loop.tradeHistory.trades.values()).filter(
-				(trade) => trade.tradeDirection === TradeDirection.Buy,
-			);
-			const histBuysAvgPrice = histBuys.map((buy) => +buy.price).reduce((a, b) => a + b, 0) / histBuys.length;
+				const histBuys = Array.from(pmmOrderbook.trading.tradeHistory.trades.values()).filter(
+					(trade) => trade.tradeDirection === TradeDirection.Buy,
+				);
+				const histBuysAvgPrice = histBuys.map((buy) => +buy.price).reduce((a, b) => a + b, 0) / histBuys.length;
 
-			const histSells = Array.from(loop.tradeHistory.trades.values()).filter(
-				(trade) => trade.tradeDirection === TradeDirection.Sell,
-			);
-			const histSellsAvgPrice = histSells.map((buy) => +buy.price).reduce((a, b) => a + b, 0) / histSells.length;
-			logmsg += `\n${"---------"}**Recent Trades**${"---------"}`;
-			logmsg += `\n${histSells.length} sells ${
-				histSellsAvgPrice ? `of average price ${new BigNumber(histSellsAvgPrice).toFixed()}` : ""
-			}`;
-			logmsg += `\n${histBuys.length} buys  ${
-				histBuysAvgPrice ? `of average price ${new BigNumber(histBuysAvgPrice).toFixed()}` : ""
-			}`;
+				const histSells = Array.from(pmmOrderbook.trading.tradeHistory.trades.values()).filter(
+					(trade) => trade.tradeDirection === TradeDirection.Sell,
+				);
+				const histSellsAvgPrice =
+					histSells.map((buy) => +buy.price).reduce((a, b) => a + b, 0) / histSells.length;
+				logmsg += `\n${"---------"}**Recent Trades**${"---------"}`;
+				logmsg += `\n${histSells.length} sells ${
+					histSellsAvgPrice ? `of average price ${new BigNumber(histSellsAvgPrice).toFixed()}` : ""
+				}`;
+				logmsg += `\n${histBuys.length} buys  ${
+					histBuysAvgPrice ? `of average price ${new BigNumber(histBuysAvgPrice).toFixed()}` : ""
+				}`;
+				logmsg += `\n`;
+				logmsg += `--`.repeat(15);
+			}
+			logmsg += `\n`;
+			logmsg += `==`.repeat(15);
 
 			await loop.logger?.sendMessage(logmsg);
 		},
@@ -261,9 +263,11 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 		 *
 		 */
 		async logOrderbookPositionUpdate(
-			loop: PMMLoop,
-			ordersToCancel: Array<SpotLimitOrder> | undefined,
-			ordersToCreate: Array<OrderOperation> | undefined,
+			allOrderbookUpdates: Array<{
+				orderbook: Orderbook;
+				ordersToCancel: Array<SpotLimitOrder>;
+				ordersToCreate: Array<OrderOperation>;
+			}>,
 		) {
 			const formatOptions: Intl.DateTimeFormatOptions = {
 				year: "numeric",
@@ -272,23 +276,28 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			};
 			let logmsg = ``;
 			logmsg += `\n**${new Date().toLocaleTimeString("nl-NL", formatOptions)}**`;
-			logmsg += `\n**MARKET:** \t${loop.orderbooks[0].ticker}`;
-			logmsg += `\n**MID PRICE:** \t${getOrderbookMidPrice(loop.orderbooks[0])}`;
-			logmsg += `\n${"---------"}**Order Updates**${"---------"}`;
+			logmsg += `\n${"========="}**Order Updates**${"========="}`;
+			for (const pmmOrderbookUpdate of allOrderbookUpdates) {
+				logmsg += `\n**MARKET:** ${pmmOrderbookUpdate.orderbook.ticker} (${getOrderbookMidPrice(
+					pmmOrderbookUpdate.orderbook,
+				)})`;
 
-			for (const orderToCancel of ordersToCancel ?? []) {
-				logmsg += `\n**cancelling** ${orderToCancel.orderSide === OrderSide.Sell ? "sell" : "buy"}: ${
-					orderToCancel.quantity
-				} @ ${orderToCancel.price}`;
-			}
-			for (const orderToCreate of ordersToCreate ?? []) {
-				logmsg += `\n**opening** ${orderToCreate.orderSide === OrderSide.Sell ? "sell" : "buy"}: ${
-					orderToCreate.quantity
-				} @ ${orderToCreate.price}`;
-			}
+				for (const orderToCancel of pmmOrderbookUpdate.ordersToCancel ?? []) {
+					logmsg += `\n**closing** ${orderToCancel.orderSide === OrderSide.Sell ? "sell" : "buy"}: ${
+						orderToCancel.quantity
+					} @ ${orderToCancel.price}`;
+				}
+				for (const orderToCreate of pmmOrderbookUpdate.ordersToCreate ?? []) {
+					logmsg += `\n**opening ** ${orderToCreate.orderSide === OrderSide.Sell ? "sell" : "buy"}: ${
+						orderToCreate.quantity
+					} @ ${orderToCreate.price}`;
+				}
 
-			logmsg += `\n${"---------"}**-------------**${"---------"}`;
-			await loop.logger?.sendMessage(logmsg);
+				logmsg += `\n${"---------"}**-------------**${"---------"}`;
+			}
+			logmsg += `\n`;
+			logmsg += `==`.repeat(15);
+			await this._sendMessage(logmsg);
 		},
 
 		/**

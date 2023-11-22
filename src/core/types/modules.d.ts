@@ -174,5 +174,6 @@ declare namespace NodeJS {
 		PRICE_FLOOR_PCT: string;
 		ORDER_LEVELS: string;
 		FILLED_ORDER_DELAY: string;
+		PMM_SETUPS: string;
 	}
 }

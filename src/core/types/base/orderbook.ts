@@ -1,3 +1,5 @@
+import { SpotLimitOrder, SpotTrade } from "@injectivelabs/sdk-ts";
+
 import { Asset, NativeAssetInfo } from "./asset";
 export interface Order {
 	price: number;
@@ -18,7 +20,30 @@ export interface Orderbook {
 	takerFeeRate: number;
 	ticker: string;
 }
-
+export interface PMMOrderbook extends Orderbook {
+	trading: {
+		activeOrders: { buys: Map<string, SpotLimitOrder>; sells: Map<string, SpotLimitOrder> };
+		tradeHistory: {
+			summary: { grossGainInQuote: number };
+			trades: Array<SpotTrade>;
+		};
+		config: {
+			orderRefreshTime: number;
+			bidSpread: number;
+			askSpread: number;
+			minSpread: number;
+			maxOrderAge: number;
+			orderRefreshTolerancePct: number;
+			orderAmount: number;
+			priceCeiling: number;
+			priceFloor: number;
+			priceCeilingPct: number;
+			priceFloorPct: number;
+			orderLevels: number;
+			filledOrderDelay: number;
+		};
+	};
+}
 /**
  * Market sell the offered asset, meaning it should be matched to the buy side of the orderbook.
  * @param orderbook Orderbook type to sell on.

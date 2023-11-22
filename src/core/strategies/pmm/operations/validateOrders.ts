@@ -2,8 +2,7 @@ import { SpotLimitOrder, spotPriceToChainPriceToFixed } from "@injectivelabs/sdk
 import { OrderSide } from "@injectivelabs/ts-types";
 import { BigNumber } from "bignumber.js";
 
-import { PMMConfig } from "../../../types/base/configs";
-import { getOrderbookMidPrice, getOrderbookSpread, Orderbook } from "../../../types/base/orderbook";
+import { getOrderbookMidPrice, getOrderbookSpread, PMMOrderbook } from "../../../types/base/orderbook";
 
 export type OrderOperation = {
 	price: string;
@@ -16,13 +15,13 @@ export type OrderOperation = {
  *
  */
 export function validateOrders(
-	orderbook: Orderbook,
-	botConfig: PMMConfig,
+	pmmOrderbook: PMMOrderbook,
 	buys: Map<string, SpotLimitOrder> | undefined,
 	sells: Map<string, SpotLimitOrder> | undefined,
 ) {
-	const midPrice = getOrderbookMidPrice(orderbook);
-	const spread = getOrderbookSpread(orderbook);
+	const midPrice = getOrderbookMidPrice(pmmOrderbook);
+	const spread = getOrderbookSpread(pmmOrderbook);
+	const tradingParameters = pmmOrderbook.trading.config;
 
 	const ordersToCancel: Array<SpotLimitOrder> = [];
 	const ordersToCreate: Array<OrderOperation> = [];
@@ -31,25 +30,25 @@ export function validateOrders(
 			if (
 				+buyOrder.price <
 				+spotPriceToChainPriceToFixed({
-					value: +midPrice * (1 - botConfig.bidSpread / 10000),
-					baseDecimals: orderbook.baseAssetDecimals,
-					quoteDecimals: orderbook.quoteAssetDecimals,
+					value: +midPrice * (1 - tradingParameters.bidSpread / 10000),
+					baseDecimals: pmmOrderbook.baseAssetDecimals,
+					quoteDecimals: pmmOrderbook.quoteAssetDecimals,
 				})
 			) {
 				ordersToCancel.push(buyOrder);
 				ordersToCreate.push({
-					price: BigNumber(+midPrice * (1 - botConfig.bidSpread / 10000)).toFixed(3),
-					quantity: botConfig.orderAmount,
-					marketid: orderbook.marketId,
+					price: BigNumber(+midPrice * (1 - tradingParameters.bidSpread / 10000)).toFixed(3),
+					quantity: tradingParameters.orderAmount,
+					marketid: pmmOrderbook.marketId,
 					orderSide: OrderSide.Buy,
 				});
 			}
 		}
 	} else {
 		ordersToCreate.push({
-			price: BigNumber(+midPrice * (1 - botConfig.bidSpread / 10000)).toFixed(3),
-			quantity: botConfig.orderAmount,
-			marketid: orderbook.marketId,
+			price: BigNumber(+midPrice * (1 - tradingParameters.bidSpread / 10000)).toFixed(3),
+			quantity: tradingParameters.orderAmount,
+			marketid: pmmOrderbook.marketId,
 			orderSide: OrderSide.Buy,
 		});
 	}
@@ -58,15 +57,15 @@ export function validateOrders(
 			if (
 				+sellOrder.price >
 				+spotPriceToChainPriceToFixed({
-					value: +midPrice * (1 + botConfig.bidSpread / 10000),
-					baseDecimals: orderbook.baseAssetDecimals,
-					quoteDecimals: orderbook.quoteAssetDecimals,
+					value: +midPrice * (1 + tradingParameters.bidSpread / 10000),
+					baseDecimals: pmmOrderbook.baseAssetDecimals,
+					quoteDecimals: pmmOrderbook.quoteAssetDecimals,
 				})
 			) {
 				ordersToCancel.push(sellOrder);
 				ordersToCreate.push({
-					price: BigNumber(+midPrice * (1 + botConfig.askSpread / 10000)).toFixed(3),
-					quantity: botConfig.orderAmount,
+					price: BigNumber(+midPrice * (1 + tradingParameters.askSpread / 10000)).toFixed(3),
+					quantity: tradingParameters.orderAmount,
 					marketid: sellOrder.marketId,
 					orderSide: sellOrder.orderSide,
 				});
@@ -74,9 +73,9 @@ export function validateOrders(
 		}
 	} else {
 		ordersToCreate.push({
-			price: BigNumber(+midPrice * (1 + botConfig.askSpread / 10000)).toFixed(3),
-			quantity: botConfig.orderAmount,
-			marketid: orderbook.marketId,
+			price: BigNumber(+midPrice * (1 + tradingParameters.askSpread / 10000)).toFixed(3),
+			quantity: tradingParameters.orderAmount,
+			marketid: pmmOrderbook.marketId,
 			orderSide: OrderSide.Sell,
 		});
 	}
