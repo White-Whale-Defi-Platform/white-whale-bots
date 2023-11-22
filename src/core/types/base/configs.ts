@@ -72,6 +72,7 @@ export interface PMMMarketConfig {
 export interface PMMConfig extends BaseConfig {
 	marketConfigs: Array<PMMMarketConfig>;
 	orderbooks: Array<string>;
+	orderRefreshTime: number;
 	// orderbooks: Array<string>;
 	// bidSpread: number;
 	// askSpread: number;
@@ -279,6 +280,7 @@ function getPMMConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): PMMConfi
 		...baseConfig,
 		marketConfigs: marketConfigs,
 		orderbooks: orderbooks,
+		orderRefreshTime: +envs.ORDER_REFRESH_TIME ?? 900,
 		// bidSpread: +envs.BID_SPREAD,
 		// askSpread: +envs.ASK_SPREAD,
 		// minSpread: +envs.BID_SPREAD,

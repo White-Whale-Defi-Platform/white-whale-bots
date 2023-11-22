@@ -144,6 +144,7 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				const midPrice = getOrderbookMidPrice(pmmOrderbook);
 				logmsg += `\n**MARKET:** \t${pmmOrderbook.ticker} (${midPrice})`;
 				logmsg += `\n**GROSS GAIN:** \t${pmmOrderbook.trading.tradeHistory.summary.grossGainInQuote}`;
+				logmsg += `\n**SPREADS (BID/ASK):** \t${pmmOrderbook.trading.config.bidSpread}/${pmmOrderbook.trading.config.askSpread}`;
 				logmsg += `\n${"---------"}**Active Orders**${"---------"}`;
 				pmmOrderbook.trading.activeOrders.buys.forEach((buyOrder) => {
 					logmsg += `\nbuy : ${buyOrder.quantity} @ ${buyOrder.price} (~ ${

@@ -29,21 +29,21 @@ export async function fetchPMMParameters(
 	const ohlc0: AllChronosMarketHistory = ohlc[0];
 
 	const candleWidths = ohlc0.h.map((high, i) => {
-		return Math.abs(high - ohlc0.l[i]) * ohlc0.v[i];
+		return Math.abs(high - ohlc0.l[i]);
 	});
 	const averageWeightedWidth = candleWidths.reduce((a, b) => a + b) / ohlc0.v.reduce((a, b) => a + b, 0);
 
-	// const sortedCandleWidths = candleWidths.sort((a, b) => a - b);
-	// const mid = Math.floor(sortedCandleWidths.length / 2);
-	// const medianCandleWidth =
-	// 	sortedCandleWidths.length % 2 !== 0
-	// 		? sortedCandleWidths[mid]
-	// 		: (sortedCandleWidths[mid - 1] + sortedCandleWidths[mid]) / 2;
+	const sortedCandleWidths = candleWidths.sort((a, b) => a - b);
+	const mid = Math.floor(sortedCandleWidths.length / 2);
+	const medianCandleWidth =
+		sortedCandleWidths.length % 2 !== 0
+			? sortedCandleWidths[mid]
+			: (sortedCandleWidths[mid - 1] + sortedCandleWidths[mid]) / 2;
 
 	// const medianCandleWeight =
 	// 	sortedCandleWidths.length % 2 !== 0 ? ohlc0.v[mid] : (ohlc0.v[mid - 1] + ohlc0.v[mid]) / 2;
 	// const spread = (medianCandleWidth / medianCandleWeight / getOrderbookMidPrice(orderbook)) * 10000; //in bps
 	// console.log(spread,
-	const spread = (averageWeightedWidth / getOrderbookMidPrice(orderbook)) * 10000;
+	const spread = (medianCandleWidth / getOrderbookMidPrice(orderbook)) * 10000;
 	return [spread, spread]; //return bidspread , askspread
 }

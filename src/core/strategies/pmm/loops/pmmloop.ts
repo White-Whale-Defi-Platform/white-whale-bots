@@ -11,6 +11,7 @@ import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { PMMConfig } from "../../../types/base/configs";
 import { Orderbook, PMMOrderbook } from "../../../types/base/orderbook";
+import { fetchPMMParameters } from "../operations/marketAnalysis";
 import Scheduler from "../operations/scheduling";
 import { calculateTradeHistoryProfit } from "../operations/tradeHistoryProfit";
 import { OrderOperation, validateOrders } from "../operations/validateOrders";
@@ -49,6 +50,7 @@ export class PMMLoop {
 			this.scheduler.addListener("logTrigger", this.logger.loopLogging.logPMMLoop);
 		}
 		this.scheduler.addListener("updateOrders", this.executeOrderOperations);
+		this.scheduler.addListener("updateParameters", this.updateParameters);
 	}
 
 	/**
@@ -111,11 +113,12 @@ export class PMMLoop {
 			);
 			if (nrOfOperations > 2) {
 				const decimalCompensator = this.botConfig.gasDenom === "inj" ? 1e12 : 1;
+				const gas = 200000 + 30000 * nrOfOperations;
 				const gasFee = {
 					denom: this.botConfig.gasDenom,
-					amount: (250000 * this.botConfig.gasPrice * decimalCompensator).toFixed(),
+					amount: (gas * this.botConfig.gasPrice * decimalCompensator).toFixed(),
 				};
-				const fee: StdFee = { amount: [gasFee], gas: String(250000) };
+				const fee: StdFee = { amount: [gasFee], gas: String(gas) };
 				const txRes = await this.chainOperator.signAndBroadcast([msgBatchUpdateOrders], fee);
 				console.log(txRes);
 			} else {
@@ -199,7 +202,20 @@ export class PMMLoop {
 		);
 		await this.logger?.loopLogging.logPMMLoop(this, new Date());
 	};
-
+	/**
+	 *
+	 */
+	updateParameters = async () => {
+		console.log(this.scheduler);
+		for (const pmmOrderbook of this.PMMOrderbooks) {
+			const [bidspread, askspread] = await fetchPMMParameters(pmmOrderbook, "30", "24");
+			console.log(
+				`updating parameters for ${pmmOrderbook.ticker}: bid ${pmmOrderbook.trading.config.bidSpread} --> ${bidspread}, ask ${pmmOrderbook.trading.config.askSpread} --> ${askspread}`,
+			);
+			pmmOrderbook.trading.config.bidSpread = bidspread;
+			pmmOrderbook.trading.config.askSpread = askspread;
+		}
+	};
 	/**
 	 *
 	 */
@@ -215,7 +231,7 @@ export class PMMLoop {
 	public async init() {
 		await this.setMyOrders();
 		await this.executeOrderOperations();
-		this.scheduler.startOrderUpdates(300 * 1000);
+		this.scheduler.startOrderUpdates(this.botConfig.orderRefreshTime * 1000);
 		this.scheduler.startLogTimer(this.botConfig.signOfLife * 60 * 1000, this);
 		await delay(1000);
 	}
@@ -234,6 +250,7 @@ export class PMMLoop {
 
 		const loop = new PMMLoop(chainOperator, botConfig, logger, PMMOrderbooks, getOrderbookState);
 		await loop.init();
+		loop.scheduler.emit("updateParameters");
 		return loop;
 	}
 }
