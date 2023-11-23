@@ -26,7 +26,25 @@ export default class Scheduler extends EventEmitter {
 	 */
 	public startOrderUpdates(interval: number): void {
 		setInterval(() => {
-			this.emit("updateOrders", { time: new Date() });
+			this.emit("updateOrders");
+		}, interval);
+	}
+
+	/**
+	 *
+	 */
+	public setOrderCooldown(interval: number, marketId: string): void {
+		setTimeout(() => {
+			this.emit("endOfCooldown", marketId);
+		}, interval);
+	}
+
+	/**
+	 *
+	 */
+	public startParameterUpdates(interval: number): void {
+		setInterval(() => {
+			this.emit("updateParameters");
 		}, interval);
 	}
 }

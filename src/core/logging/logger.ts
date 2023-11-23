@@ -1,4 +1,4 @@
-import { SpotLimitOrder, spotPriceFromChainPrice } from "@injectivelabs/sdk-ts";
+import { SpotLimitOrder, spotPriceFromChainPrice, spotQuantityFromChainQuantity } from "@injectivelabs/sdk-ts";
 import { OrderSide, TradeDirection } from "@injectivelabs/ts-types";
 import { BigNumber } from "bignumber.js";
 
@@ -144,10 +144,23 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				const midPrice = getOrderbookMidPrice(pmmOrderbook);
 				logmsg += `\n**MARKET:** \t${pmmOrderbook.ticker} (${midPrice})`;
 				logmsg += `\n**GROSS GAIN:** \t${pmmOrderbook.trading.tradeHistory.summary.grossGainInQuote}`;
-				logmsg += `\n**SPREADS (BID/ASK):** \t${pmmOrderbook.trading.config.bidSpread}/${pmmOrderbook.trading.config.askSpread}`;
+				logmsg += `\n**SPREADS (B/A):** \t${Math.round(pmmOrderbook.trading.config.bidSpread * 100) / 100}/${
+					Math.round(pmmOrderbook.trading.config.askSpread * 100) / 100
+				}`;
 				logmsg += `\n${"---------"}**Active Orders**${"---------"}`;
 				pmmOrderbook.trading.activeOrders.buys.forEach((buyOrder) => {
-					logmsg += `\nbuy : ${buyOrder.quantity} @ ${buyOrder.price} (~ ${
+					logmsg += `\nbuy : ${spotQuantityFromChainQuantity({
+						value: buyOrder.quantity,
+						baseDecimals: pmmOrderbook.baseAssetDecimals,
+					})} @ ${
+						Math.round(
+							spotPriceFromChainPrice({
+								value: buyOrder.price,
+								baseDecimals: pmmOrderbook.baseAssetDecimals,
+								quoteDecimals: 6,
+							}).toNumber() * 10000,
+						) / 10000
+					} (~ ${
 						Math.round(
 							((spotPriceFromChainPrice({
 								value: buyOrder.price,
@@ -161,7 +174,18 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 					}%)`;
 				});
 				pmmOrderbook.trading.activeOrders.sells.forEach((sellOrder) => {
-					logmsg += `\nsell: ${sellOrder.quantity} @ ${sellOrder.price} (~ +${
+					logmsg += `\nsell: ${spotQuantityFromChainQuantity({
+						value: sellOrder.quantity,
+						baseDecimals: pmmOrderbook.baseAssetDecimals,
+					})} @ ${
+						Math.round(
+							spotPriceFromChainPrice({
+								value: sellOrder.price,
+								baseDecimals: pmmOrderbook.baseAssetDecimals,
+								quoteDecimals: 6,
+							}).toNumber() * 10000,
+						) / 10000
+					} (~ +${
 						Math.round(
 							((spotPriceFromChainPrice({
 								value: sellOrder.price,
@@ -284,14 +308,33 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				)})`;
 
 				for (const orderToCancel of pmmOrderbookUpdate.ordersToCancel ?? []) {
-					logmsg += `\n**closing** ${orderToCancel.orderSide === OrderSide.Sell ? "sell" : "buy"}: ${
-						orderToCancel.quantity
-					} @ ${orderToCancel.price}`;
+					logmsg += `\n**closing** ${
+						orderToCancel.orderSide === OrderSide.Sell ? "sell" : "buy"
+					}: ${spotQuantityFromChainQuantity({
+						value: orderToCancel.quantity,
+						baseDecimals: pmmOrderbookUpdate.orderbook.baseAssetDecimals,
+					}).toFixed()} @ ${
+						Math.round(
+							spotPriceFromChainPrice({
+								value: orderToCancel.price,
+								baseDecimals: pmmOrderbookUpdate.orderbook.baseAssetDecimals,
+								quoteDecimals: 6,
+							}).toNumber() * 10000,
+						) / 10000
+					}`;
 				}
 				for (const orderToCreate of pmmOrderbookUpdate.ordersToCreate ?? []) {
 					logmsg += `\n**opening ** ${orderToCreate.orderSide === OrderSide.Sell ? "sell" : "buy"}: ${
-						orderToCreate.quantity
-					} @ ${orderToCreate.price}`;
+						orderToCreate.quantity / 1e6
+					} @ ${
+						Math.round(
+							spotPriceFromChainPrice({
+								value: orderToCreate.price,
+								baseDecimals: 6,
+								quoteDecimals: 6,
+							}).toNumber() * 10000,
+						) / 10000
+					}`;
 				}
 
 				logmsg += `\n${"---------"}**-------------**${"---------"}`;

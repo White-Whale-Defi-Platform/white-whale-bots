@@ -51,6 +51,7 @@ export class PMMLoop {
 		}
 		this.scheduler.addListener("updateOrders", this.executeOrderOperations);
 		this.scheduler.addListener("updateParameters", this.updateParameters);
+		this.scheduler.addListener("endOfCooldown", this.endOfCooldown);
 	}
 
 	/**
@@ -77,31 +78,39 @@ export class PMMLoop {
 	/**
 	 *
 	 */
-	executeOrderOperations = async (time?: Date) => {
+	executeOrderOperations = async (marketId?: string) => {
+		console.log(marketId);
 		const allOrderbookUpdates: Array<{
 			orderbook: Orderbook;
 			ordersToCancel: Array<SpotLimitOrder>;
 			ordersToCreate: Array<OrderOperation>;
 		}> = [];
+
 		this.PMMOrderbooks.forEach((pmmOrderbook) => {
-			const { ordersToCancel, ordersToCreate } = validateOrders(
-				pmmOrderbook,
-				pmmOrderbook.trading.activeOrders.buys.size === 0 ? undefined : pmmOrderbook.trading.activeOrders.buys,
-				pmmOrderbook.trading.activeOrders.sells.size === 0
-					? undefined
-					: pmmOrderbook.trading.activeOrders.sells,
-			);
-			if (ordersToCancel || ordersToCreate) {
-				allOrderbookUpdates.push({
-					orderbook: pmmOrderbook,
-					ordersToCancel: ordersToCancel ?? [],
-					ordersToCreate: ordersToCreate ?? [],
-				});
-			}
-			if (ordersToCancel) {
-				for (const orderToCancel of ordersToCancel) {
-					pmmOrderbook.trading.activeOrders.buys.delete(orderToCancel.orderHash);
-					pmmOrderbook.trading.activeOrders.sells.delete(orderToCancel.orderHash);
+			if (marketId && !(pmmOrderbook.marketId === marketId)) {
+				console.log("skipping ob", pmmOrderbook.ticker);
+			} else {
+				const { ordersToCancel, ordersToCreate } = validateOrders(
+					pmmOrderbook,
+					pmmOrderbook.trading.activeOrders.buys.size === 0
+						? undefined
+						: pmmOrderbook.trading.activeOrders.buys,
+					pmmOrderbook.trading.activeOrders.sells.size === 0
+						? undefined
+						: pmmOrderbook.trading.activeOrders.sells,
+				);
+				if (ordersToCancel || ordersToCreate) {
+					allOrderbookUpdates.push({
+						orderbook: pmmOrderbook,
+						ordersToCancel: ordersToCancel ?? [],
+						ordersToCreate: ordersToCreate ?? [],
+					});
+				}
+				if (ordersToCancel) {
+					for (const orderToCancel of ordersToCancel) {
+						pmmOrderbook.trading.activeOrders.buys.delete(orderToCancel.orderHash);
+						pmmOrderbook.trading.activeOrders.sells.delete(orderToCancel.orderHash);
+					}
 				}
 			}
 		});
@@ -120,10 +129,10 @@ export class PMMLoop {
 				};
 				const fee: StdFee = { amount: [gasFee], gas: String(gas) };
 				const txRes = await this.chainOperator.signAndBroadcast([msgBatchUpdateOrders], fee);
-				console.log(txRes);
+				console.log(txRes.transactionHash);
 			} else {
 				const txRes = await this.chainOperator.signAndBroadcast([msgBatchUpdateOrders]);
-				console.log(txRes);
+				console.log(txRes.transactionHash);
 			}
 			await this.logger?.tradeLogging.logOrderbookPositionUpdate(allOrderbookUpdates);
 		}
@@ -178,19 +187,32 @@ export class PMMLoop {
 	 *
 	 */
 	setMyTrades = async () => {
+		let triggerCooldown = false;
+		let orderbookToCooldown: PMMOrderbook = this.PMMOrderbooks[0];
 		await Promise.all(
 			this.PMMOrderbooks.map(async (pmmOrderbook) => {
-				const tradeHistory = await this.chainOperator.client.queryOrderbookTrades(
+				const tradeHistoryLocal = pmmOrderbook.trading.tradeHistory.trades.map((st) => st.orderHash);
+				const tradeHistoryChain = await this.chainOperator.client.queryOrderbookTrades(
 					pmmOrderbook.marketId,
 					this.chainOperator.client.subaccountId,
 					this.startTimestamp,
 				);
-				if (tradeHistory) {
-					pmmOrderbook.trading.tradeHistory.trades = tradeHistory.trades;
+				if (tradeHistoryChain) {
+					tradeHistoryChain.trades
+						.map((thc) => thc.orderHash)
+						.forEach((oh) => {
+							if (tradeHistoryLocal.find((thl) => thl === oh) === undefined) {
+								triggerCooldown = true;
+								orderbookToCooldown = pmmOrderbook;
+							}
+						});
+
 					pmmOrderbook.trading.tradeHistory.summary.grossGainInQuote = calculateTradeHistoryProfit(
 						pmmOrderbook,
-						tradeHistory.trades,
+						tradeHistoryChain.trades,
 					);
+
+					pmmOrderbook.trading.tradeHistory.trades = tradeHistoryChain.trades;
 				}
 
 				// const portfolio = await this.chainOperator.queryAccountPortfolio();
@@ -200,13 +222,19 @@ export class PMMLoop {
 				// }
 			}),
 		);
-		await this.logger?.loopLogging.logPMMLoop(this, new Date());
+		if (triggerCooldown) {
+			console.log(
+				"obtained new trade hash on chain-->trade happened-->jgoing into cooldown for 3 minutes for: ",
+				orderbookToCooldown.ticker,
+			);
+			this.scheduler.setOrderCooldown(1000 * 3 * 60, orderbookToCooldown.marketId);
+			await this.logger?.loopLogging.logPMMLoop(this, new Date());
+		}
 	};
 	/**
 	 *
 	 */
 	updateParameters = async () => {
-		console.log(this.scheduler);
 		for (const pmmOrderbook of this.PMMOrderbooks) {
 			const [bidspread, askspread] = await fetchPMMParameters(pmmOrderbook, "30", "24");
 			console.log(
@@ -215,6 +243,14 @@ export class PMMLoop {
 			pmmOrderbook.trading.config.bidSpread = bidspread;
 			pmmOrderbook.trading.config.askSpread = askspread;
 		}
+	};
+
+	/**
+	 *
+	 */
+	endOfCooldown = async (marketId: string) => {
+		console.log("end of cooldown triggered");
+		this.scheduler.emit("updateOrders", marketId);
 	};
 	/**
 	 *
@@ -233,6 +269,7 @@ export class PMMLoop {
 		await this.executeOrderOperations();
 		this.scheduler.startOrderUpdates(this.botConfig.orderRefreshTime * 1000);
 		this.scheduler.startLogTimer(this.botConfig.signOfLife * 60 * 1000, this);
+		this.scheduler.startParameterUpdates(60 * 60 * 1000);
 		await delay(1000);
 	}
 
@@ -250,7 +287,6 @@ export class PMMLoop {
 
 		const loop = new PMMLoop(chainOperator, botConfig, logger, PMMOrderbooks, getOrderbookState);
 		await loop.init();
-		loop.scheduler.emit("updateParameters");
 		return loop;
 	}
 }
