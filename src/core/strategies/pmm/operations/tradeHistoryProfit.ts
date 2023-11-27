@@ -16,8 +16,8 @@ export function calculateTradeHistoryProfit(orderbook: Orderbook, tradeHistory: 
 	const sells = tradeHistory.filter((st) => st.tradeDirection === TradeDirection.Sell);
 	const leastTrades = Math.min(buys.length, sells.length);
 
-	const buysToUse = buys.slice(0, leastTrades - 1);
-	const sellsToUse = sells.slice(0, leastTrades - 1);
+	const buysToUse = buys.slice(0, Math.max(leastTrades, 0));
+	const sellsToUse = sells.slice(0, Math.max(leastTrades, 0));
 	for (const trade of [...buysToUse, ...sellsToUse]) {
 		if (trade.tradeDirection === TradeDirection.Buy) {
 			profit -= +trade.quantity * +trade.price;

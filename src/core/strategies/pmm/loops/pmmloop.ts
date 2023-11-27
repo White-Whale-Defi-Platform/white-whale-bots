@@ -11,7 +11,7 @@ import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { PMMConfig } from "../../../types/base/configs";
 import { Orderbook, PMMOrderbook } from "../../../types/base/orderbook";
-import { fetchPMMParameters } from "../operations/marketAnalysis";
+import { setPMMParameters } from "../operations/marketAnalysis";
 import Scheduler from "../operations/scheduling";
 import { calculateTradeHistoryProfit } from "../operations/tradeHistoryProfit";
 import { OrderOperation, validateOrders } from "../operations/validateOrders";
@@ -50,7 +50,6 @@ export class PMMLoop {
 			this.scheduler.addListener("logTrigger", this.logger.loopLogging.logPMMLoop);
 		}
 		this.scheduler.addListener("updateOrders", this.executeOrderOperations);
-		this.scheduler.addListener("updateParameters", this.updateParameters);
 		this.scheduler.addListener("endOfCooldown", this.endOfCooldown);
 	}
 
@@ -79,13 +78,12 @@ export class PMMLoop {
 	 *
 	 */
 	executeOrderOperations = async (marketId?: string) => {
-		console.log(marketId);
 		const allOrderbookUpdates: Array<{
 			orderbook: Orderbook;
 			ordersToCancel: Array<SpotLimitOrder>;
 			ordersToCreate: Array<OrderOperation>;
 		}> = [];
-
+		await this.updatePMMParameters();
 		this.PMMOrderbooks.forEach((pmmOrderbook) => {
 			if (marketId && !(pmmOrderbook.marketId === marketId)) {
 				console.log("skipping ob", pmmOrderbook.ticker);
@@ -114,7 +112,6 @@ export class PMMLoop {
 				}
 			}
 		});
-
 		if (allOrderbookUpdates.length > 0) {
 			const [msgBatchUpdateOrders, nrOfOperations] = getBatchUpdateOrdersMessage(
 				this.chainOperator,
@@ -231,20 +228,15 @@ export class PMMLoop {
 			await this.logger?.loopLogging.logPMMLoop(this, new Date());
 		}
 	};
+
 	/**
 	 *
 	 */
-	updateParameters = async () => {
+	updatePMMParameters = async () => {
 		for (const pmmOrderbook of this.PMMOrderbooks) {
-			const [bidspread, askspread] = await fetchPMMParameters(pmmOrderbook, "30", "24");
-			console.log(
-				`updating parameters for ${pmmOrderbook.ticker}: bid ${pmmOrderbook.trading.config.bidSpread} --> ${bidspread}, ask ${pmmOrderbook.trading.config.askSpread} --> ${askspread}`,
-			);
-			pmmOrderbook.trading.config.bidSpread = bidspread;
-			pmmOrderbook.trading.config.askSpread = askspread;
+			await setPMMParameters(pmmOrderbook, String(pmmOrderbook.trading.config.orderRefreshTime / 60), "336");
 		}
 	};
-
 	/**
 	 *
 	 */
@@ -269,7 +261,6 @@ export class PMMLoop {
 		await this.executeOrderOperations();
 		this.scheduler.startOrderUpdates(this.botConfig.orderRefreshTime * 1000);
 		this.scheduler.startLogTimer(this.botConfig.signOfLife * 60 * 1000, this);
-		this.scheduler.startParameterUpdates(60 * 60 * 1000);
 		await delay(1000);
 	}
 

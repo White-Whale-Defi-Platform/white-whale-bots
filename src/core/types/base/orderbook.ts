@@ -32,6 +32,7 @@ export interface PMMOrderbook extends Orderbook {
 			bidSpread: number;
 			askSpread: number;
 			minSpread: number;
+			priceMultiplier: number;
 			maxOrderAge: number;
 			orderRefreshTolerancePct: number;
 			orderAmount: number;

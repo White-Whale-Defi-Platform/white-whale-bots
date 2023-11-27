@@ -1,7 +1,7 @@
 import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
 import { AllChronosMarketHistory, IndexerRestMarketChronosApi } from "@injectivelabs/sdk-ts";
 
-import { getOrderbookMidPrice, Orderbook } from "../../../types/base/orderbook";
+import { getOrderbookMidPrice, Orderbook, PMMOrderbook } from "../../../types/base/orderbook";
 /**
  *
  */
@@ -20,42 +20,39 @@ async function marketHistory(orderbook: Orderbook, resolution: string, countback
 /**
  *
  */
-export async function fetchPMMParameters(
-	orderbook: Orderbook,
-	resolution: string,
-	countback = "14",
-): Promise<[number, number]> {
+export async function setPMMParameters(orderbook: PMMOrderbook, resolution: string, countback = "14") {
 	const ohlc = await marketHistory(orderbook, resolution, countback);
 	const ohlc0: AllChronosMarketHistory = ohlc[0];
-
+	const midprice = getOrderbookMidPrice(orderbook);
 	const atr = ATR(ohlc0, 14);
 
-	const natr = (atr / ohlc0.c[ohlc0.c.length - 1]) * 10000; //in bps
-	console.log(atr, natr);
-	const candleWidths = ohlc0.h.map((high, i) => {
-		return Math.abs(high - ohlc0.l[i]);
+	const natr = atr / ohlc0.c[ohlc0.c.length - 1]; //in bps
+
+	const candleNormalisedWidths = ohlc0.h.map((high, i) => {
+		return Math.abs((high - ohlc0.l[i]) / ohlc0.c[i]);
 	});
-	const averageWeightedWidth = candleWidths.reduce((a, b) => a + b) / ohlc0.v.reduce((a, b) => a + b, 0);
+	const averageWeightedWidth = candleNormalisedWidths.reduce((a, b) => a + b) / candleNormalisedWidths.length;
+	const rsi = RSI(ohlc0, 14);
 
-	const sortedCandleWidths = candleWidths.sort((a, b) => a - b);
-	const mid = Math.floor(sortedCandleWidths.length / 2);
-	const medianCandleWidth =
-		sortedCandleWidths.length % 2 !== 0
-			? sortedCandleWidths[mid]
-			: (sortedCandleWidths[mid - 1] + sortedCandleWidths[mid]) / 2;
-
-	// const medianCandleWeight =
-	// 	sortedCandleWidths.length % 2 !== 0 ? ohlc0.v[mid] : (ohlc0.v[mid - 1] + ohlc0.v[mid]) / 2;
-	// const spread = (medianCandleWidth / medianCandleWeight / getOrderbookMidPrice(orderbook)) * 10000; //in bps
-	// console.log(spread,
-	const spread = (medianCandleWidth / getOrderbookMidPrice(orderbook)) * 10000;
-	return [natr, natr]; //return bidspread , askspread
+	const spreadMultiplier = natr / averageWeightedWidth;
+	const priceMultiplier = ((50 - rsi) / 50) * natr;
+	console.log(
+		`updating parameters for ${orderbook.ticker}: bid ${orderbook.trading.config.bidSpread} --> ${
+			(natr * 10000) / 2
+		}, ask ${orderbook.trading.config.askSpread} --> ${(natr * 10000) / 2}`,
+		`\nprice multiplier with RSI ${rsi}: ${priceMultiplier}, shifts price from ${midprice} to ${
+			(1 + priceMultiplier) * midprice
+		}`,
+	);
+	orderbook.trading.config.askSpread = (natr * 10000) / 2;
+	orderbook.trading.config.bidSpread = (natr * 10000) / 2;
+	orderbook.trading.config.priceMultiplier = 1 + priceMultiplier;
 }
 
 /**
  *
  */
-export function ATR(candles: AllChronosMarketHistory, periods: number): number {
+function ATR(candles: AllChronosMarketHistory, periods: number): number {
 	const trs = [];
 	for (let [i, _] of candles.h.entries()) {
 		i += candles.h.length - periods - 1;
@@ -72,4 +69,24 @@ export function ATR(candles: AllChronosMarketHistory, periods: number): number {
 		}
 	}
 	return trs.reduce((a, b) => a + b) / trs.length;
+}
+
+/**
+ *
+ */
+function RSI(candles: AllChronosMarketHistory, periods: number) {
+	// Calculate the average of the upward price changes
+	let avgUpwardChange = 0;
+	let avgDownwardChange = 0;
+	for (let i = candles.c.length - periods - 1; i < candles.c.length - 1; i++) {
+		avgUpwardChange += Math.max(0, candles.c[i] - candles.c[i - 1]);
+		avgDownwardChange += Math.max(0, candles.c[i - 1] - candles.c[i]);
+	}
+	avgUpwardChange /= candles.c.length;
+	avgDownwardChange /= candles.c.length;
+
+	// Calculate the RSI
+	const rsi = 100 - 100 / (1 + avgUpwardChange / avgDownwardChange);
+
+	return rsi;
 }
