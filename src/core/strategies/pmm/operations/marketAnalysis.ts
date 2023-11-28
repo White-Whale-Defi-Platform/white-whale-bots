@@ -26,13 +26,13 @@ export async function setPMMParameters(orderbook: PMMOrderbook, resolution: stri
 	const midprice = getOrderbookMidPrice(orderbook);
 	const atr = ATR(ohlc0, 14);
 
-	const natr = atr / ohlc0.c[ohlc0.c.length - 1]; //in bps
+	const natr = Number.isNaN(atr / ohlc0.c[ohlc0.c.length - 1]) ? 0.008 : atr / ohlc0.c[ohlc0.c.length - 1]; //in bps
 
 	const candleNormalisedWidths = ohlc0.h.map((high, i) => {
 		return Math.abs((high - ohlc0.l[i]) / ohlc0.c[i]);
 	});
 	const averageWeightedWidth = candleNormalisedWidths.reduce((a, b) => a + b) / candleNormalisedWidths.length;
-	const rsi = RSI(ohlc0, 14);
+	const rsi = Number.isNaN(RSI(ohlc0, 14)) ? 50 : RSI(ohlc0, 14);
 
 	const spreadMultiplier = natr / averageWeightedWidth;
 	const priceMultiplier = ((50 - rsi) / 50) * natr;

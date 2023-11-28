@@ -185,7 +185,7 @@ export class PMMLoop {
 	 */
 	setMyTrades = async () => {
 		let triggerCooldown = false;
-		let orderbookToCooldown: PMMOrderbook = this.PMMOrderbooks[0];
+		const orderbooksToCooldown: Array<PMMOrderbook> = [];
 		await Promise.all(
 			this.PMMOrderbooks.map(async (pmmOrderbook) => {
 				const tradeHistoryLocal = pmmOrderbook.trading.tradeHistory.trades.map((st) => st.orderHash);
@@ -200,7 +200,7 @@ export class PMMLoop {
 						.forEach((oh) => {
 							if (tradeHistoryLocal.find((thl) => thl === oh) === undefined) {
 								triggerCooldown = true;
-								orderbookToCooldown = pmmOrderbook;
+								orderbooksToCooldown.push(pmmOrderbook);
 							}
 						});
 
@@ -221,10 +221,13 @@ export class PMMLoop {
 		);
 		if (triggerCooldown) {
 			console.log(
-				"obtained new trade hash on chain-->trade happened-->jgoing into cooldown for 3 minutes for: ",
-				orderbookToCooldown.ticker,
+				"obtained new trade hash on chain-->trade happened-->going into cooldown for 3 minutes for: ",
+				orderbooksToCooldown.map((ob) => ob.ticker),
 			);
-			this.scheduler.setOrderCooldown(1000 * 3 * 60, orderbookToCooldown.marketId);
+
+			orderbooksToCooldown.forEach((ob) => {
+				this.scheduler.setOrderCooldown(1000 * 3 * 60, ob.marketId);
+			});
 			await this.logger?.loopLogging.logPMMLoop(this, new Date());
 		}
 	};

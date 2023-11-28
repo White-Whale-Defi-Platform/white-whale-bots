@@ -35,7 +35,9 @@ export interface PMMOrderbook extends Orderbook {
 			priceMultiplier: number;
 			maxOrderAge: number;
 			orderRefreshTolerancePct: number;
-			orderAmount: number;
+			buyOrderAmount: number;
+			sellOrderAmount: number;
+			defaultOrderAmount: number;
 			priceCeiling: number;
 			priceFloor: number;
 			priceCeilingPct: number;
@@ -102,4 +104,23 @@ export function getOrderbookMidPrice(orderbook: Orderbook) {
  */
 export function getOrderbookSpread(orderbook: Orderbook) {
 	return orderbook.sells[0].price - orderbook.buys[0].price;
+}
+
+/**
+ *
+ */
+export function getOrderbookMaxPosition(orderbook: Orderbook, buy: boolean, priceThreshold: number) {
+	if (buy) {
+		const filteredBuys = orderbook.buys.filter((buy) => buy.price >= priceThreshold);
+		const priceWall = filteredBuys
+			.map((value, i) => [value.quantity * value.price, value.price])
+			.reduce((r, a) => (a[0] > r[0] ? a : r))[1];
+		return priceWall;
+	} else {
+		const filteredSells = orderbook.sells.filter((sell) => sell.price <= priceThreshold);
+		const priceWall = filteredSells
+			.map((value, i) => [value.quantity * value.price, value.price])
+			.reduce((r, a) => (a[0] > r[0] ? a : r))[1];
+		return priceWall;
+	}
 }

@@ -2,7 +2,7 @@ import { SpotLimitOrder, spotPriceToChainPriceToFixed } from "@injectivelabs/sdk
 import { OrderSide } from "@injectivelabs/ts-types";
 import { BigNumber } from "bignumber.js";
 
-import { getOrderbookMidPrice, PMMOrderbook } from "../../../types/base/orderbook";
+import { getOrderbookMaxPosition, getOrderbookMidPrice, PMMOrderbook } from "../../../types/base/orderbook";
 
 export type OrderOperation = {
 	price: string;
@@ -24,6 +24,14 @@ export function validateOrders(
 
 	const ordersToCancel: Array<SpotLimitOrder> = [];
 	const ordersToCreate: Array<OrderOperation> = [];
+	const midprice = getOrderbookMidPrice(pmmOrderbook);
+
+	const biggestSellPrice = BigNumber(
+		getOrderbookMaxPosition(pmmOrderbook, false, midprice * 1.05) - pmmOrderbook.minPriceIncrement,
+	).toFixed(5);
+	const biggestBuyPrice = BigNumber(
+		getOrderbookMaxPosition(pmmOrderbook, true, midprice * 0.95) + pmmOrderbook.minPriceIncrement,
+	).toFixed(5);
 	if (buys) {
 		for (const buyOrder of buys.values()) {
 			if (
@@ -36,8 +44,8 @@ export function validateOrders(
 			) {
 				ordersToCancel.push(buyOrder);
 				ordersToCreate.push({
-					price: BigNumber(shiftedMidPrice * (1 - tradingParameters.bidSpread / 10000)).toFixed(3),
-					quantity: tradingParameters.orderAmount,
+					price: String(biggestBuyPrice),
+					quantity: tradingParameters.buyOrderAmount,
 					marketid: pmmOrderbook.marketId,
 					orderSide: OrderSide.Buy,
 				});
@@ -45,8 +53,8 @@ export function validateOrders(
 		}
 	} else {
 		ordersToCreate.push({
-			price: BigNumber(shiftedMidPrice * (1 - tradingParameters.bidSpread / 10000)).toFixed(3),
-			quantity: tradingParameters.orderAmount,
+			price: String(biggestBuyPrice),
+			quantity: tradingParameters.buyOrderAmount,
 			marketid: pmmOrderbook.marketId,
 			orderSide: OrderSide.Buy,
 		});
@@ -63,8 +71,8 @@ export function validateOrders(
 			) {
 				ordersToCancel.push(sellOrder);
 				ordersToCreate.push({
-					price: BigNumber(shiftedMidPrice * (1 + tradingParameters.askSpread / 10000)).toFixed(3),
-					quantity: tradingParameters.orderAmount,
+					price: String(biggestSellPrice),
+					quantity: tradingParameters.sellOrderAmount,
 					marketid: sellOrder.marketId,
 					orderSide: sellOrder.orderSide,
 				});
@@ -72,8 +80,8 @@ export function validateOrders(
 		}
 	} else {
 		ordersToCreate.push({
-			price: BigNumber(shiftedMidPrice * (1 + tradingParameters.askSpread / 10000)).toFixed(3),
-			quantity: tradingParameters.orderAmount,
+			price: String(biggestSellPrice),
+			quantity: tradingParameters.sellOrderAmount,
 			marketid: pmmOrderbook.marketId,
 			orderSide: OrderSide.Sell,
 		});
