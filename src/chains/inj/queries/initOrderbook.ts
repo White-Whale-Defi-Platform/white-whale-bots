@@ -1,7 +1,7 @@
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
 import { AssetInfo } from "../../../core/types/base/asset";
 import { DexConfig, PMMConfig } from "../../../core/types/base/configs";
-import { Orderbook, PMMOrderbook } from "../../../core/types/base/orderbook";
+import { getOrderbookMidPrice, Orderbook, PMMOrderbook } from "../../../core/types/base/orderbook";
 import { identity } from "../../../core/types/identity";
 import { getOrderbookState } from "./getOrderbookState";
 /**
@@ -30,7 +30,7 @@ export async function initOrderbooks(
 			baseAssetDecimals: marketInfo.baseToken?.decimals ?? 6,
 			quoteAssetDecimals: marketInfo.quoteToken?.decimals ?? 6,
 			minQuantityIncrement: quantityIncrement,
-			minPriceIncrement: priceIncrement,
+			minPriceIncrement: priceIncrement * 10 ** decimalAdjustment,
 			buys: [],
 			sells: [],
 			marketId: orderbookAddress,
@@ -72,6 +72,8 @@ export async function initPMMOrderbooks(
 						},
 						trades: [],
 					},
+					buyAllowed: true,
+					sellAllowed: true,
 					config: {
 						orderRefreshTime: botConfig.orderRefreshTime,
 						bidSpread: 0,
@@ -83,10 +85,10 @@ export async function initPMMOrderbooks(
 						buyOrderAmount: marketConfig.orderAmount,
 						sellOrderAmount: marketConfig.orderAmount,
 						defaultOrderAmount: marketConfig.orderAmount,
-						priceCeiling: 0,
-						priceFloor: 0,
-						priceCeilingPct: 0,
-						priceFloorPct: 0,
+						priceCeiling: getOrderbookMidPrice(orderbook) * (1 + botConfig.priceCeilingPct / 100),
+						priceFloor: getOrderbookMidPrice(orderbook) * (1 - botConfig.priceFloorPct / 100),
+						priceCeilingPct: botConfig.priceCeilingPct,
+						priceFloorPct: botConfig.priceFloorPct,
 						orderLevels: 0,
 						filledOrderDelay: 0,
 					},

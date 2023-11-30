@@ -1,7 +1,7 @@
 import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
 import { AllChronosMarketHistory, IndexerRestMarketChronosApi } from "@injectivelabs/sdk-ts";
 
-import { getOrderbookMidPrice, Orderbook, PMMOrderbook } from "../../../types/base/orderbook";
+import { getOrderbookMidPrice, getOrderbookSpread, Orderbook, PMMOrderbook } from "../../../types/base/orderbook";
 /**
  *
  */
@@ -28,24 +28,23 @@ export async function setPMMParameters(orderbook: PMMOrderbook, resolution: stri
 
 	const natr = Number.isNaN(atr / ohlc0.c[ohlc0.c.length - 1]) ? 0.008 : atr / ohlc0.c[ohlc0.c.length - 1]; //in bps
 
-	const candleNormalisedWidths = ohlc0.h.map((high, i) => {
-		return Math.abs((high - ohlc0.l[i]) / ohlc0.c[i]);
-	});
-	const averageWeightedWidth = candleNormalisedWidths.reduce((a, b) => a + b) / candleNormalisedWidths.length;
+	// const candleNormalisedWidths = ohlc0.h.map((high, i) => {
+	// 	return Math.abs((high - ohlc0.l[i]) / ohlc0.c[i]);
+	// });
+	// const averageWeightedWidth = candleNormalisedWidths.reduce((a, b) => a + b) / candleNormalisedWidths.length;
 	const rsi = Number.isNaN(RSI(ohlc0, 14)) ? 50 : RSI(ohlc0, 14);
 
-	const spreadMultiplier = natr / averageWeightedWidth;
+	const biDirectionalSpread = (getOrderbookSpread(orderbook, 5, 5) / midprice / 2) * 10000;
+	// const spreadMultiplier = natr / averageWeightedWidth;
 	const priceMultiplier = ((50 - rsi) / 50) * natr;
 	console.log(
-		`updating parameters for ${orderbook.ticker}: bid ${orderbook.trading.config.bidSpread} --> ${
-			(natr * 10000) / 2
-		}, ask ${orderbook.trading.config.askSpread} --> ${(natr * 10000) / 2}`,
+		`updating parameters for ${orderbook.ticker}: bid ${orderbook.trading.config.bidSpread} --> ${biDirectionalSpread}, ask ${orderbook.trading.config.askSpread} --> ${biDirectionalSpread}`,
 		`\nprice multiplier with RSI ${rsi}: ${priceMultiplier}, shifts price from ${midprice} to ${
 			(1 + priceMultiplier) * midprice
 		}`,
 	);
-	orderbook.trading.config.askSpread = (natr * 10000) / 2;
-	orderbook.trading.config.bidSpread = (natr * 10000) / 2;
+	orderbook.trading.config.askSpread = biDirectionalSpread;
+	orderbook.trading.config.bidSpread = biDirectionalSpread;
 	orderbook.trading.config.priceMultiplier = 1 + priceMultiplier;
 }
 

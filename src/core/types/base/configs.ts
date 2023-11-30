@@ -83,8 +83,8 @@ export interface PMMConfig extends BaseConfig {
 	// orderAmount: number;
 	// priceCeiling: number;
 	// priceFloor: number;
-	// priceCeilingPct: number;
-	// priceFloorPct: number;
+	priceCeilingPct: number;
+	priceFloorPct: number;
 	// orderLevels: number;
 	// filledOrderDelay: number;
 }
@@ -275,7 +275,7 @@ function getPMMConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): PMMConfi
 			orderbooks.push(...marketConfigs.map((mc: PMMMarketConfig) => mc.marketId));
 		}
 	}
-
+	console.log(+envs.PRICE_CEILING_PCT, +envs.PRICE_FLOOR_PCT);
 	return {
 		...baseConfig,
 		marketConfigs: marketConfigs,
@@ -290,8 +290,8 @@ function getPMMConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): PMMConfi
 		// orderAmount: +envs.ORDER_AMOUNT,
 		// priceCeiling: +envs.PRICE_CEILING,
 		// priceFloor: +envs.PRICE_FLOOR,
-		// priceCeilingPct: +envs.PRICE_CEILING_PCT,
-		// priceFloorPct: +envs.PRICE_FLOOR_PCT,
+		priceCeilingPct: +envs.PRICE_CEILING_PCT,
+		priceFloorPct: +envs.PRICE_FLOOR_PCT,
 		// orderLevels: +envs.ORDER_LEVELS,
 		// filledOrderDelay: +envs.FILLED_ORDER_DELAY,
 	};

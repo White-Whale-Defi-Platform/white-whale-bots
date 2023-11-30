@@ -8,30 +8,19 @@
     */
 
 import { EncodeObject } from "@cosmjs/proto-signing";
-import {
-	MsgBatchUpdateOrders,
-	OrderType,
-	OrderTypeMap,
-	SpotLimitOrder,
-	spotPriceToChainPriceToFixed,
-} from "@injectivelabs/sdk-ts";
+import { MsgBatchUpdateOrders, OrderType, OrderTypeMap, spotPriceToChainPrice } from "@injectivelabs/sdk-ts";
 import { OrderSide } from "@injectivelabs/ts-types";
 import { BigNumberInBase } from "@injectivelabs/utils/dist/cjs/classes";
 
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
-import { OrderOperation } from "../../../core/strategies/pmm/operations/validateOrders";
-import { Orderbook } from "../../../core/types/base/orderbook";
+import { OrderbookOrderOperations } from "../../../core/strategies/pmm/operations/getOrderOperations";
 
 /**
  *
  */
 export function getBatchUpdateOrdersMessage(
 	chainOperator: ChainOperator,
-	allOrderbookUpdates: Array<{
-		orderbook: Orderbook;
-		ordersToCancel: Array<SpotLimitOrder>;
-		ordersToCreate: Array<OrderOperation>;
-	}>,
+	allOrderbookUpdates: Array<OrderbookOrderOperations>,
 ): [EncodeObject, number] {
 	const subaccountId = chainOperator.client.subaccountId;
 	const publicAddress = chainOperator.client.publicAddress;
@@ -51,12 +40,12 @@ export function getBatchUpdateOrdersMessage(
 	}> = [];
 
 	for (const orderbookUpdate of allOrderbookUpdates) {
-		if (orderbookUpdate.ordersToCancel.length > 0) {
-			orderbookUpdate.ordersToCancel.forEach((slo) => {
+		if (orderbookUpdate.ordersToCancelHashes.length > 0) {
+			orderbookUpdate.ordersToCancelHashes.forEach((slo) => {
 				spotOrdersToCancel.push({
 					marketId: orderbookUpdate.orderbook.marketId,
 					subaccountId: subaccountId,
-					orderHash: slo.orderHash,
+					orderHash: slo,
 				});
 			});
 		}
@@ -67,17 +56,20 @@ export function getBatchUpdateOrdersMessage(
 		if (orderbookUpdate.ordersToCreate.length > 0) {
 			orderbookUpdate.ordersToCreate.forEach((order) => {
 				const orderSize = +new BigNumberInBase(order.quantity).toWei(decimalAdjustment).toFixed();
-				const beliefPriceOrderbook = spotPriceToChainPriceToFixed({
-					value: order.price,
+				const beliefPriceOrderbook = spotPriceToChainPrice({
+					value: +order.price,
 					baseDecimals: orderbookUpdate.orderbook.baseAssetDecimals,
 					quoteDecimals: orderbookUpdate.orderbook.quoteAssetDecimals,
-					decimalPlaces: 3,
-				});
+				})
+					.multipliedBy(1 / orderbookUpdate.orderbook.minPriceIncrement)
+					.decimalPlaces(0)
+					.dividedBy(1 / orderbookUpdate.orderbook.minPriceIncrement)
+					.toFixed(15);
 				spotOrdersToCreate.push({
 					orderType: order.orderSide === OrderSide.Buy ? OrderTypeMap.BUY : OrderTypeMap.SELL,
 					marketId: order.marketid,
 					feeRecipient: chainOperator.client.publicAddress,
-					price: String(beliefPriceOrderbook),
+					price: beliefPriceOrderbook,
 					quantity: String(orderSize),
 				});
 			});

@@ -27,6 +27,8 @@ export interface PMMOrderbook extends Orderbook {
 			summary: { grossGainInQuote: number };
 			trades: Array<SpotTrade>;
 		};
+		buyAllowed: boolean;
+		sellAllowed: boolean;
 		config: {
 			orderRefreshTime: number;
 			bidSpread: number;
@@ -102,8 +104,8 @@ export function getOrderbookMidPrice(orderbook: Orderbook) {
 /**
  *
  */
-export function getOrderbookSpread(orderbook: Orderbook) {
-	return orderbook.sells[0].price - orderbook.buys[0].price;
+export function getOrderbookSpread(orderbook: Orderbook, sellPosition = 0, buyPosition = 0) {
+	return orderbook.sells[sellPosition].price - orderbook.buys[buyPosition].price;
 }
 
 /**

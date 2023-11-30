@@ -1,4 +1,4 @@
-import { SpotLimitOrder, spotPriceFromChainPrice, spotQuantityFromChainQuantity } from "@injectivelabs/sdk-ts";
+import { spotPriceFromChainPrice, spotQuantityFromChainQuantity } from "@injectivelabs/sdk-ts";
 import { OrderSide, TradeDirection } from "@injectivelabs/ts-types";
 import { BigNumber } from "bignumber.js";
 
@@ -6,11 +6,11 @@ import { TxResponse } from "../chainOperator/chainOperatorInterface";
 import { LiquidationLoop } from "../strategies/arbitrage/loops/liqMempoolLoop";
 import { DexLoopInterface } from "../strategies/arbitrage/loops/loopinterfaces/dexloopInterface";
 import { PMMLoop } from "../strategies/pmm/loops/pmmloop";
-import { OrderOperation } from "../strategies/pmm/operations/validateOrders";
+import { OrderbookOrderOperations } from "../strategies/pmm/operations/getOrderOperations";
 import { isNativeAsset, NativeAssetInfo } from "../types/base/asset";
 import { BotConfig } from "../types/base/configs";
 import { LogType } from "../types/base/logging";
-import { getOrderbookMidPrice, Orderbook } from "../types/base/orderbook";
+import { getOrderbookMidPrice } from "../types/base/orderbook";
 import { Loan } from "../types/base/overseer";
 import { OrderSequence } from "../types/base/path";
 import { outGivenIn } from "../types/base/pool";
@@ -146,6 +146,9 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				logmsg += `\n**GROSS GAIN:** \t${pmmOrderbook.trading.tradeHistory.summary.grossGainInQuote}`;
 				logmsg += `\n**SPREADS (B/A):** \t${Math.round(pmmOrderbook.trading.config.bidSpread * 100) / 100}/${
 					Math.round(pmmOrderbook.trading.config.askSpread * 100) / 100
+				}`;
+				logmsg += `\n**SIDE:**\t${pmmOrderbook.trading.buyAllowed ? "BUY" : ""} ${
+					pmmOrderbook.trading.sellAllowed ? "SELL" : ""
 				}`;
 				logmsg += `\n${"---------"}**Active Orders**${"---------"}`;
 				pmmOrderbook.trading.activeOrders.buys.forEach((buyOrder) => {
@@ -287,13 +290,7 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 		/**
 		 *
 		 */
-		async logOrderbookPositionUpdate(
-			allOrderbookUpdates: Array<{
-				orderbook: Orderbook;
-				ordersToCancel: Array<SpotLimitOrder>;
-				ordersToCreate: Array<OrderOperation>;
-			}>,
-		) {
+		async logOrderbookPositionUpdate(allOrderbookUpdates: Array<OrderbookOrderOperations>) {
 			const formatOptions: Intl.DateTimeFormatOptions = {
 				year: "numeric",
 				month: "numeric",
@@ -307,22 +304,22 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 					pmmOrderbookUpdate.orderbook,
 				)})`;
 
-				for (const orderToCancel of pmmOrderbookUpdate.ordersToCancel ?? []) {
-					logmsg += `\n**closing** ${
-						orderToCancel.orderSide === OrderSide.Sell ? "sell" : "buy"
-					}: ${spotQuantityFromChainQuantity({
-						value: orderToCancel.quantity,
-						baseDecimals: pmmOrderbookUpdate.orderbook.baseAssetDecimals,
-					}).toFixed()} @ ${
-						Math.round(
-							spotPriceFromChainPrice({
-								value: orderToCancel.price,
-								baseDecimals: pmmOrderbookUpdate.orderbook.baseAssetDecimals,
-								quoteDecimals: 6,
-							}).toNumber() * 10000,
-						) / 10000
-					}`;
-				}
+				// for (const orderToCancel of pmmOrderbookUpdate.ordersToCancelHashes ?? []) {
+				// 	logmsg += `\n**closing** ${
+				// 		orderToCancel.orderSide === OrderSide.Sell ? "sell" : "buy"
+				// 	}: ${spotQuantityFromChainQuantity({
+				// 		value: orderToCancel.quantity,
+				// 		baseDecimals: pmmOrderbookUpdate.orderbook.baseAssetDecimals,
+				// 	}).toFixed()} @ ${
+				// 		Math.round(
+				// 			spotPriceFromChainPrice({
+				// 				value: orderToCancel.price,
+				// 				baseDecimals: pmmOrderbookUpdate.orderbook.baseAssetDecimals,
+				// 				quoteDecimals: 6,
+				// 			}).toNumber() * 10000,
+				// 		) / 10000
+				// 	}`;
+				// }
 				for (const orderToCreate of pmmOrderbookUpdate.ordersToCreate ?? []) {
 					logmsg += `\n**opening ** ${orderToCreate.orderSide === OrderSide.Sell ? "sell" : "buy"}: ${
 						orderToCreate.quantity / 1e6
