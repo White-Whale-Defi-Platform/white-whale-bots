@@ -1,6 +1,7 @@
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
 import { AssetInfo } from "../../../core/types/base/asset";
 import { DexConfig, PMMConfig } from "../../../core/types/base/configs";
+import { Inventory } from "../../../core/types/base/inventory";
 import { getOrderbookMidPrice, Orderbook, PMMOrderbook } from "../../../core/types/base/orderbook";
 import { identity } from "../../../core/types/identity";
 import { getOrderbookState } from "./getOrderbookState";
@@ -48,10 +49,12 @@ export async function initOrderbooks(
  *
  */
 export async function initPMMOrderbooks(
+	chainoperator: ChainOperator,
 	orderbooks: Array<Orderbook>,
 	botConfig: PMMConfig,
 ): Promise<Array<PMMOrderbook>> {
 	const pmmOrderbooks: Array<PMMOrderbook> = [];
+	const inventory = await chainoperator.queryAccountPortfolio();
 	for (const orderbook of orderbooks) {
 		const marketConfig = botConfig.marketConfigs.find((mc) => mc.marketId === orderbook.marketId);
 
@@ -74,6 +77,7 @@ export async function initPMMOrderbooks(
 					},
 					buyAllowed: true,
 					sellAllowed: true,
+					inventory: inventory ?? ({} as Inventory),
 					config: {
 						orderRefreshTime: botConfig.orderRefreshTime,
 						bidSpread: 0,

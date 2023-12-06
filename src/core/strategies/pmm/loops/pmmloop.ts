@@ -289,7 +289,7 @@ export class PMMLoop {
 		if (obs) {
 			orderbooks.push(...obs);
 		}
-		const PMMOrderbooks = await initPMMOrderbooks(orderbooks, botConfig);
+		const PMMOrderbooks = await initPMMOrderbooks(chainOperator, orderbooks, botConfig);
 		const getOrderbookState = chains.injective.getOrderbookState;
 
 		const loop = new PMMLoop(chainOperator, botConfig, logger, PMMOrderbooks, getOrderbookState);
