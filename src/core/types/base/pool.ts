@@ -7,6 +7,7 @@ import { isSendMessage } from "../messages/sendmessages";
 import {
 	isAstroSwapOperationsMessages,
 	isDefaultSwapMessage,
+	isGeneralSwapOperationsMessage,
 	isJunoSwapMessage,
 	isJunoSwapOperationsMessage,
 	isSwapMessage,
@@ -242,7 +243,6 @@ function applySwapMsg(pool: Pool, msg: MsgExecuteContract, pools: Array<Pool>) {
  */
 function applySwapOperationMsg(poolsFromRouter: Array<Pool>, msg: MsgExecuteContract) {
 	const decodedMsg = JSON.parse(fromUtf8(msg.msg));
-
 	if (isTFMSwapOperationsMessage(decodedMsg)) {
 		let offerAsset = fromChainAsset({
 			amount: decodedMsg.execute_swap_operations.routes[0].offer_amount,
@@ -279,8 +279,7 @@ function applySwapOperationMsg(poolsFromRouter: Array<Pool>, msg: MsgExecuteCont
 					offerAsset = offerAssetNext;
 				}
 			}
-		}
-		if (isAstroSwapOperationsMessages(operations)) {
+		} else if (isAstroSwapOperationsMessages(operations)) {
 			let offerAsset: Asset = fromChainAsset({
 				amount: initialAmount,
 				info: operations[0].astro_swap.offer_asset_info,
@@ -298,8 +297,7 @@ function applySwapOperationMsg(poolsFromRouter: Array<Pool>, msg: MsgExecuteCont
 					offerAsset = offerAssetNext;
 				}
 			}
-		}
-		if (isWyndDaoSwapOperationsMessages(operations)) {
+		} else if (isWyndDaoSwapOperationsMessages(operations)) {
 			let offerAsset: Asset;
 			if (isWyndDaoNativeAsset(operations[0].wyndex_swap.offer_asset_info)) {
 				offerAsset = {
@@ -330,6 +328,26 @@ function applySwapOperationMsg(poolsFromRouter: Array<Pool>, msg: MsgExecuteCont
 					offerAsset = offerAssetNext;
 				}
 			}
+		} else if (isGeneralSwapOperationsMessage(operations)) {
+			let offerAsset: Asset = fromChainAsset({
+				amount: initialAmount,
+				info: operations[0].offer_asset_info,
+			});
+			// astropoart router
+			for (const operation of operations) {
+				const currentPool = findPoolByInfos(
+					poolsFromRouter,
+					operation.offer_asset_info,
+					operation.ask_asset_info,
+				);
+				if (currentPool !== undefined) {
+					const offerAssetNext = outGivenIn(currentPool, offerAsset);
+					applyTradeOnPool(currentPool, offerAsset);
+					offerAsset = offerAssetNext;
+				}
+			}
+		} else {
+			console.log("unrecognized swap operations", inspect(decodedMsg, true, null, true));
 		}
 	}
 }

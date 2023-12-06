@@ -45,10 +45,16 @@ export type AstroSwapOperation = {
 		ask_asset_info: AssetInfo;
 	};
 };
+
+export type GeneralSwapOperation = {
+	offer_asset_info: AssetInfo;
+	ask_asset_info: AssetInfo;
+};
 type SwapOperationsInnerMessageOperations =
 	| Array<WWSwapOperation>
 	| Array<AstroSwapOperation>
-	| Array<WyndSwapOperations>;
+	| Array<WyndSwapOperations>
+	| Array<GeneralSwapOperation>;
 
 export type SwapOperationsMessage = {
 	execute_swap_operations: SwapOperationsInnerMessage;
@@ -174,4 +180,16 @@ export function isWyndDaoSwapOperationsMessages(
 	msg: SwapOperationsInnerMessageOperations,
 ): msg is Array<WyndSwapOperations> {
 	return msg[0]["wyndex_swap" as keyof (typeof msg)[0]] !== undefined;
+}
+
+/**
+ *
+ */
+export function isGeneralSwapOperationsMessage(
+	msg: SwapOperationsInnerMessageOperations,
+): msg is Array<GeneralSwapOperation> {
+	return (
+		msg[0]["offer_asset_info" as keyof (typeof msg)[0]] !== undefined &&
+		msg[0]["ask_asset_info" as keyof (typeof msg)[0]]
+	);
 }
