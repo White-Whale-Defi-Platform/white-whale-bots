@@ -33,9 +33,9 @@ export default class Scheduler extends EventEmitter {
 	/**
 	 *
 	 */
-	public setOrderCooldown(interval: number, marketId: string): void {
+	public setOrderCooldown(interval: number, marketIds: Array<string>): void {
 		setTimeout(() => {
-			this.emit("endOfCooldown", marketId);
+			this.emit("endOfCooldown", marketIds);
 		}, interval);
 	}
 

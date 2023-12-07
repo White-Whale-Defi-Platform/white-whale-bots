@@ -78,11 +78,11 @@ export class PMMLoop {
 	/**
 	 *
 	 */
-	executeOrderOperations = async (marketId?: string) => {
+	executeOrderOperations = async (marketIds?: Array<string>) => {
 		const allOrderbookUpdates: Array<OrderbookOrderOperations> = [];
 		this.PMMOrderbooks.forEach((pmmOrderbook) => {
 			if (
-				(marketId && !(pmmOrderbook.marketId === marketId)) ||
+				(marketIds && !marketIds.includes(pmmOrderbook.marketId)) ||
 				this.marketsOnCooldown.includes(pmmOrderbook.marketId)
 			) {
 				console.log("skipping ob", pmmOrderbook.ticker);
@@ -198,15 +198,15 @@ export class PMMLoop {
 		);
 		if (triggerCooldown && init === false) {
 			console.log(
-				"obtained new trade hash on chain-->trade happened-->going into cooldown for 3 minutes for: ",
-				orderbooksToCooldown.map((ob) => ob.ticker),
+				"obtained new trade hash on chain-->trade happened-->going into cooldown for: ",
+				...new Set(orderbooksToCooldown.map((ob) => ob.ticker)),
 				"switching trade side",
 			);
 
-			orderbooksToCooldown.forEach((ob) => {
-				this.marketsOnCooldown.push(ob.marketId);
-				this.scheduler.setOrderCooldown(5 * 1000, ob.marketId);
-			});
+			const marketsToCooldown = orderbooksToCooldown.map((ob) => ob.marketId);
+			this.marketsOnCooldown.push(...marketsToCooldown);
+			this.scheduler.setOrderCooldown(5 * 1000, marketsToCooldown);
+
 			// await this.logger?.loopLogging.logPMMLoop(this, new Date());
 		}
 	};
@@ -243,11 +243,11 @@ export class PMMLoop {
 	/**
 	 *
 	 */
-	endOfCooldown = async (marketId: string) => {
-		this.marketsOnCooldown = this.marketsOnCooldown.filter((cdMarketId) => cdMarketId != marketId);
-		console.log("end of cooldown triggered for ", marketId);
+	endOfCooldown = async (marketIds: Array<string>) => {
+		this.marketsOnCooldown = this.marketsOnCooldown.filter((cdMarketId) => !marketIds.includes(cdMarketId));
+		console.log("end of cooldown triggered for ", marketIds);
 
-		this.scheduler.emit("updateOrders", marketId);
+		this.scheduler.emit("updateOrders", marketIds);
 	};
 	/**
 	 *
