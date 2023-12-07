@@ -85,7 +85,8 @@ export interface PMMConfig extends BaseConfig {
 	// priceFloor: number;
 	priceCeilingPct: number;
 	priceFloorPct: number;
-	// orderLevels: number;
+	orderLevels: number;
+	pingPongEnabled: boolean;
 	// filledOrderDelay: number;
 }
 
@@ -292,7 +293,8 @@ function getPMMConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): PMMConfi
 		// priceFloor: +envs.PRICE_FLOOR,
 		priceCeilingPct: +envs.PRICE_CEILING_PCT,
 		priceFloorPct: +envs.PRICE_FLOOR_PCT,
-		// orderLevels: +envs.ORDER_LEVELS,
+		orderLevels: +envs.ORDER_LEVELS,
+		pingPongEnabled: envs.PING_PONG == "1" ? true : false,
 		// filledOrderDelay: +envs.FILLED_ORDER_DELAY,
 	};
 }

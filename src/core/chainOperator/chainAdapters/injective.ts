@@ -21,7 +21,6 @@ import {
 	PrivateKey,
 	PublicKey,
 	SpotMarket,
-	TradeExecutionSide,
 } from "@injectivelabs/sdk-ts";
 import { ChainId } from "@injectivelabs/ts-types";
 import { SkipBundleClient } from "@skip-mev/skipjs";
@@ -228,7 +227,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		return await this._spotQueryClient.fetchTrades({
 			subaccountId: subaccountId,
 			marketId: marketid,
-			executionSide: TradeExecutionSide.Maker,
 			startTime: sinceTimestamp,
 		});
 	}

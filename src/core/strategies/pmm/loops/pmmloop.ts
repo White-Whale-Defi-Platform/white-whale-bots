@@ -59,10 +59,10 @@ export class PMMLoop {
 	 */
 	public async step() {
 		while (true) {
-			const checkTradeUpdates = await this.setMyOrders();
-			if (checkTradeUpdates) {
-				await this.setMyTrades();
-			}
+			await this.setMyOrders();
+
+			await this.setMyTrades();
+
 			await this.updateOrderbookStates(this.chainOperator, this.PMMOrderbooks);
 		}
 		/*
@@ -120,7 +120,6 @@ export class PMMLoop {
 	 */
 	setMyOrders = async () => {
 		// this.myOrders = { buys: new Map(), sells: new Map() };
-		let checkTradeUpdates = false;
 		await Promise.all(
 			this.PMMOrderbooks.map(async (pmmOrderbook) => {
 				const activeOrders = await getSubaccountOrders(this.chainOperator, pmmOrderbook);
@@ -130,13 +129,11 @@ export class PMMLoop {
 					for (const buyOrderHash of pmmOrderbook.trading.activeOrders.buys.keys()) {
 						if (!myOrdersHashes.includes(buyOrderHash)) {
 							pmmOrderbook.trading.activeOrders.buys.delete(buyOrderHash);
-							checkTradeUpdates = true;
 						}
 					}
 					for (const sellOrderHash of pmmOrderbook.trading.activeOrders.sells.keys()) {
 						if (!myOrdersHashes.includes(sellOrderHash)) {
 							pmmOrderbook.trading.activeOrders.sells.delete(sellOrderHash);
-							checkTradeUpdates = true;
 						}
 					}
 
@@ -145,26 +142,22 @@ export class PMMLoop {
 							!pmmOrderbook.trading.activeOrders.buys.has(myOrder.orderHash) &&
 							!pmmOrderbook.trading.activeOrders.sells.has(myOrder.orderHash)
 						) {
-							// new order
-							checkTradeUpdates = true;
-						}
-						if (myOrder.orderSide === OrderSide.Buy) {
-							pmmOrderbook.trading.activeOrders.buys.set(myOrder.orderHash, myOrder);
-						} else if (myOrder.orderSide === OrderSide.Sell) {
-							pmmOrderbook.trading.activeOrders.sells.set(myOrder.orderHash, myOrder);
+							if (myOrder.orderSide === OrderSide.Buy) {
+								pmmOrderbook.trading.activeOrders.buys.set(myOrder.orderHash, myOrder);
+							} else if (myOrder.orderSide === OrderSide.Sell) {
+								pmmOrderbook.trading.activeOrders.sells.set(myOrder.orderHash, myOrder);
+							}
 						}
 					}
 				}
 			}),
 		);
-
-		return checkTradeUpdates;
 	};
 
 	/**
 	 *
 	 */
-	setMyTrades = async () => {
+	setMyTrades = async (init = false) => {
 		let triggerCooldown = false;
 		const orderbooksToCooldown: Array<PMMOrderbook> = [];
 		await Promise.all(
@@ -173,27 +166,25 @@ export class PMMLoop {
 				const tradeHistoryChain = await this.chainOperator.client.queryOrderbookTrades(
 					pmmOrderbook.marketId,
 					this.chainOperator.client.subaccountId,
-					this.startTimestamp,
 				);
 				if (tradeHistoryChain) {
 					tradeHistoryChain.trades.forEach((thc) => {
 						if (tradeHistoryLocal.find((thl) => thl === thc.orderHash) === undefined) {
 							triggerCooldown = true;
 							orderbooksToCooldown.push(pmmOrderbook);
-							if (thc.tradeDirection === TradeDirection.Buy) {
-								pmmOrderbook.trading.buyAllowed = false;
-								pmmOrderbook.trading.sellAllowed = true;
-							} else {
-								pmmOrderbook.trading.buyAllowed = true;
-								pmmOrderbook.trading.sellAllowed = false;
-							}
+							pmmOrderbook.trading.tradeHistory.summary.grossGainInQuote = calculateTradeHistoryProfit(
+								pmmOrderbook,
+								tradeHistoryChain.trades,
+							);
 						}
 					});
-
-					pmmOrderbook.trading.tradeHistory.summary.grossGainInQuote = calculateTradeHistoryProfit(
-						pmmOrderbook,
-						tradeHistoryChain.trades,
-					);
+					if (tradeHistoryChain.trades[0].tradeDirection === TradeDirection.Buy) {
+						pmmOrderbook.trading.buyAllowed = false;
+						pmmOrderbook.trading.sellAllowed = true;
+					} else {
+						pmmOrderbook.trading.buyAllowed = true;
+						pmmOrderbook.trading.sellAllowed = false;
+					}
 
 					pmmOrderbook.trading.tradeHistory.trades = tradeHistoryChain.trades;
 				}
@@ -205,7 +196,7 @@ export class PMMLoop {
 				// }
 			}),
 		);
-		if (triggerCooldown) {
+		if (triggerCooldown && init === false) {
 			console.log(
 				"obtained new trade hash on chain-->trade happened-->going into cooldown for 3 minutes for: ",
 				orderbooksToCooldown.map((ob) => ob.ticker),
@@ -214,9 +205,9 @@ export class PMMLoop {
 
 			orderbooksToCooldown.forEach((ob) => {
 				this.marketsOnCooldown.push(ob.marketId);
-				this.scheduler.setOrderCooldown(180 * 1000, ob.marketId);
+				this.scheduler.setOrderCooldown(5 * 1000, ob.marketId);
 			});
-			await this.logger?.loopLogging.logPMMLoop(this, new Date());
+			// await this.logger?.loopLogging.logPMMLoop(this, new Date());
 		}
 	};
 
@@ -256,7 +247,7 @@ export class PMMLoop {
 		this.marketsOnCooldown = this.marketsOnCooldown.filter((cdMarketId) => cdMarketId != marketId);
 		console.log("end of cooldown triggered for ", marketId);
 
-		// this.scheduler.emit("updateOrders", marketId);
+		this.scheduler.emit("updateOrders", marketId);
 	};
 	/**
 	 *
@@ -273,7 +264,9 @@ export class PMMLoop {
 	public async init() {
 		await this.updatePMMParameters();
 		await this.setMyOrders();
+		await this.setMyTrades(true);
 		await this.executeOrderOperations();
+
 		this.scheduler.startOrderUpdates(this.botConfig.orderRefreshTime * 1000);
 		this.scheduler.startLogTimer(this.botConfig.signOfLife * 60 * 1000, this);
 		this.scheduler.startParameterUpdates(15 * 60 * 1000);

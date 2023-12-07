@@ -173,6 +173,7 @@ declare namespace NodeJS {
 		PRICE_CEILING_PCT: string;
 		PRICE_FLOOR_PCT: string;
 		ORDER_LEVELS: string;
+		PING_PONG: string;
 		FILLED_ORDER_DELAY: string;
 		PMM_SETUPS: string;
 	}
