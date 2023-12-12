@@ -31,6 +31,7 @@ export interface PMMOrderbook extends Orderbook {
 		inventory: Inventory;
 		buyAllowed: boolean;
 		sellAllowed: boolean;
+		inventorySkew: number;
 		config: {
 			orderRefreshTime: number;
 			bidSpread: number;
@@ -48,6 +49,7 @@ export interface PMMOrderbook extends Orderbook {
 			priceFloorPct: number;
 			orderLevels: number;
 			filledOrderDelay: number;
+			maxInventorySkew: number;
 		};
 	};
 }

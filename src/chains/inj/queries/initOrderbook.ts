@@ -55,6 +55,7 @@ export async function initPMMOrderbooks(
 ): Promise<Array<PMMOrderbook>> {
 	const pmmOrderbooks: Array<PMMOrderbook> = [];
 	const inventory = await chainoperator.queryAccountPortfolio();
+
 	for (const orderbook of orderbooks) {
 		const marketConfig = botConfig.marketConfigs.find((mc) => mc.marketId === orderbook.marketId);
 
@@ -78,6 +79,7 @@ export async function initPMMOrderbooks(
 					buyAllowed: true,
 					sellAllowed: true,
 					inventory: inventory ?? ({} as Inventory),
+					inventorySkew: 50,
 					config: {
 						orderRefreshTime: botConfig.orderRefreshTime,
 						bidSpread: 0,
@@ -93,11 +95,13 @@ export async function initPMMOrderbooks(
 						priceFloor: getOrderbookMidPrice(orderbook) * (1 - botConfig.priceFloorPct / 100),
 						priceCeilingPct: botConfig.priceCeilingPct,
 						priceFloorPct: botConfig.priceFloorPct,
-						orderLevels: 0,
+						orderLevels: botConfig.orderLevels,
 						filledOrderDelay: 0,
+						maxInventorySkew: 70,
 					},
 				},
 			};
+
 			// await setPMMParameters(pmmOrderbook, String(botConfig.orderRefreshTime / 60), "336");
 			pmmOrderbooks.push(pmmOrderbook);
 		}

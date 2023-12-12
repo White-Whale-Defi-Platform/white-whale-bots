@@ -11,7 +11,7 @@ import { Logger } from "../../../logging/logger";
 import { PMMConfig } from "../../../types/base/configs";
 import { Orderbook, PMMOrderbook } from "../../../types/base/orderbook";
 import { getOrderOperations, OrderbookOrderOperations } from "../operations/getOrderOperations";
-import { setPMMParameters } from "../operations/marketAnalysis";
+import { inventorySkew, setPMMParameters } from "../operations/marketAnalysis";
 import Scheduler from "../operations/scheduling";
 import { calculateTradeHistoryProfit } from "../operations/tradeHistoryProfit";
 
@@ -205,12 +205,34 @@ export class PMMLoop {
 
 			const marketsToCooldown = orderbooksToCooldown.map((ob) => ob.marketId);
 			this.marketsOnCooldown.push(...marketsToCooldown);
+			await this.setMyInventory(marketsToCooldown);
 			this.scheduler.setOrderCooldown(5 * 1000, marketsToCooldown);
 
 			// await this.logger?.loopLogging.logPMMLoop(this, new Date());
 		}
 	};
 
+	/**
+	 *
+	 */
+	async setMyInventory(marketIds: Array<string> | undefined = undefined) {
+		const inventory = await this.chainOperator.queryAccountPortfolio();
+		await Promise.all(
+			this.PMMOrderbooks.map(async (orderbook) => {
+				if (inventory) {
+					orderbook.trading.inventory = inventory;
+				}
+				if (marketIds && !marketIds.includes(orderbook.marketId)) {
+					console.log("skipping inventory for :", orderbook.ticker);
+				} else {
+					console.log(" setting inventory for: ", orderbook.ticker);
+					const marketInventorySkew = Math.round(inventorySkew(orderbook) * 100);
+					orderbook.trading.inventorySkew = marketInventorySkew;
+					console.log("skew: ", marketInventorySkew);
+				}
+			}),
+		);
+	}
 	/**
 	 *
 	 */
@@ -249,6 +271,7 @@ export class PMMLoop {
 
 		this.scheduler.emit("updateOrders", marketIds);
 	};
+
 	/**
 	 *
 	 */
@@ -265,6 +288,7 @@ export class PMMLoop {
 		await this.updatePMMParameters();
 		await this.setMyOrders();
 		await this.setMyTrades(true);
+		await this.setMyInventory(undefined);
 		await this.executeOrderOperations();
 
 		this.scheduler.startOrderUpdates(this.botConfig.orderRefreshTime * 1000);

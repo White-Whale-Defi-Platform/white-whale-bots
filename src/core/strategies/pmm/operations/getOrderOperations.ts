@@ -101,7 +101,8 @@ export function getOrderOperations(
 const buyAllowed = (orderbook: PMMOrderbook, price: number) => {
 	return (
 		(price < orderbook.trading.config.priceCeiling && orderbook.trading.buyAllowed === true) ||
-		price < orderbook.trading.config.priceFloor
+		price < orderbook.trading.config.priceFloor ||
+		orderbook.trading.inventorySkew < 100 - orderbook.trading.config.maxInventorySkew
 	);
 };
 
@@ -111,6 +112,7 @@ const buyAllowed = (orderbook: PMMOrderbook, price: number) => {
 const sellAllowed = (orderbook: PMMOrderbook, price: number) => {
 	return (
 		(price > orderbook.trading.config.priceFloor && orderbook.trading.sellAllowed === true) ||
-		price > orderbook.trading.config.priceCeiling
-	);
+		price > orderbook.trading.config.priceCeiling ||
+		orderbook.trading.inventorySkew > orderbook.trading.config.maxInventorySkew
+	); //too much base asset so sell only
 };
