@@ -1,7 +1,6 @@
 import { SpotLimitOrder, SpotTrade } from "@injectivelabs/sdk-ts";
 
 import { Asset, NativeAssetInfo } from "./asset";
-import { Inventory } from "./inventory";
 export interface Order {
 	price: number;
 	quantity: number;
@@ -28,10 +27,10 @@ export interface PMMOrderbook extends Orderbook {
 			summary: { grossGainInQuote: number };
 			trades: Array<SpotTrade>;
 		};
-		inventory: Inventory;
 		buyAllowed: boolean;
 		sellAllowed: boolean;
 		inventorySkew: number;
+		assignedQuoteAmount: number;
 		config: {
 			orderRefreshTime: number;
 			bidSpread: number;
@@ -50,6 +49,7 @@ export interface PMMOrderbook extends Orderbook {
 			orderLevels: number;
 			filledOrderDelay: number;
 			maxInventorySkew: number;
+			pingPongEnabled: boolean;
 		};
 	};
 }

@@ -89,34 +89,3 @@ function RSI(candles: AllChronosMarketHistory, periods: number) {
 
 	return rsi;
 }
-
-/**
- *
- */
-export function inventorySkew(pmmOrderbook: PMMOrderbook) {
-	const allocatedQuoteAmount =
-		pmmOrderbook.trading.config.buyOrderAmount *
-		getOrderbookMidPrice(pmmOrderbook) *
-		pmmOrderbook.trading.config.orderLevels;
-	const baseAsset = pmmOrderbook.baseAssetInfo;
-	const quoteAsset = pmmOrderbook.quoteAssetInfo;
-
-	const baseAssetInInventory = pmmOrderbook.trading.inventory.bankBalancesList
-		.filter((coin) => coin.denom === baseAsset.native_token.denom)
-		.map((coin) => +coin.amount)
-		.reduce((a, b) => {
-			return a + b;
-		});
-	const quoteAssetInInventory = pmmOrderbook.trading.inventory.bankBalancesList
-		.filter((coin) => coin.denom === quoteAsset.native_token.denom)
-		.map((coin) => +coin.amount)
-		.reduce((a, b) => {
-			return a + b;
-		});
-	const spotAmount = baseAssetInInventory / 10 ** (pmmOrderbook.baseAssetDecimals - pmmOrderbook.quoteAssetDecimals);
-	const midPrice = getOrderbookMidPrice(pmmOrderbook);
-
-	const usableQuoteAmount = Math.min(quoteAssetInInventory, allocatedQuoteAmount);
-	const skew = (spotAmount * midPrice) / (spotAmount * midPrice + usableQuoteAmount);
-	return skew;
-}

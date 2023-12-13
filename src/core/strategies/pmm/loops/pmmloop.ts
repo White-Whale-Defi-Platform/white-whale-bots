@@ -3,15 +3,17 @@ import { OrderSide, TradeDirection } from "@injectivelabs/ts-types";
 
 import * as chains from "../../../../chains";
 import { initOrderbooks } from "../../../../chains/inj";
+import { getBatchCancelOrdersMessage } from "../../../../chains/inj/messages/getBatchCancelOrdersMessage";
 import { getBatchUpdateOrdersMessage } from "../../../../chains/inj/messages/getBatchUpdateOrdersMessage";
 import { getSubaccountOrders } from "../../../../chains/inj/queries/getOrderbookOrders";
 import { initPMMOrderbooks } from "../../../../chains/inj/queries/initOrderbook";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { PMMConfig } from "../../../types/base/configs";
+import { Inventory, inventorySkew, netWorth } from "../../../types/base/inventory";
 import { Orderbook, PMMOrderbook } from "../../../types/base/orderbook";
 import { getOrderOperations, OrderbookOrderOperations } from "../operations/getOrderOperations";
-import { inventorySkew, setPMMParameters } from "../operations/marketAnalysis";
+import { setPMMParameters } from "../operations/marketAnalysis";
 import Scheduler from "../operations/scheduling";
 import { calculateTradeHistoryProfit } from "../operations/tradeHistoryProfit";
 
@@ -26,6 +28,17 @@ export class PMMLoop {
 	startTimestamp = Date.now();
 	marketsOnCooldown: Array<string> = [];
 
+	inventory: {
+		initialQuoteAmount: number;
+		killSwitchQuoteAmount: number;
+		currentQuoteAmount: number;
+		inventory: Inventory;
+	} = {
+		initialQuoteAmount: 0,
+		killSwitchQuoteAmount: 0,
+		currentQuoteAmount: 0,
+		inventory: {} as Inventory,
+	};
 	scheduler: Scheduler;
 	updateOrderbookStates: (chainOperator: ChainOperator, orderbooks: Array<Orderbook>) => Promise<void>;
 
@@ -217,16 +230,18 @@ export class PMMLoop {
 	 */
 	async setMyInventory(marketIds: Array<string> | undefined = undefined) {
 		const inventory = await this.chainOperator.queryAccountPortfolio();
+		if (!inventory) {
+			return;
+		}
+		this.inventory.inventory = inventory;
+		this.inventory.currentQuoteAmount = netWorth(this.PMMOrderbooks, inventory);
 		await Promise.all(
 			this.PMMOrderbooks.map(async (orderbook) => {
-				if (inventory) {
-					orderbook.trading.inventory = inventory;
-				}
 				if (marketIds && !marketIds.includes(orderbook.marketId)) {
-					console.log("skipping inventory for :", orderbook.ticker);
+					console.log("skipping inventory skew for :", orderbook.ticker);
 				} else {
-					console.log(" setting inventory for: ", orderbook.ticker);
-					const marketInventorySkew = Math.round(inventorySkew(orderbook) * 100);
+					console.log(" setting inventory skew for: ", orderbook.ticker);
+					const marketInventorySkew = Math.round(inventorySkew(inventory, orderbook) * 100);
 					orderbook.trading.inventorySkew = marketInventorySkew;
 					console.log("skew: ", marketInventorySkew);
 				}
@@ -271,7 +286,19 @@ export class PMMLoop {
 
 		this.scheduler.emit("updateOrders", marketIds);
 	};
+	/**
+	 *
+	 */
+	public async cancelAllOrders() {
+		const allOrders = this.PMMOrderbooks.flatMap((ob) => [
+			...ob.trading.activeOrders.buys.values(),
+			...ob.trading.activeOrders.sells.values(),
+		]);
+		const cancelMsg = getBatchCancelOrdersMessage(this.chainOperator, allOrders);
 
+		const txRes = await this.chainOperator.signAndBroadcast([cancelMsg]);
+		console.log("cancelling all current orders ", txRes.transactionHash);
+	}
 	/**
 	 *
 	 */
@@ -288,7 +315,19 @@ export class PMMLoop {
 		await this.updatePMMParameters();
 		await this.setMyOrders();
 		await this.setMyTrades(true);
+		await this.cancelAllOrders();
+
+		await delay(5000);
 		await this.setMyInventory(undefined);
+
+		const inventory = await this.chainOperator.queryAccountPortfolio();
+		if (inventory) {
+			this.inventory.initialQuoteAmount = netWorth(this.PMMOrderbooks, inventory);
+			this.inventory.inventory = inventory;
+			this.inventory.killSwitchQuoteAmount =
+				this.inventory.initialQuoteAmount - 0.1 * this.botConfig.maxCapitalUsed;
+		}
+
 		await this.executeOrderOperations();
 
 		this.scheduler.startOrderUpdates(this.botConfig.orderRefreshTime * 1000);
@@ -310,6 +349,7 @@ export class PMMLoop {
 		const getOrderbookState = chains.injective.getOrderbookState;
 
 		const loop = new PMMLoop(chainOperator, botConfig, logger, PMMOrderbooks, getOrderbookState);
+
 		await loop.init();
 		return loop;
 	}

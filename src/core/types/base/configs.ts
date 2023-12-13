@@ -87,6 +87,7 @@ export interface PMMConfig extends BaseConfig {
 	priceFloorPct: number;
 	orderLevels: number;
 	pingPongEnabled: boolean;
+	maxCapitalUsed: number;
 	// filledOrderDelay: number;
 }
 
@@ -295,6 +296,7 @@ function getPMMConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): PMMConfi
 		priceFloorPct: +envs.PRICE_FLOOR_PCT,
 		orderLevels: +envs.ORDER_LEVELS,
 		pingPongEnabled: envs.PING_PONG == "1" ? true : false,
+		maxCapitalUsed: +envs.MAX_CAPITAL_USED,
 		// filledOrderDelay: +envs.FILLED_ORDER_DELAY,
 	};
 }

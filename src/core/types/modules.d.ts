@@ -176,5 +176,6 @@ declare namespace NodeJS {
 		PING_PONG: string;
 		FILLED_ORDER_DELAY: string;
 		PMM_SETUPS: string;
+		MAX_CAPITAL_USED: string;
 	}
 }
