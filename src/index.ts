@@ -38,6 +38,7 @@ async function main() {
 			break;
 		case SetupType.PMM:
 			loop = await PMMLoop.createLoop(chainOperator, <PMMConfig>botConfig, logger);
+			await logger.loopLogging.logPMMLoop(loop, new Date());
 			break;
 	}
 

@@ -99,7 +99,7 @@ export class ChainOperator {
 	/**
 	 *
 	 */
-	async queryOrderbookOrders(marketid: string, subaccountId: string) {
+	async queryOrderbookOrders(marketid?: string, subaccountId: string = this.client.subaccountId) {
 		return this.client.queryOrderbookOrders(marketid, subaccountId);
 	}
 

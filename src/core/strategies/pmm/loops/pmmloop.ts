@@ -71,13 +71,17 @@ export class PMMLoop {
 	 *
 	 */
 	public async step() {
-		while (true) {
+		while (true && this.inventory.currentQuoteAmount > this.inventory.killSwitchQuoteAmount) {
 			await this.setMyOrders();
 
 			await this.setMyTrades();
 
 			await this.updateOrderbookStates(this.chainOperator, this.PMMOrderbooks);
 		}
+		console.log(
+			`cancelling bot, too much loss: started at ${this.inventory.initialQuoteAmount} and current ${this.inventory.currentQuoteAmount}`,
+		);
+		return;
 		/*
 
 		*/
@@ -100,23 +104,15 @@ export class PMMLoop {
 			) {
 				console.log("skipping ob", pmmOrderbook.ticker);
 			} else {
-				const { ordersToCancel, ordersToCreate } = getOrderOperations(
-					pmmOrderbook,
-					pmmOrderbook.trading.activeOrders.buys.size === 0
-						? undefined
-						: pmmOrderbook.trading.activeOrders.buys,
-					pmmOrderbook.trading.activeOrders.sells.size === 0
-						? undefined
-						: pmmOrderbook.trading.activeOrders.sells,
-				);
-				if (ordersToCancel || ordersToCreate) {
+				const { ordersToCancel, ordersToCreate } = getOrderOperations(pmmOrderbook);
+				if (ordersToCancel.length > 0 || ordersToCreate.length > 0) {
 					allOrderbookUpdates.push({
 						orderbook: pmmOrderbook,
-						ordersToCancelHashes: ordersToCancel ?? [],
-						ordersToCreate: ordersToCreate ?? [],
+						ordersToCancelHashes: ordersToCancel,
+						ordersToCreate: ordersToCreate,
 					});
 				}
-				if (ordersToCancel) {
+				if (ordersToCancel.length > 0) {
 					for (const orderToCancel of ordersToCancel) {
 						pmmOrderbook.trading.activeOrders.buys.delete(orderToCancel);
 						pmmOrderbook.trading.activeOrders.sells.delete(orderToCancel);
@@ -185,12 +181,14 @@ export class PMMLoop {
 						if (tradeHistoryLocal.find((thl) => thl === thc.orderHash) === undefined) {
 							triggerCooldown = true;
 							orderbooksToCooldown.push(pmmOrderbook);
-							pmmOrderbook.trading.tradeHistory.summary.grossGainInQuote = calculateTradeHistoryProfit(
-								pmmOrderbook,
-								tradeHistoryChain.trades,
-							);
 						}
 					});
+
+					pmmOrderbook.trading.tradeHistory.summary.grossGainInQuote = calculateTradeHistoryProfit(
+						pmmOrderbook,
+						tradeHistoryChain.trades,
+					);
+
 					if (tradeHistoryChain.trades[0].tradeDirection === TradeDirection.Buy) {
 						pmmOrderbook.trading.buyAllowed = false;
 						pmmOrderbook.trading.sellAllowed = true;
@@ -201,12 +199,6 @@ export class PMMLoop {
 
 					pmmOrderbook.trading.tradeHistory.trades = tradeHistoryChain.trades;
 				}
-
-				// const portfolio = await this.chainOperator.queryAccountPortfolio();
-
-				// if (portfolio) {
-				// 	this.tradeHistory.summary.currentValueInQuote = calculatePortfolioValue(this.orderbooks[0], portfolio);
-				// }
 			}),
 		);
 		if (triggerCooldown && init === false) {
@@ -290,14 +282,23 @@ export class PMMLoop {
 	 *
 	 */
 	public async cancelAllOrders() {
-		const allOrders = this.PMMOrderbooks.flatMap((ob) => [
-			...ob.trading.activeOrders.buys.values(),
-			...ob.trading.activeOrders.sells.values(),
-		]);
+		const allOnChainOrders = await getSubaccountOrders(this.chainOperator);
+		if (!allOnChainOrders) {
+			console.log("no orders to cancel");
+			return;
+		}
+		const allOrders = allOnChainOrders.orders;
 		const cancelMsg = getBatchCancelOrdersMessage(this.chainOperator, allOrders);
 
-		const txRes = await this.chainOperator.signAndBroadcast([cancelMsg]);
-		console.log("cancelling all current orders ", txRes.transactionHash);
+		const decimalCompensator = this.botConfig.gasDenom === "inj" ? 1e12 : 1;
+		const gas = 200000 + 30000 * allOrders.length;
+		const gasFee = {
+			denom: this.botConfig.gasDenom,
+			amount: (gas * this.botConfig.gasPrice * decimalCompensator).toFixed(),
+		};
+		const fee: StdFee = { amount: [gasFee], gas: String(gas) };
+		const txRes = await this.chainOperator.signAndBroadcast([cancelMsg], fee);
+		console.log(`cancelling ${allOrders.length} current orders:  ${txRes.transactionHash}`);
 	}
 	/**
 	 *
@@ -313,11 +314,11 @@ export class PMMLoop {
 	 */
 	public async init() {
 		await this.updatePMMParameters();
-		await this.setMyOrders();
-		await this.setMyTrades(true);
 		await this.cancelAllOrders();
 
 		await delay(5000);
+		await this.setMyOrders();
+		await this.setMyTrades(true);
 		await this.setMyInventory(undefined);
 
 		const inventory = await this.chainOperator.queryAccountPortfolio();

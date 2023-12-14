@@ -202,7 +202,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	async queryOrderbookOrders(marketId: string, subaccountId: string = this.subaccountId) {
+	async queryOrderbookOrders(marketId?: string, subaccountId: string = this.subaccountId) {
 		return await this._spotQueryClient.fetchSubaccountOrdersList({
 			subaccountId: subaccountId,
 			marketId: marketId,

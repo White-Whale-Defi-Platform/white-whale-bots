@@ -1,12 +1,12 @@
 import { AccountPortfolioV2 as Inventory } from "@injectivelabs/sdk-ts";
 
-import { getOrderbookMidPrice, Orderbook, PMMOrderbook } from "./orderbook";
+import { getOrderbookMidPrice, PMMOrderbook } from "./orderbook";
 export { AccountPortfolioV2 as Inventory } from "@injectivelabs/sdk-ts";
 
 /**
  *
  */
-export function netWorth(orderbooks: Array<Orderbook>, inventory: Inventory) {
+export function netWorth(orderbooks: Array<PMMOrderbook>, inventory: Inventory) {
 	let netWorth = 0; //in quote 6 decimal
 
 	for (const ob of orderbooks) {
@@ -18,6 +18,13 @@ export function netWorth(orderbooks: Array<Orderbook>, inventory: Inventory) {
 			});
 		const spotAmount = baseAssetInInventory / 10 ** (ob.baseAssetDecimals - ob.quoteAssetDecimals);
 		netWorth += spotAmount * getOrderbookMidPrice(ob);
+		ob.trading.activeOrders.buys.forEach((value, key) => {
+			netWorth += +value.price * +value.quantity;
+		});
+
+		ob.trading.activeOrders.sells.forEach((value, key) => {
+			netWorth += +value.price * +value.quantity;
+		});
 	}
 	const uniqueQuoteDenoms = [
 		...new Set(
@@ -35,6 +42,7 @@ export function netWorth(orderbooks: Array<Orderbook>, inventory: Inventory) {
 			});
 		netWorth += quoteAssetInInventory;
 	}
+	console.log(netWorth);
 	return netWorth;
 }
 /**

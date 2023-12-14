@@ -1,7 +1,7 @@
-import { SpotLimitOrder, spotPriceToChainPriceToFixed } from "@injectivelabs/sdk-ts";
-import { OrderSide } from "@injectivelabs/ts-types";
+import { OrderSide, TradeDirection } from "@injectivelabs/ts-types";
 
 import { getOrderbookMidPrice, Orderbook, PMMOrderbook } from "../../../types/base/orderbook";
+import { priceBasedTradeDirection, validOpenOrder } from "./tradingRules";
 
 export type OrderOperation = {
 	price: string;
@@ -18,39 +18,30 @@ export interface OrderbookOrderOperations {
 /**
  *
  */
-export function getOrderOperations(
-	pmmOrderbook: PMMOrderbook,
-	buys: Map<string, SpotLimitOrder> | undefined,
-	sells: Map<string, SpotLimitOrder> | undefined,
-) {
+export function getOrderOperations(pmmOrderbook: PMMOrderbook) {
 	const shiftedMidPrice = getOrderbookMidPrice(pmmOrderbook) * pmmOrderbook.trading.config.priceMultiplier;
 	const tradingParameters = pmmOrderbook.trading.config;
 
-	const ordersToCancel: Array<string> = [];
+	const allowedTradeDirections = priceBasedTradeDirection(pmmOrderbook, shiftedMidPrice);
+	console.log("allowed directions: ", allowedTradeDirections);
+	const sellsToCancel: Array<string> = [];
+	const buysToCancel: Array<string> = [];
 	const ordersToCreate: Array<OrderOperation> = [];
-	if (buys) {
-		for (const buyOrder of buys.values()) {
-			if (
-				+buyOrder.price <
-					+spotPriceToChainPriceToFixed({
-						value: shiftedMidPrice * (1 - tradingParameters.bidSpread / 10000),
-						baseDecimals: pmmOrderbook.baseAssetDecimals,
-						quoteDecimals: pmmOrderbook.quoteAssetDecimals,
-					}) ||
-				!buyAllowed(pmmOrderbook, shiftedMidPrice)
-			) {
-				ordersToCancel.push(buyOrder.orderHash);
-				if (buyAllowed(pmmOrderbook, shiftedMidPrice)) {
-					ordersToCreate.push({
-						price: String(shiftedMidPrice * (1 - tradingParameters.bidSpread / 10000)),
-						quantity: tradingParameters.buyOrderAmount,
-						marketid: pmmOrderbook.marketId,
-						orderSide: OrderSide.Buy,
-					});
-				}
-			}
+	for (const buyOrder of pmmOrderbook.trading.activeOrders.buys.values()) {
+		if (!validOpenOrder(pmmOrderbook, buyOrder, shiftedMidPrice, allowedTradeDirections)) {
+			buysToCancel.push(buyOrder.orderHash);
 		}
-	} else if (buyAllowed(pmmOrderbook, shiftedMidPrice)) {
+	}
+
+	for (const sellOrder of pmmOrderbook.trading.activeOrders.sells.values()) {
+		if (!validOpenOrder(pmmOrderbook, sellOrder, shiftedMidPrice, allowedTradeDirections)) {
+			sellsToCancel.push(sellOrder.orderHash);
+		}
+	}
+	if (
+		allowedTradeDirections.includes(TradeDirection.Buy) &&
+		pmmOrderbook.trading.activeOrders.buys.size - buysToCancel.length < pmmOrderbook.trading.config.orderLevels
+	) {
 		ordersToCreate.push({
 			price: String(shiftedMidPrice * (1 - tradingParameters.bidSpread / 10000)),
 			quantity: tradingParameters.buyOrderAmount,
@@ -58,29 +49,10 @@ export function getOrderOperations(
 			orderSide: OrderSide.Buy,
 		});
 	}
-	if (sells) {
-		for (const sellOrder of sells.values()) {
-			if (
-				+sellOrder.price >
-					+spotPriceToChainPriceToFixed({
-						value: shiftedMidPrice * (1 + tradingParameters.bidSpread / 10000),
-						baseDecimals: pmmOrderbook.baseAssetDecimals,
-						quoteDecimals: pmmOrderbook.quoteAssetDecimals,
-					}) ||
-				!sellAllowed(pmmOrderbook, shiftedMidPrice)
-			) {
-				ordersToCancel.push(sellOrder.orderHash);
-				if (sellAllowed(pmmOrderbook, shiftedMidPrice)) {
-					ordersToCreate.push({
-						price: String(shiftedMidPrice * (1 + tradingParameters.bidSpread / 10000)),
-						quantity: tradingParameters.sellOrderAmount,
-						marketid: sellOrder.marketId,
-						orderSide: sellOrder.orderSide,
-					});
-				}
-			}
-		}
-	} else if (sellAllowed(pmmOrderbook, shiftedMidPrice)) {
+	if (
+		allowedTradeDirections.includes(TradeDirection.Sell) &&
+		pmmOrderbook.trading.activeOrders.sells.size - sellsToCancel.length < pmmOrderbook.trading.config.orderLevels
+	) {
 		ordersToCreate.push({
 			price: String(shiftedMidPrice * (1 + tradingParameters.bidSpread / 10000)),
 			quantity: tradingParameters.sellOrderAmount,
@@ -90,29 +62,7 @@ export function getOrderOperations(
 	}
 
 	return {
-		ordersToCancel: ordersToCancel.length === 0 ? undefined : ordersToCancel,
-		ordersToCreate: ordersToCreate.length === 0 ? undefined : ordersToCreate,
+		ordersToCancel: [...buysToCancel, ...sellsToCancel],
+		ordersToCreate: ordersToCreate,
 	};
 }
-
-/**
- *
- */
-const buyAllowed = (orderbook: PMMOrderbook, price: number) => {
-	return (
-		(price < orderbook.trading.config.priceCeiling && orderbook.trading.buyAllowed === true) ||
-		price < orderbook.trading.config.priceFloor ||
-		orderbook.trading.inventorySkew < 100 - orderbook.trading.config.maxInventorySkew
-	);
-};
-
-/**
- *
- */
-const sellAllowed = (orderbook: PMMOrderbook, price: number) => {
-	return (
-		(price > orderbook.trading.config.priceFloor && orderbook.trading.sellAllowed === true) ||
-		price > orderbook.trading.config.priceCeiling ||
-		orderbook.trading.inventorySkew > orderbook.trading.config.maxInventorySkew
-	); //too much base asset so sell only
-};
