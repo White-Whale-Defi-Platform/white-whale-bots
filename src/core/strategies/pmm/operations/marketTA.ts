@@ -1,11 +1,30 @@
 import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
 import { AllChronosMarketHistory, IndexerRestMarketChronosApi } from "@injectivelabs/sdk-ts";
 
-import { getOrderbookMidPrice, getOrderbookSpread, Orderbook, PMMOrderbook } from "../../../types/base/orderbook";
+import { Orderbook } from "../../../types/base/orderbook";
 /**
  *
  */
-async function marketHistory(orderbook: Orderbook, resolution: string, countback = "48") {
+export default async function getMarketTA(orderbook: Orderbook, resolution: string, countback = "48") {
+	const ohlc = await marketHistory(orderbook, resolution, countback);
+	const ohlc0: AllChronosMarketHistory = ohlc[0];
+
+	const atr = ATR(ohlc0, 14);
+
+	const natr = Number.isNaN(atr / ohlc0.c[ohlc0.c.length - 1]) ? 0.008 : atr / ohlc0.c[ohlc0.c.length - 1]; //in bps
+
+	// const candleNormalisedWidths = ohlc0.h.map((high, i) => {
+	// 	return Math.abs((high - ohlc0.l[i]) / ohlc0.c[i]);
+	// });
+	// const averageWeightedWidth = candleNormalisedWidths.reduce((a, b) => a + b) / candleNormalisedWidths.length;
+	const rsi = Number.isNaN(RSI(ohlc0, 14)) ? 50 : RSI(ohlc0, 14);
+	return { rsi: rsi, natr: natr };
+}
+
+/**
+ *
+ */
+export async function marketHistory(orderbook: Orderbook, resolution: string, countback = "48") {
 	const network = Network.MainnetSentry;
 	const endpoints = getNetworkEndpoints(network);
 	const fetcher = new IndexerRestMarketChronosApi(`${endpoints.indexer}/api/chronos/v1/market`);
@@ -20,38 +39,7 @@ async function marketHistory(orderbook: Orderbook, resolution: string, countback
 /**
  *
  */
-export async function setPMMParameters(orderbook: PMMOrderbook, resolution: string, countback = "14") {
-	const ohlc = await marketHistory(orderbook, resolution, countback);
-	const ohlc0: AllChronosMarketHistory = ohlc[0];
-	const midprice = getOrderbookMidPrice(orderbook);
-	const atr = ATR(ohlc0, 14);
-
-	const natr = Number.isNaN(atr / ohlc0.c[ohlc0.c.length - 1]) ? 0.008 : atr / ohlc0.c[ohlc0.c.length - 1]; //in bps
-
-	// const candleNormalisedWidths = ohlc0.h.map((high, i) => {
-	// 	return Math.abs((high - ohlc0.l[i]) / ohlc0.c[i]);
-	// });
-	// const averageWeightedWidth = candleNormalisedWidths.reduce((a, b) => a + b) / candleNormalisedWidths.length;
-	const rsi = Number.isNaN(RSI(ohlc0, 14)) ? 50 : RSI(ohlc0, 14);
-
-	const biDirectionalSpread = (getOrderbookSpread(orderbook, 5, 5) / midprice / 2) * 10000;
-	// const spreadMultiplier = natr / averageWeightedWidth;
-	const priceMultiplier = ((50 - rsi) / 50) * natr;
-	console.log(
-		`updating parameters for ${orderbook.ticker}: bid ${orderbook.trading.config.bidSpread} --> ${biDirectionalSpread}, ask ${orderbook.trading.config.askSpread} --> ${biDirectionalSpread}`,
-		`\nprice multiplier with RSI ${rsi}: ${priceMultiplier}, shifts price from ${midprice} to ${
-			(1 + priceMultiplier) * midprice
-		}`,
-	);
-	orderbook.trading.config.askSpread = biDirectionalSpread;
-	orderbook.trading.config.bidSpread = biDirectionalSpread;
-	orderbook.trading.config.priceMultiplier = 1 + priceMultiplier;
-}
-
-/**
- *
- */
-function ATR(candles: AllChronosMarketHistory, periods: number): number {
+export function ATR(candles: AllChronosMarketHistory, periods: number): number {
 	const trs = [];
 	for (let [i, _] of candles.h.entries()) {
 		i += candles.h.length - periods - 1;
@@ -73,7 +61,7 @@ function ATR(candles: AllChronosMarketHistory, periods: number): number {
 /**
  *
  */
-function RSI(candles: AllChronosMarketHistory, periods: number) {
+export function RSI(candles: AllChronosMarketHistory, periods: number) {
 	// Calculate the average of the upward price changes
 	let avgUpwardChange = 0;
 	let avgDownwardChange = 0;

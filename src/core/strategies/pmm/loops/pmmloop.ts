@@ -13,8 +13,8 @@ import { PMMConfig } from "../../../types/base/configs";
 import { Inventory, inventorySkew, netWorth } from "../../../types/base/inventory";
 import { Orderbook, PMMOrderbook } from "../../../types/base/orderbook";
 import { getOrderOperations, OrderbookOrderOperations } from "../operations/getOrderOperations";
-import { setPMMParameters } from "../operations/marketAnalysis";
 import Scheduler from "../operations/scheduling";
+import { setPMMParameters } from "../operations/setParameters";
 import { calculateTradeHistoryProfit } from "../operations/tradeHistoryProfit";
 
 /**
@@ -175,8 +175,10 @@ export class PMMLoop {
 				const tradeHistoryChain = await this.chainOperator.client.queryOrderbookTrades(
 					pmmOrderbook.marketId,
 					this.chainOperator.client.subaccountId,
+					this.startTimestamp,
 				);
-				if (tradeHistoryChain) {
+
+				if (tradeHistoryChain && tradeHistoryChain.trades.length > 0) {
 					tradeHistoryChain.trades.forEach((thc) => {
 						if (tradeHistoryLocal.find((thl) => thl === thc.orderHash) === undefined) {
 							triggerCooldown = true;
@@ -313,13 +315,13 @@ export class PMMLoop {
 	 *
 	 */
 	public async init() {
-		await this.updatePMMParameters();
 		await this.cancelAllOrders();
 
 		await delay(5000);
 		await this.setMyOrders();
 		await this.setMyTrades(true);
 		await this.setMyInventory(undefined);
+		await this.updatePMMParameters();
 
 		const inventory = await this.chainOperator.queryAccountPortfolio();
 		if (inventory) {

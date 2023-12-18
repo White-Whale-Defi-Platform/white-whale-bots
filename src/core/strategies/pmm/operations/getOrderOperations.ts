@@ -27,6 +27,13 @@ export function getOrderOperations(pmmOrderbook: PMMOrderbook) {
 	const sellsToCancel: Array<string> = [];
 	const buysToCancel: Array<string> = [];
 	const ordersToCreate: Array<OrderOperation> = [];
+
+	const buyPrice = Math.min(shiftedMidPrice * (1 - tradingParameters.bidSpread / 10000), pmmOrderbook.buys[0].price);
+	const sellPrice = Math.max(
+		shiftedMidPrice * (1 + tradingParameters.bidSpread / 10000),
+		pmmOrderbook.sells[0].price,
+	);
+
 	for (const buyOrder of pmmOrderbook.trading.activeOrders.buys.values()) {
 		if (!validOpenOrder(pmmOrderbook, buyOrder, shiftedMidPrice, allowedTradeDirections)) {
 			buysToCancel.push(buyOrder.orderHash);
@@ -43,7 +50,7 @@ export function getOrderOperations(pmmOrderbook: PMMOrderbook) {
 		pmmOrderbook.trading.activeOrders.buys.size - buysToCancel.length < pmmOrderbook.trading.config.orderLevels
 	) {
 		ordersToCreate.push({
-			price: String(shiftedMidPrice * (1 - tradingParameters.bidSpread / 10000)),
+			price: String(buyPrice),
 			quantity: tradingParameters.buyOrderAmount,
 			marketid: pmmOrderbook.marketId,
 			orderSide: OrderSide.Buy,
@@ -54,7 +61,7 @@ export function getOrderOperations(pmmOrderbook: PMMOrderbook) {
 		pmmOrderbook.trading.activeOrders.sells.size - sellsToCancel.length < pmmOrderbook.trading.config.orderLevels
 	) {
 		ordersToCreate.push({
-			price: String(shiftedMidPrice * (1 + tradingParameters.bidSpread / 10000)),
+			price: String(sellPrice),
 			quantity: tradingParameters.sellOrderAmount,
 			marketid: pmmOrderbook.marketId,
 			orderSide: OrderSide.Sell,

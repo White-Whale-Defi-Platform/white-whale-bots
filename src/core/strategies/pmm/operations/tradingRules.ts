@@ -26,12 +26,17 @@ export const priceBasedTradeDirection = (pmmOrderbook: PMMOrderbook, midPrice: n
 				//within trading range and inventory not skewed, check for pingpong
 				if (pmmOrderbook.trading.config.pingPongEnabled) {
 					//pingpong enabled
-					if (pmmOrderbook.trading.tradeHistory.trades[0].tradeDirection === TradeDirection.Buy) {
-						//last trade was buy, return sell
-						return [TradeDirection.Sell];
+					if (pmmOrderbook.trading.tradeHistory.trades.length > 0) {
+						//we have historic trades
+						if (pmmOrderbook.trading.tradeHistory.trades[0].tradeDirection === TradeDirection.Buy) {
+							//last trade was buy, return sell
+							return [TradeDirection.Sell];
+						} else {
+							//last trade was sell, return buy
+							return [TradeDirection.Buy];
+						}
 					} else {
-						//last trade was sell, return buy
-						return [TradeDirection.Buy];
+						return [TradeDirection.Sell, TradeDirection.Buy];
 					}
 				} else {
 					//no ping pong, both directions allowed

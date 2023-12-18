@@ -49,12 +49,16 @@ export function netWorth(orderbooks: Array<PMMOrderbook>, inventory: Inventory) 
  *
  */
 export function inventorySkew(inventory: Inventory, pmmOrderbook: PMMOrderbook) {
-	const baseAssetInInventory = inventory.bankBalancesList
+	let baseAssetInInventory = inventory.bankBalancesList
 		.filter((coin) => coin.denom === pmmOrderbook.baseAssetInfo.native_token.denom)
 		.map((coin) => +coin.amount)
 		.reduce((a, b) => {
 			return a + b;
 		});
+
+	pmmOrderbook.trading.activeOrders.sells.forEach((value, key) => {
+		baseAssetInInventory += +value.quantity;
+	});
 
 	const spotAmount = baseAssetInInventory / 10 ** (pmmOrderbook.baseAssetDecimals - pmmOrderbook.quoteAssetDecimals);
 	const midPrice = getOrderbookMidPrice(pmmOrderbook);
