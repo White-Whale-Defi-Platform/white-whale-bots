@@ -26,11 +26,7 @@ export function calculateTradeHistoryProfit(orderbook: Orderbook, tradeHistory: 
 			profit += (+trade.quantity / 1e6) * +trade.price;
 		}
 	}
-	return +spotQuantityFromChainQuantityToFixed({
-		value: profit,
-		baseDecimals: orderbook.quoteAssetDecimals,
-		decimalPlaces: 4,
-	});
+	return profit;
 }
 
 /**

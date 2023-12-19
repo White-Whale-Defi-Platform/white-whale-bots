@@ -23,7 +23,7 @@ export function getOrderOperations(pmmOrderbook: PMMOrderbook) {
 	const tradingParameters = pmmOrderbook.trading.config;
 
 	const allowedTradeDirections = priceBasedTradeDirection(pmmOrderbook, shiftedMidPrice);
-	console.log("allowed directions: ", allowedTradeDirections);
+	pmmOrderbook.trading.allowedTradeDirections = allowedTradeDirections;
 	const sellsToCancel: Array<string> = [];
 	const buysToCancel: Array<string> = [];
 	const ordersToCreate: Array<OrderOperation> = [];

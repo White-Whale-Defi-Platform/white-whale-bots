@@ -1,5 +1,5 @@
 import { StdFee } from "@cosmjs/stargate";
-import { OrderSide, TradeDirection } from "@injectivelabs/ts-types";
+import { OrderSide } from "@injectivelabs/ts-types";
 
 import * as chains from "../../../../chains";
 import { initOrderbooks } from "../../../../chains/inj";
@@ -102,7 +102,7 @@ export class PMMLoop {
 				(marketIds && !marketIds.includes(pmmOrderbook.marketId)) ||
 				this.marketsOnCooldown.includes(pmmOrderbook.marketId)
 			) {
-				console.log("skipping ob", pmmOrderbook.ticker);
+				//do nothing
 			} else {
 				const { ordersToCancel, ordersToCreate } = getOrderOperations(pmmOrderbook);
 				if (ordersToCancel.length > 0 || ordersToCreate.length > 0) {
@@ -191,25 +191,11 @@ export class PMMLoop {
 						tradeHistoryChain.trades,
 					);
 
-					if (tradeHistoryChain.trades[0].tradeDirection === TradeDirection.Buy) {
-						pmmOrderbook.trading.buyAllowed = false;
-						pmmOrderbook.trading.sellAllowed = true;
-					} else {
-						pmmOrderbook.trading.buyAllowed = true;
-						pmmOrderbook.trading.sellAllowed = false;
-					}
-
 					pmmOrderbook.trading.tradeHistory.trades = tradeHistoryChain.trades;
 				}
 			}),
 		);
 		if (triggerCooldown && init === false) {
-			console.log(
-				"obtained new trade hash on chain-->trade happened-->going into cooldown for: ",
-				...new Set(orderbooksToCooldown.map((ob) => ob.ticker)),
-				"switching trade side",
-			);
-
 			const marketsToCooldown = orderbooksToCooldown.map((ob) => ob.marketId);
 			this.marketsOnCooldown.push(...marketsToCooldown);
 			await this.setMyInventory(marketsToCooldown);
@@ -232,12 +218,12 @@ export class PMMLoop {
 		await Promise.all(
 			this.PMMOrderbooks.map(async (orderbook) => {
 				if (marketIds && !marketIds.includes(orderbook.marketId)) {
-					console.log("skipping inventory skew for :", orderbook.ticker);
+					// console.log("skipping inventory skew for :", orderbook.ticker);
 				} else {
-					console.log(" setting inventory skew for: ", orderbook.ticker);
+					// console.log(" setting inventory skew for: ", orderbook.ticker);
 					const marketInventorySkew = Math.round(inventorySkew(inventory, orderbook) * 100);
 					orderbook.trading.inventorySkew = marketInventorySkew;
-					console.log("skew: ", marketInventorySkew);
+					// console.log("skew: ", marketInventorySkew);
 				}
 			}),
 		);
@@ -256,10 +242,8 @@ export class PMMLoop {
 			};
 			const fee: StdFee = { amount: [gasFee], gas: String(gas) };
 			const txRes = await this.chainOperator.signAndBroadcast([msgBatchUpdateOrders], fee);
-			console.log(txRes.transactionHash);
 		} else {
 			const txRes = await this.chainOperator.signAndBroadcast([msgBatchUpdateOrders]);
-			console.log(txRes.transactionHash);
 		}
 		await this.logger?.tradeLogging.logOrderbookPositionUpdate(orderUpdates);
 	}
@@ -276,8 +260,6 @@ export class PMMLoop {
 	 */
 	endOfCooldown = async (marketIds: Array<string>) => {
 		this.marketsOnCooldown = this.marketsOnCooldown.filter((cdMarketId) => !marketIds.includes(cdMarketId));
-		console.log("end of cooldown triggered for ", marketIds);
-
 		this.scheduler.emit("updateOrders", marketIds);
 	};
 	/**
@@ -308,6 +290,8 @@ export class PMMLoop {
 	public async reset() {
 		await this.setMyOrders();
 		await this.setMyTrades();
+		await this.setMyInventory();
+		await this.updatePMMParameters();
 		//do something later
 	}
 

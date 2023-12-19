@@ -1,4 +1,5 @@
 import { SpotLimitOrder, SpotTrade } from "@injectivelabs/sdk-ts";
+import { TradeDirection } from "@injectivelabs/ts-types";
 
 import { Asset, NativeAssetInfo } from "./asset";
 export interface Order {
@@ -27,8 +28,7 @@ export interface PMMOrderbook extends Orderbook {
 			summary: { grossGainInQuote: number };
 			trades: Array<SpotTrade>;
 		};
-		buyAllowed: boolean;
-		sellAllowed: boolean;
+		allowedTradeDirections: Array<TradeDirection>;
 		inventorySkew: number;
 		assignedQuoteAmount: number;
 		config: {

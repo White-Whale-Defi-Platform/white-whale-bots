@@ -1,4 +1,4 @@
-import { spotPriceFromChainPrice, spotQuantityFromChainQuantity } from "@injectivelabs/sdk-ts";
+import { spotPriceFromChainPrice } from "@injectivelabs/sdk-ts";
 import { OrderSide, TradeDirection } from "@injectivelabs/ts-types";
 import { BigNumber } from "bignumber.js";
 
@@ -139,7 +139,12 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 
 			let logmsg = ``;
 			logmsg += `\n**${date.toLocaleTimeString("nl-NL", formatOptions)}**\n`;
-			logmsg += `==`.repeat(15);
+			logmsg += `${`===`.repeat(5)}PMM Status${`===`.repeat(5)}`;
+			logmsg += `\n**STARTING VALUE:** \t${loop.inventory.initialQuoteAmount}`;
+			logmsg += `\n**CURRENT VALUE:** \t${loop.inventory.currentQuoteAmount} (${
+				loop.inventory.currentQuoteAmount / loop.inventory.initialQuoteAmount
+			})\n`;
+			logmsg += `--`.repeat(15);
 			for (const pmmOrderbook of loop.PMMOrderbooks) {
 				const midPrice = getOrderbookMidPrice(pmmOrderbook);
 				logmsg += `\n**MARKET:** \t${pmmOrderbook.ticker} (${midPrice})`;
@@ -147,61 +152,8 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				logmsg += `\n**SPREADS (B/A):** \t${Math.round(pmmOrderbook.trading.config.bidSpread * 100) / 100}/${
 					Math.round(pmmOrderbook.trading.config.askSpread * 100) / 100
 				}`;
-				logmsg += `\n**SIDE:**\t${pmmOrderbook.trading.buyAllowed ? "BUY" : ""} ${
-					pmmOrderbook.trading.sellAllowed ? "SELL" : ""
-				}`;
-				logmsg += `\n${"---------"}**Active Orders**${"---------"}`;
-				pmmOrderbook.trading.activeOrders.buys.forEach((buyOrder) => {
-					logmsg += `\nbuy : ${spotQuantityFromChainQuantity({
-						value: buyOrder.quantity,
-						baseDecimals: pmmOrderbook.baseAssetDecimals,
-					})} @ ${
-						Math.round(
-							spotPriceFromChainPrice({
-								value: buyOrder.price,
-								baseDecimals: pmmOrderbook.baseAssetDecimals,
-								quoteDecimals: 6,
-							}).toNumber() * 10000,
-						) / 10000
-					} (~ ${
-						Math.round(
-							((spotPriceFromChainPrice({
-								value: buyOrder.price,
-								baseDecimals: pmmOrderbook.baseAssetDecimals,
-								quoteDecimals: 6,
-							}).toNumber() -
-								midPrice) /
-								midPrice) *
-								100000,
-						) / 1000
-					}%)`;
-				});
-				pmmOrderbook.trading.activeOrders.sells.forEach((sellOrder) => {
-					logmsg += `\nsell: ${spotQuantityFromChainQuantity({
-						value: sellOrder.quantity,
-						baseDecimals: pmmOrderbook.baseAssetDecimals,
-					})} @ ${
-						Math.round(
-							spotPriceFromChainPrice({
-								value: sellOrder.price,
-								baseDecimals: pmmOrderbook.baseAssetDecimals,
-								quoteDecimals: 6,
-							}).toNumber() * 10000,
-						) / 10000
-					} (~ +${
-						Math.round(
-							((spotPriceFromChainPrice({
-								value: sellOrder.price,
-								baseDecimals: pmmOrderbook.baseAssetDecimals,
-								quoteDecimals: 6,
-							}).toNumber() -
-								midPrice) /
-								midPrice) *
-								100000,
-						) / 1000
-					}%)`;
-				});
-
+				logmsg += `\n**INV. SKEW:** \t${pmmOrderbook.trading.inventorySkew}`;
+				logmsg += `\n**DIRECTION:** \t${pmmOrderbook.trading.allowedTradeDirections}`;
 				const histBuys = Array.from(pmmOrderbook.trading.tradeHistory.trades.values()).filter(
 					(trade) => trade.tradeDirection === TradeDirection.Buy,
 				);
@@ -212,12 +164,11 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 				);
 				const histSellsAvgPrice =
 					histSells.map((buy) => +buy.price).reduce((a, b) => a + b, 0) / histSells.length;
-				logmsg += `\n${"---------"}**Recent Trades**${"---------"}`;
-				logmsg += `\n${histSells.length} sells ${
-					histSellsAvgPrice ? `of average price ${new BigNumber(histSellsAvgPrice).toFixed()}` : ""
+				logmsg += `\n**BUYS:**   \t${histBuys.length} @ ${
+					histBuysAvgPrice ? `${new BigNumber(histBuysAvgPrice).toFixed()} average` : ""
 				}`;
-				logmsg += `\n${histBuys.length} buys  ${
-					histBuysAvgPrice ? `of average price ${new BigNumber(histBuysAvgPrice).toFixed()}` : ""
+				logmsg += `\n**SELLS:**  \t${histSells.length} @ ${
+					histSellsAvgPrice ? `${new BigNumber(histSellsAvgPrice).toFixed()} average` : ""
 				}`;
 				logmsg += `\n`;
 				logmsg += `--`.repeat(15);
@@ -291,13 +242,7 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 		 *
 		 */
 		async logOrderbookPositionUpdate(allOrderbookUpdates: Array<OrderbookOrderOperations>) {
-			const formatOptions: Intl.DateTimeFormatOptions = {
-				year: "numeric",
-				month: "numeric",
-				day: "numeric",
-			};
 			let logmsg = ``;
-			logmsg += `\n**${new Date().toLocaleTimeString("nl-NL", formatOptions)}**`;
 			logmsg += `\n${"========="}**Order Updates**${"========="}`;
 			for (const pmmOrderbookUpdate of allOrderbookUpdates) {
 				logmsg += `\n**MARKET:** ${pmmOrderbookUpdate.orderbook.ticker} (${getOrderbookMidPrice(
@@ -338,7 +283,7 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			}
 			logmsg += `\n`;
 			logmsg += `==`.repeat(15);
-			await this._sendMessage(logmsg);
+			await this._sendMessage(logmsg, LogType.Console);
 		},
 
 		/**

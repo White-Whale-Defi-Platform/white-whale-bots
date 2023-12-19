@@ -86,8 +86,7 @@ export async function initPMMOrderbooks(
 						},
 						trades: [],
 					},
-					buyAllowed: true,
-					sellAllowed: true,
+					allowedTradeDirections: [],
 					assignedQuoteAmount: maxCapitalUsedOrderbook,
 					inventorySkew: 50,
 					config: {
