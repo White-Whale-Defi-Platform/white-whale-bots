@@ -172,6 +172,7 @@ export class PMMLoop {
 		await Promise.all(
 			this.PMMOrderbooks.map(async (pmmOrderbook) => {
 				const tradeHistoryLocal = pmmOrderbook.trading.tradeHistory.trades.map((st) => st.orderHash);
+				this.chainOperator.client.queryOrderbookOrders;
 				const tradeHistoryChain = await this.chainOperator.client.queryOrderbookTrades(
 					pmmOrderbook.marketId,
 					this.chainOperator.client.subaccountId,
