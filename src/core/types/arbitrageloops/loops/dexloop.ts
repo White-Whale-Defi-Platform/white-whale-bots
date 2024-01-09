@@ -99,6 +99,9 @@ export class DexLoop implements DexLoopInterface {
 			}
 		}
 		const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+		allPools.forEach((pool) => {
+			console.log({ ...pool });
+		});
 		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
 			console.log("spinning up mempool loop");
 			return new DexMempoolLoop(

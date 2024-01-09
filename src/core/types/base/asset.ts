@@ -109,6 +109,15 @@ export function fromChainAsset(input: Asset): RichAsset {
 			info: input.info,
 			decimals: 18,
 		};
+	} else if (
+		isNativeAsset(input.info) &&
+		["factory/inj13ze65lwstqrz4qy6vvxx3lglnkkuan436aw45e/HACHI"].includes(input.info.native_token.denom)
+	) {
+		return {
+			amount: new BigNumber(+input.amount).dividedBy(new BigNumber(10).pow(3)).toFixed(6),
+			info: input.info,
+			decimals: 9,
+		};
 	} else if (isWyndDaoNativeAsset(input.info)) {
 		return {
 			amount: input.amount,

@@ -1,6 +1,9 @@
+import { fromAscii, fromBase64 } from "@cosmjs/encoding";
+
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
 import {
 	Asset,
+	AssetInfo,
 	fromChainAsset,
 	isJunoSwapNativeAssetInfo,
 	isWyndDaoNativeAsset,
@@ -8,9 +11,29 @@ import {
 	JunoSwapAssetInfo,
 	RichAsset,
 } from "../../../core/types/base/asset";
-import { AmmDexName, Pool } from "../../../core/types/base/pool";
+import { AmmDexName, DefaultPool, PairType, PCLPool, Pool } from "../../../core/types/base/pool";
 import { Uint128 } from "../../../core/types/base/uint128";
 import { getPoolsFromFactory } from "./getPoolsFromFactory";
+
+interface PCLConfigResponse {
+	block_time_last: number;
+	params: string;
+	owner: string;
+	factory_addr: string;
+}
+
+interface PCLConfigParams {
+	amp: string;
+	gamma: string;
+	mid_fee: string;
+	out_fee: string;
+	fee_gamma: string;
+	repeg_profit_threshold: string;
+	min_price_scale_delta: string;
+	price_scale: string;
+	ma_half_time: number;
+	track_asset_balances: boolean;
+}
 
 interface JunoSwapPoolState {
 	token1_reserve: string;
@@ -24,6 +47,12 @@ interface JunoSwapPoolState {
 interface PoolState {
 	assets: [Asset, Asset];
 	total_share: Uint128;
+}
+
+interface PairResponse {
+	asset_infos: Array<AssetInfo>;
+	contract_addr: string;
+	pair_type?: string | Record<string, string>;
 }
 
 /**
@@ -46,6 +75,18 @@ export async function getPoolStates(chainOperator: ChainOperator, pools: Array<P
 				});
 				const [assets] = processPoolStateAssets(poolState);
 				pool.assets = assets;
+
+				if (pool.pairType === PairType.pcl) {
+					const pclPool: PCLPool = <PCLPool>pool;
+					const d = Number(await chainOperator.queryContractSmart(pool.address, { compute_d: {} }));
+					const config: PCLConfigResponse = await chainOperator.queryContractSmart(pool.address, {
+						config: {},
+					});
+					const configParams: PCLConfigParams = JSON.parse(fromAscii(fromBase64(config.params)));
+					pclPool.D = d;
+					pclPool.amp = +configParams.amp;
+					pclPool.gamma = +configParams.gamma;
+				}
 			}
 		}),
 	);
@@ -66,30 +107,18 @@ export async function initPools(
 	const pools: Array<Pool> = [];
 	const factoryPools = await getPoolsFromFactory(chainOperator, factoryMapping);
 	for (const poolAddress of poolAddresses) {
-		let assets: Array<RichAsset> = [];
-		let dexname: AmmDexName;
-		let totalShare: string;
-		try {
-			const poolState = <PoolState>await chainOperator.queryContractSmart(poolAddress.pool, { pool: {} });
-			[assets, dexname, totalShare] = processPoolStateAssets(poolState);
-		} catch (error) {
-			const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(poolAddress.pool, { info: {} });
-			[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
-		}
+		const pool: Pool = await initPool(chainOperator, poolAddress.pool);
+
 		const factory = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.factory ?? "";
 		const router = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.router ?? "";
 
-		pools.push({
-			assets: assets,
-			totalShare: totalShare,
-			address: poolAddress.pool,
-			dexname: dexname,
-			inputfee: poolAddress.inputfee,
-			outputfee: poolAddress.outputfee,
-			LPratio: poolAddress.LPratio,
-			factoryAddress: factory,
-			routerAddress: router,
-		});
+		(pool.inputfee = poolAddress.inputfee),
+			(pool.outputfee = poolAddress.outputfee),
+			(pool.LPratio = poolAddress.LPratio),
+			(pool.factoryAddress = factory),
+			(pool.routerAddress = router);
+
+		pools.push(pool);
 	}
 	return pools;
 }
@@ -149,4 +178,85 @@ function processJunoswapPoolStateAssets(poolState: JunoSwapPoolState): [Array<Ri
 	);
 
 	return [assets, AmmDexName.junoswap, poolState.lp_token_supply];
+}
+
+/**
+ *
+ */
+async function initPool(chainOperator: ChainOperator, pooladdress: string): Promise<Pool> {
+	const pairType = await initPairType(chainOperator, pooladdress);
+	const defaultPool = await initDefaultPool(chainOperator, pooladdress);
+
+	if (pairType === PairType.pcl) {
+		return await initPCLPool(chainOperator, defaultPool);
+	}
+	return defaultPool;
+	/**
+	 *
+	 */
+	async function initDefaultPool(chainOperator: ChainOperator, pooladdress: string): Promise<DefaultPool> {
+		let assets: Array<RichAsset> = [];
+		let dexname: AmmDexName;
+		let totalShare: string;
+		try {
+			const poolState = <PoolState>await chainOperator.queryContractSmart(pooladdress, { pool: {} });
+
+			[assets, dexname, totalShare] = processPoolStateAssets(poolState);
+		} catch (error) {
+			const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(pooladdress, { info: {} });
+			[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
+		}
+		const defaultPool: DefaultPool = {
+			assets: assets,
+			totalShare: totalShare,
+			address: pooladdress,
+			dexname: dexname,
+			pairType: pairType,
+			inputfee: 0,
+			outputfee: 0,
+			LPratio: 0,
+			factoryAddress: "",
+			routerAddress: "",
+		};
+		return defaultPool;
+	}
+
+	/**
+	 *
+	 */
+	async function initPCLPool(chainOperator: ChainOperator, defaultPool: DefaultPool): Promise<PCLPool> {
+		const d = Number(await chainOperator.queryContractSmart(defaultPool.address, { compute_d: {} }));
+		console.log(d);
+		const config: PCLConfigResponse = await chainOperator.queryContractSmart(defaultPool.address, { config: {} });
+		const configParams: PCLConfigParams = JSON.parse(fromAscii(fromBase64(config.params)));
+		return { ...defaultPool, D: d, amp: +configParams.amp, gamma: +configParams.gamma };
+	}
+	/**
+	 *
+	 */
+	async function initPairType(chainOperator: ChainOperator, pooladdress: string): Promise<PairType> {
+		try {
+			const poolPairResponse: PairResponse = await chainOperator.queryContractSmart(pooladdress, {
+				pair: {},
+			});
+			if (!poolPairResponse.pair_type) {
+				return PairType.xyk;
+			} else if (typeof poolPairResponse.pair_type === "string") {
+				if (poolPairResponse.pair_type !== "constant_product") {
+					return PairType.stable;
+				}
+			} else if (poolPairResponse.pair_type["custom"] === "concentrated") {
+				return PairType.pcl;
+			} else if (poolPairResponse.pair_type["stable"] !== undefined) {
+				return PairType.stable;
+			} else {
+				return PairType.xyk;
+			}
+		} catch (e) {
+			console.log("cannot detect pair type for: ", pooladdress, " defaulting to xyk");
+			console.log(e);
+			return PairType.xyk;
+		}
+		return PairType.xyk;
+	}
 }

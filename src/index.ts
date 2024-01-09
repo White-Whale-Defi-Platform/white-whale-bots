@@ -6,7 +6,7 @@ import { DexLoop } from "./core/types/arbitrageloops/loops/dexloop";
 import { LiquidationLoop } from "./core/types/arbitrageloops/loops/liqMempoolLoop";
 import { DexConfig, LiquidationConfig, setBotConfig, SetupType } from "./core/types/base/configs";
 // load env files
-dotenv.config({ path: "./src/envs/chains/terra.env" });
+dotenv.config({ path: "./src/envs/chains/injective.env" });
 
 /**
  * Runs the main program.

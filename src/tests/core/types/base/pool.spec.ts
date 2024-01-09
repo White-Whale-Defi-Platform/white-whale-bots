@@ -3,7 +3,7 @@ import { assert } from "chai";
 import { describe } from "mocha";
 
 import { Asset } from "../../../../core/types/base/asset";
-import { AmmDexName, outGivenIn, Pool } from "../../../../core/types/base/pool";
+import { AmmDexName, outGivenIn, PairType, Pool } from "../../../../core/types/base/pool";
 import { identity } from "../../../../core/types/identity";
 
 describe("Test outGivenIn for pool with 18 and 6 decimal assets", () => {
@@ -30,6 +30,7 @@ describe("Test outGivenIn for pool with 18 and 6 decimal assets", () => {
 		],
 		totalShare: "357638203545997474",
 		dexname: AmmDexName.default,
+		pairType: PairType.xyk,
 		address: "",
 		factoryAddress: "",
 		routerAddress: "",
@@ -89,6 +90,7 @@ describe("Test outGivenIn for pool with 6 and 6 decimal assets", () => {
 		],
 		totalShare: "357638203545997474",
 		dexname: AmmDexName.default,
+		pairType: PairType.xyk,
 		address: "",
 		factoryAddress: "",
 		routerAddress: "",

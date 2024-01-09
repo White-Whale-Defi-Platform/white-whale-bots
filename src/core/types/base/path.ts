@@ -129,7 +129,7 @@ export function getFeeAndThresholdForOrderbookPath(
 	botConfig: DexConfig,
 ): { fee: StdFee; threshold: number } {
 	const decimalCompensator = botConfig.gasDenom === "inj" ? 1e12 : 1;
-	const flashloanCompensator = botConfig.flashloanRouterAddress ? 3.6 : 1;
+	const flashloanCompensator = botConfig.flashloanRouterAddress ? 6 : 1;
 	const gasFee = {
 		denom: botConfig.gasDenom,
 		amount: (botConfig.gasPerHop * 2 * botConfig.gasPrice * decimalCompensator * flashloanCompensator).toFixed(),

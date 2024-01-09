@@ -41,7 +41,7 @@ export enum AmmDexName {
 export enum ClobDexName {
 	injective = "injective",
 }
-export interface Pool {
+export interface DefaultPool {
 	/**
 	 * The two assets that can be swapped between in the pool.
 	 */
@@ -56,11 +56,25 @@ export interface Pool {
 	address: string;
 
 	dexname: AmmDexName;
+	pairType: PairType;
 	inputfee: number;
 	outputfee: number;
 	LPratio: number;
 	factoryAddress: string;
 	routerAddress: string;
+}
+
+export type Pool = DefaultPool | PCLPool;
+export interface PCLPool extends DefaultPool {
+	D: number;
+	amp: number;
+	gamma: number;
+}
+
+export enum PairType {
+	xyk = "xyk",
+	pcl = "pcl",
+	stable = "stable",
 }
 
 /**
@@ -89,6 +103,11 @@ export function outGivenIn(pool: Pool, offer_asset: Asset): RichAsset {
 		return { amount: String(outGivenIn), info: asset_out.info, decimals: asset_out.decimals };
 	}
 }
+
+/**
+ *
+ */
+export function outGivenInPCL(pool: PCLPool, offer_asset: Asset) {}
 
 /**
  * Function to apply a specific trade on a pool.
@@ -188,6 +207,7 @@ export function applyMempoolMessagesOnPools(pools: Array<Pool>, mempoolTxs: Arra
 		} catch (e) {
 			console.log("cannot apply swap operations message");
 			console.log(inspect(JSON.parse(fromUtf8(swapOperationsMsg.msg.msg)), true, null, true));
+			console.log(e);
 			continue;
 		}
 	}

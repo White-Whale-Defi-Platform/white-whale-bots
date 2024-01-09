@@ -113,7 +113,7 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 		if (isNativeAsset(offerAssetChain.info)) {
 			msg = <DefaultSwapMessage>{
 				swap: {
-					max_spread: String(spread),
+					max_spread: "0.1",
 					offer_asset: {
 						amount: offerAssetChain.amount,
 						info:
@@ -129,7 +129,7 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 			const innerSwapMsg: InnerSwapMessage = {
 				swap: {
 					belief_price: beliefPriceChain,
-					max_spread: String(spread),
+					max_spread: "0.1",
 				},
 			};
 			const objJsonStr = JSON.stringify(innerSwapMsg);
