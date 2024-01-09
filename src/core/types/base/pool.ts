@@ -84,6 +84,18 @@ export enum PairType {
  * @return [number, assetInfo] of the received asset by the user.
  */
 export function outGivenIn(pool: Pool, offer_asset: Asset): RichAsset {
+	if (pool.pairType === PairType.xyk) {
+		return outGivenInXYK(pool, offer_asset);
+	} else if (pool.pairType === PairType.pcl) {
+		return outGivenInPCL(<PCLPool>pool, offer_asset);
+	}
+	return { ...offer_asset, decimals: 6 };
+}
+
+/**
+ *
+ */
+function outGivenInXYK(pool: Pool, offer_asset: Asset): RichAsset {
 	const [asset_in, asset_out] = getAssetsOrder(pool, offer_asset.info) ?? [];
 	const a_in = BigNumber(asset_in.amount);
 	const a_out = BigNumber(asset_out.amount);
@@ -103,11 +115,73 @@ export function outGivenIn(pool: Pool, offer_asset: Asset): RichAsset {
 		return { amount: String(outGivenIn), info: asset_out.info, decimals: asset_out.decimals };
 	}
 }
-
 /**
  *
  */
-export function outGivenInPCL(pool: PCLPool, offer_asset: Asset) {}
+function outGivenInPCL(pool: PCLPool, offer_asset: Asset): RichAsset {
+	const [_, asset_out] = getAssetsOrder(pool, offer_asset.info) ?? [];
+	let ask_index: 0 | 1 = 0;
+	if (isMatchingAssetInfos(pool.assets[0].info, offer_asset.info)) {
+		ask_index = 1;
+	} else {
+		ask_index = 0;
+	}
+	const xs = pool.assets.map((asset) => +asset.amount);
+	xs[1 - ask_index] = xs[1 - ask_index] + +offer_asset.amount;
+
+	const new_outBalance = newton_y(xs, pool.amp, pool.gamma, pool.D, ask_index);
+	const delta_outBalance = xs[ask_index] - new_outBalance;
+	return { amount: String(delta_outBalance), info: asset_out.info, decimals: asset_out.decimals };
+	/**
+	 *
+	 */
+	function newton_y(xs: Array<number>, amp: number, gamma: number, d: number, ask_index: 1 | 0): number {
+		const N_POW2 = 4;
+		const x = xs;
+		const x0 = d ** 2 / (N_POW2 * x[1 - ask_index]);
+		let xi_1 = x0;
+		x[ask_index] = x0;
+
+		for (let i = 0; i < 32; i++) {
+			// #         print(F(D, x, amp, gamma),dF(D, x, amp, gamma, ask_index) )
+			const xi = xi_1 - f(d, x, amp, gamma) / dfdx(d, x, amp, gamma, ask_index);
+			x[ask_index] = xi;
+			xi_1 = xi;
+		}
+		return xi_1;
+	}
+	/**
+	 *
+	 */
+	function f(d: number, x: Array<number>, amp: number, gamma: number) {
+		const N_POW2 = 4;
+		const mul = x[0] * x[1];
+		const d_pow2 = d ** 2;
+		const k0 = (mul * N_POW2) / d_pow2;
+		const k = (amp * gamma ** 2 * k0) / (gamma + 1 - k0) ** 2;
+		return k * d * (x[0] + x[1]) + mul - k * d_pow2 - d_pow2 / N_POW2;
+	}
+	/**
+	 *
+	 */
+	function dfdx(d: number, x: Array<number>, amp: number, gamma: number, ask_index: 1 | 0) {
+		const N_POW2 = 4;
+		const padding = 10000000000000;
+		const x_r = x[1 - ask_index];
+		const d_pow2 = d ** 2;
+		const k0 = (x[0] * x[1] * N_POW2) / d_pow2;
+
+		const gamma_one_k0 = gamma + 1 - k0;
+		const gamma_one_k0_pow2 = gamma_one_k0 ** 2;
+		const a_gamma_pow2 = amp * gamma ** 2;
+		const k = (a_gamma_pow2 * k0) / gamma_one_k0_pow2;
+		const k0_x = x_r * N_POW2;
+		const k_x =
+			(k0_x * a_gamma_pow2 * (gamma + 1 + k0) * padding) / (padding * d_pow2 * gamma_one_k0 * gamma_one_k0_pow2);
+		// #     print("Variables xr: {}, dpow2: {}, k0: {}, gamma_one_k0: {}, gamma_one_k0_pow2: {}, a_gamma_pow2: {}, k: {}, k0_x: {}, k_x: {}, ".format(x_r, d_pow2, k0, gamma_one_k0, gamma_one_k0_pow2, a_gamma_pow2, k, k0_x, k_x))
+		return (k_x * (x[0] + x[1]) + k) * d + x_r - k_x * d_pow2;
+	}
+}
 
 /**
  * Function to apply a specific trade on a pool.
