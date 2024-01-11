@@ -1,7 +1,7 @@
 import { AssetInfo, isNativeAsset } from "../types/base/asset";
 import { DexConfig } from "../types/base/configs";
-import { getFeeAndThresholdForAmmPath, Path } from "../types/base/path";
-import { Pool } from "../types/base/pool";
+import { getFeeAndThresholdForAmmPath, Path, PathComplexity } from "../types/base/path";
+import { PairType, Pool } from "../types/base/pool";
 
 export interface Graph {
 	vertices: Map<string, Vertex>;
@@ -88,6 +88,10 @@ export function getPaths(graph: Graph, botConfig: DexConfig): Array<Path> | unde
 	// create paths and sets identifier
 	for (const poolList of poolLists) {
 		const { fee, threshold } = getFeeAndThresholdForAmmPath(poolList, botConfig);
+		const pathComplexity: PathComplexity =
+			poolList.filter((pool) => pool.pairType === PairType.xyk).length === poolList.length
+				? PathComplexity.default
+				: PathComplexity.pcl;
 		if (poolList.length >= 2) {
 			paths.push({
 				pools: poolList,
@@ -95,6 +99,7 @@ export function getPaths(graph: Graph, botConfig: DexConfig): Array<Path> | unde
 				identifier: getAddrfromPools(poolList),
 				fee: fee,
 				threshold: threshold,
+				pathComplexity: pathComplexity,
 			});
 		}
 	}

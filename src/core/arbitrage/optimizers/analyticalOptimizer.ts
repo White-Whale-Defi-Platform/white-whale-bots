@@ -1,5 +1,5 @@
 import { AssetInfo } from "../../types/base/asset";
-import { Path } from "../../types/base/path";
+import { Path, PathComplexity } from "../../types/base/path";
 import { getAssetsOrder, outGivenIn } from "../../types/base/pool";
 import { OptimalTrade, TradeType } from "../../types/base/trades";
 
@@ -17,11 +17,25 @@ export function getOptimalTrade(
 	let maxPath;
 
 	paths.map((path: Path) => {
-		const [tradesize, profit] = getOptimalTradeForPath(path, offerAssetInfo, flashloanfee);
-		if (profit > maxProfit && tradesize > 0) {
-			maxProfit = profit;
-			maxTradesize = tradesize;
-			maxPath = path;
+		if (path.pathComplexity === PathComplexity.default) {
+			//path does not contain a pcl pool
+			const [tradesize, profit] = getOptimalTradeForPath(path, offerAssetInfo, flashloanfee);
+			if (profit > maxProfit && tradesize > 0) {
+				maxProfit = profit;
+				maxTradesize = tradesize;
+				maxPath = path;
+			}
+			console.log("optimizing default path: ", tradesize, profit);
+		} else if (path.pathComplexity === PathComplexity.pcl) {
+			//path contains a pcl pool
+
+			const [tradesize, profit] = getOptimalTradeForPCLPath(path, offerAssetInfo);
+			if (profit > maxProfit && tradesize > 0) {
+				maxProfit = profit;
+				maxTradesize = tradesize;
+				maxPath = path;
+			}
+			console.log("optimizing pcl path: ", tradesize, profit);
 		}
 	});
 	if (maxPath) {
@@ -82,4 +96,66 @@ export function getOptimalTradeForPath(path: Path, offerAssetInfo: AssetInfo, fl
 
 	// # Return the floor of delta_a
 	return [delta_a, profit];
+}
+
+/**
+ *
+ */
+export function getOptimalTradeForPCLPath(path: Path, offerAssetInfo: AssetInfo, flashloanfee = 0): [number, number] {
+	if (path.pools.length > 2) {
+		//start with 2 hop pools only
+		return [0, 0];
+	} else {
+		const tradesizes = [...Array(1400).keys()].map((x) => x * 1e6);
+		return binarySearch(path, offerAssetInfo, flashloanfee, tradesizes, 0, tradesizes.length - 1);
+	}
+
+	/**
+	 *
+	 */
+	function binarySearch(
+		path: Path,
+		offerAssetInfo: AssetInfo,
+		flashloanfee: number,
+		arr: Array<number>,
+		low: number,
+		high: number,
+	): [number, number] {
+		if (low === high || low > high) {
+			return [arr[low], getProfitForTradesize(path, arr[low], offerAssetInfo, flashloanfee)];
+		}
+		const mid = Math.floor((low + high) / 2);
+		const midValue = getProfitForTradesize(path, arr[mid], offerAssetInfo, flashloanfee);
+		const leftOfMidValue = getProfitForTradesize(path, arr[mid - 1], offerAssetInfo, flashloanfee);
+		const rightOfMidValue = getProfitForTradesize(path, arr[mid + 1], offerAssetInfo, flashloanfee);
+		try {
+			if (midValue > rightOfMidValue && midValue > leftOfMidValue) {
+				return [arr[mid], getProfitForTradesize(path, arr[mid], offerAssetInfo, flashloanfee)];
+			}
+			if (midValue > rightOfMidValue && midValue < leftOfMidValue) {
+				return binarySearch(path, offerAssetInfo, flashloanfee, arr, low, mid - 1);
+			} else {
+				return binarySearch(path, offerAssetInfo, flashloanfee, arr, mid + 1, high);
+			}
+		} catch (e) {
+			console.log(e);
+			console.log(low, mid, high);
+			console.log(leftOfMidValue, midValue, rightOfMidValue);
+		}
+		return binarySearch(path, offerAssetInfo, flashloanfee, arr, low, high);
+	}
+
+	/**
+	 *
+	 */
+	function getProfitForTradesize(path: Path, tradesize: number, offerAssetInfo: AssetInfo, flashloanFee: number) {
+		let currentOfferAsset = { amount: String(tradesize), info: offerAssetInfo };
+
+		for (let i = 0; i < path.pools.length; i++) {
+			const outAsset = outGivenIn(path.pools[i], currentOfferAsset);
+			currentOfferAsset = outAsset;
+		}
+
+		return +currentOfferAsset.amount - (1 + flashloanFee / 100) * tradesize;
+	}
 }

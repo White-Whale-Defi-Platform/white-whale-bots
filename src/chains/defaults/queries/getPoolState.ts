@@ -20,6 +20,7 @@ interface PCLConfigResponse {
 	params: string;
 	owner: string;
 	factory_addr: string;
+	price_scale: string;
 }
 
 interface PCLConfigParams {
@@ -86,6 +87,7 @@ export async function getPoolStates(chainOperator: ChainOperator, pools: Array<P
 					pclPool.D = d;
 					pclPool.amp = +configParams.amp;
 					pclPool.gamma = +configParams.gamma;
+					pclPool.priceScale = +configParams.price_scale;
 				}
 			}
 		}),
@@ -229,7 +231,13 @@ async function initPool(chainOperator: ChainOperator, pooladdress: string): Prom
 		console.log(d);
 		const config: PCLConfigResponse = await chainOperator.queryContractSmart(defaultPool.address, { config: {} });
 		const configParams: PCLConfigParams = JSON.parse(fromAscii(fromBase64(config.params)));
-		return { ...defaultPool, D: d, amp: +configParams.amp, gamma: +configParams.gamma };
+		return {
+			...defaultPool,
+			D: d,
+			amp: +configParams.amp,
+			gamma: +configParams.gamma,
+			priceScale: +configParams.price_scale,
+		};
 	}
 	/**
 	 *

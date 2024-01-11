@@ -69,6 +69,7 @@ export interface PCLPool extends DefaultPool {
 	D: number;
 	amp: number;
 	gamma: number;
+	priceScale: number;
 }
 
 export enum PairType {
@@ -119,6 +120,7 @@ function outGivenInXYK(pool: Pool, offer_asset: Asset): RichAsset {
  *
  */
 function outGivenInPCL(pool: PCLPool, offer_asset: Asset): RichAsset {
+	//assumes outputfee
 	const [_, asset_out] = getAssetsOrder(pool, offer_asset.info) ?? [];
 	let ask_index: 0 | 1 = 0;
 	if (isMatchingAssetInfos(pool.assets[0].info, offer_asset.info)) {
@@ -126,18 +128,24 @@ function outGivenInPCL(pool: PCLPool, offer_asset: Asset): RichAsset {
 	} else {
 		ask_index = 0;
 	}
-	const xs = pool.assets.map((asset) => +asset.amount);
-	xs[1 - ask_index] = xs[1 - ask_index] + +offer_asset.amount;
+	const xs = pool.assets.map((asset) => +asset.amount / 10 ** 6);
 
+	xs[1 - ask_index] = xs[1 - ask_index] + +offer_asset.amount / 1e6;
+	xs[1] *= pool.priceScale;
 	const new_outBalance = newton_y(xs, pool.amp, pool.gamma, pool.D, ask_index);
 	const delta_outBalance = xs[ask_index] - new_outBalance;
-	return { amount: String(delta_outBalance), info: asset_out.info, decimals: asset_out.decimals };
+
+	const return_amount =
+		(ask_index === 0 ? delta_outBalance : delta_outBalance / pool.priceScale) * (1 - pool.outputfee / 100);
+	xs[ask_index] = new_outBalance;
+
+	return { amount: String(return_amount * 1e6), info: asset_out.info, decimals: asset_out.decimals };
 	/**
 	 *
 	 */
 	function newton_y(xs: Array<number>, amp: number, gamma: number, d: number, ask_index: 1 | 0): number {
 		const N_POW2 = 4;
-		const x = xs;
+		const x = xs.slice();
 		const x0 = d ** 2 / (N_POW2 * x[1 - ask_index]);
 		let xi_1 = x0;
 		x[ask_index] = x0;
