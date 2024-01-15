@@ -25,7 +25,6 @@ export function getOptimalTrade(
 				maxTradesize = tradesize;
 				maxPath = path;
 			}
-			console.log("optimizing default path: ", tradesize, profit);
 		} else if (path.pathComplexity === PathComplexity.pcl) {
 			//path contains a pcl pool
 
@@ -35,7 +34,6 @@ export function getOptimalTrade(
 				maxTradesize = tradesize;
 				maxPath = path;
 			}
-			console.log("optimizing pcl path: ", tradesize, profit);
 		}
 	});
 	if (maxPath) {
