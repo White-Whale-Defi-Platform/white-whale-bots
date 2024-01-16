@@ -70,6 +70,9 @@ export interface PCLPool extends DefaultPool {
 	amp: number;
 	gamma: number;
 	priceScale: number;
+	feeGamma: number;
+	midFee: number;
+	outFee: number;
 }
 
 export enum PairType {
@@ -135,9 +138,11 @@ function outGivenInPCL(pool: PCLPool, offer_asset: Asset): RichAsset {
 	const new_outBalance = newton_y(xs, pool.amp, pool.gamma, pool.D, ask_index);
 	const delta_outBalance = xs[ask_index] - new_outBalance;
 
-	const return_amount =
-		(ask_index === 0 ? delta_outBalance : delta_outBalance / pool.priceScale) * (1 - pool.outputfee / 100);
+	const dy = ask_index === 0 ? delta_outBalance : delta_outBalance / pool.priceScale;
 	xs[ask_index] = new_outBalance;
+	const outputFeeRate = fee(xs, pool.feeGamma, pool.midFee, pool.outFee);
+	const outputFee = dy * outputFeeRate;
+	const return_amount = dy - outputFee;
 
 	return { amount: String(return_amount * 1e6), info: asset_out.info, decimals: asset_out.decimals };
 	/**
@@ -188,6 +193,19 @@ function outGivenInPCL(pool: PCLPool, offer_asset: Asset): RichAsset {
 			(k0_x * a_gamma_pow2 * (gamma + 1 + k0) * padding) / (padding * d_pow2 * gamma_one_k0 * gamma_one_k0_pow2);
 		// #     print("Variables xr: {}, dpow2: {}, k0: {}, gamma_one_k0: {}, gamma_one_k0_pow2: {}, a_gamma_pow2: {}, k: {}, k0_x: {}, k_x: {}, ".format(x_r, d_pow2, k0, gamma_one_k0, gamma_one_k0_pow2, a_gamma_pow2, k, k0_x, k_x))
 		return (k_x * (x[0] + x[1]) + k) * d + x_r - k_x * d_pow2;
+	}
+
+	/**
+	 *
+	 */
+	function fee(x: Array<number>, feeGamma: number, midFee: number, outFee: number): number {
+		const sum = x[0] + x[1];
+		let k = (x[0] * x[1] * 4) / sum ** 2;
+		k = feeGamma / (feeGamma + 1 - k);
+		if (k <= 0.001) {
+			k = 0;
+		}
+		return k * midFee + (1 - k) * outFee;
 	}
 }
 

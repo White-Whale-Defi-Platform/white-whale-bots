@@ -119,7 +119,6 @@ export async function initPools(
 			(pool.LPratio = poolAddress.LPratio),
 			(pool.factoryAddress = factory),
 			(pool.routerAddress = router);
-
 		pools.push(pool);
 	}
 	return pools;
@@ -228,7 +227,6 @@ async function initPool(chainOperator: ChainOperator, pooladdress: string): Prom
 	 */
 	async function initPCLPool(chainOperator: ChainOperator, defaultPool: DefaultPool): Promise<PCLPool> {
 		const d = Number(await chainOperator.queryContractSmart(defaultPool.address, { compute_d: {} }));
-		console.log(d);
 		const config: PCLConfigResponse = await chainOperator.queryContractSmart(defaultPool.address, { config: {} });
 		const configParams: PCLConfigParams = JSON.parse(fromAscii(fromBase64(config.params)));
 		return {
@@ -237,6 +235,9 @@ async function initPool(chainOperator: ChainOperator, pooladdress: string): Prom
 			amp: +configParams.amp,
 			gamma: +configParams.gamma,
 			priceScale: +configParams.price_scale,
+			feeGamma: +configParams.fee_gamma,
+			midFee: +configParams.mid_fee,
+			outFee: +configParams.out_fee,
 		};
 	}
 	/**

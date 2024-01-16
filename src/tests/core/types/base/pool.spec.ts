@@ -2,8 +2,8 @@ import BigNumber from "bignumber.js";
 import { assert } from "chai";
 import { describe } from "mocha";
 
-import { Asset } from "../../../../core/types/base/asset";
-import { AmmDexName, outGivenIn, PairType, Pool } from "../../../../core/types/base/pool";
+import { Asset, RichAsset } from "../../../../core/types/base/asset";
+import { AmmDexName, outGivenIn, PairType, PCLPool, Pool } from "../../../../core/types/base/pool";
 import { identity } from "../../../../core/types/identity";
 
 describe("Test outGivenIn for pool with 18 and 6 decimal assets", () => {
@@ -126,6 +126,56 @@ describe("Test outGivenIn for pool with 6 and 6 decimal assets", () => {
 
 		assert.closeTo(price.toNumber() * 0.997 * +input.amount, +output.amount, 100);
 	});
+});
+
+describe("Test outGivenIn for PCL pool", () => {
+	const asset0: RichAsset = {
+		info: { native_token: { denom: "peggy0xdAC17F958D2ee523a2206206994597C13D831ec7" } },
+		amount: "119049137856",
+		decimals: 6,
+	};
+	const asset1: RichAsset = { amount: "3004379246.755965", info: { native_token: { denom: "inj" } }, decimals: 18 };
+	const pclPool: PCLPool = {
+		assets: [asset0, asset1],
+		totalShare: "18278368578",
+		address: "inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp",
+		dexname: AmmDexName.default,
+		pairType: PairType.pcl,
+		inputfee: 0,
+		outputfee: 0.3,
+		LPratio: 0,
+		factoryAddress: "",
+		routerAddress: "",
+		D: 239345.29781235137,
+		amp: 10,
+		gamma: 0.000145,
+		priceScale: 40.04034110992774,
+		midFee: 0.0026,
+		outFee: 0.0045,
+		feeGamma: 0.00023,
+	};
+
+	/*expected outcome: {
+  "return_amount": "249260514562831308",
+  "spread_amount": "484148904998105",
+  "commission_amount": "698611467674416"
+}*/
+	const offerAsset: Asset = {
+		info: {
+			native_token: {
+				denom: "peggy0xdAC17F958D2ee523a2206206994597C13D831ec7",
+			},
+		},
+		amount: "10000000",
+	};
+	const out0 = outGivenIn(pclPool, offerAsset);
+	console.log(
+		out0,
+		"expected: ",
+		"249260.514562831308",
+		"difference: ",
+		Math.abs(+out0.amount - BigNumber("249260.514562831308").toNumber()),
+	);
 });
 
 /*example outgivenin setup and actual received numbers on-chain:
