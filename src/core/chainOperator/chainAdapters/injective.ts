@@ -211,7 +211,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			if (!fee || fee === "auto") {
 				const broadcasterOptions = {
 					msgs: preppedMsgs,
-					injectiveAddress: this._publicAddress,
 				};
 				const simRes = await this._signAndBroadcastClient.simulate(broadcasterOptions);
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
@@ -236,7 +235,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 				*/
 				const broadcasterOptions = {
 					msgs: preppedMsgs,
-					injectiveAddress: this._publicAddress,
 					gas: {
 						gasPrice: String(+fee.amount[0].amount / +fee.gas),
 						gas: +fee.gas,
