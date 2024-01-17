@@ -8,10 +8,9 @@ import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } fr
 import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
 import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
-import { Orderbook } from "../../base/orderbook";
+import { Orderbook, removedUnusedOrderbooks } from "../../base/orderbook";
 
 import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
-import { inspect } from "util";
 
 /**
  *
@@ -54,9 +53,10 @@ export class DexMempoolLoop implements DexLoopInterface {
 		const paths = getAmmPaths(allPools, botConfig);
 		const filteredPools = removedUnusedPools(allPools, paths);
 		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks, botConfig);
+		const filteredOrderbooks = removedUnusedOrderbooks(orderbooks, orderbookPaths);
 		this.orderbookPaths = orderbookPaths;
 		this.pools = filteredPools;
-		this.orderbooks = orderbooks;
+		this.orderbooks = filteredOrderbooks;
 		this.CDpaths = new Map<
 			string,
 			{ timeoutIteration: number; timeoutDuration: number; path: OrderbookPath | Path }
@@ -85,22 +85,6 @@ export class DexMempoolLoop implements DexLoopInterface {
 			]);
 		} else {
 			await this.updatePoolStates(this.chainOperator, this.pools);
-		}
-
-		const arbTrade: OptimalTrade | undefined = this.ammArb(this.paths, this.botConfig);
-
-		const arbTradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
-
-		if (arbTrade && arbTradeOB) {
-			if (arbTrade.profit > arbTradeOB.profit) {
-				await this.trade(arbTrade);
-			} else if (arbTrade.profit <= arbTradeOB.profit) {
-				await this.trade(arbTradeOB);
-			}
-		} else if (arbTrade) {
-			await this.trade(arbTrade);
-		} else if (arbTradeOB) {
-			await this.trade(arbTradeOB);
 		}
 
 		while (true) {
@@ -183,7 +167,6 @@ export class DexMempoolLoop implements DexLoopInterface {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		console.log(inspect(arbTradeOB.path.fee));
 		const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], arbTradeOB.path.fee);
 		await this.logger?.tradeLogging.logOrderbookTrade(arbTradeOB, txResponse);
 	}
@@ -201,7 +184,6 @@ export class DexMempoolLoop implements DexLoopInterface {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		console.log(inspect(arbTrade.path.fee));
 		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTrade.path.fee);
 
 		await this.logger?.tradeLogging.logAmmTrade(arbTrade, txResponse);

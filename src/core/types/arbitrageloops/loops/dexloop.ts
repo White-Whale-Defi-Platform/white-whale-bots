@@ -6,7 +6,7 @@ import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
-import { Orderbook } from "../../base/orderbook";
+import { Orderbook, removedUnusedOrderbooks } from "../../base/orderbook";
 import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
 import { Pool, removedUnusedPools } from "../../base/pool";
 import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
@@ -51,9 +51,9 @@ export class DexLoop implements DexLoopInterface {
 		const paths = getAmmPaths(allPools, botConfig);
 		const filteredPools = removedUnusedPools(allPools, paths);
 		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks, botConfig);
-
+		const filteredOrderbooks = removedUnusedOrderbooks(orderbooks, orderbookPaths);
 		this.orderbookPaths = orderbookPaths;
-		this.orderbooks = orderbooks;
+		this.orderbooks = filteredOrderbooks;
 		this.pools = filteredPools;
 		this.CDpaths = new Map<
 			string,

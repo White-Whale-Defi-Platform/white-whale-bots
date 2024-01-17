@@ -5,6 +5,7 @@ import { Logger } from "./core/logging";
 import { DexLoop } from "./core/types/arbitrageloops/loops/dexloop";
 import { LiquidationLoop } from "./core/types/arbitrageloops/loops/liqMempoolLoop";
 import { DexConfig, LiquidationConfig, setBotConfig, SetupType } from "./core/types/base/configs";
+import { LogType } from "./core/types/base/logging";
 // load env files
 dotenv.config({ path: "./src/envs/chains/injective.env" });
 
@@ -19,7 +20,7 @@ async function main() {
 	const logger = new Logger(botConfig);
 
 	// print the config
-	await logger.loopLogging.logConfig(botConfig);
+	await logger.loopLogging.logConfig(botConfig, LogType.Console);
 	//spawn chainOperator for interaction with blockchains
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 	//create the arbitrage loop based on input config
@@ -28,12 +29,12 @@ async function main() {
 		case SetupType.DEX:
 			loop = await DexLoop.createLoop(chainOperator, <DexConfig>botConfig, logger);
 			//print the created arbitrage loop
-			await logger.loopLogging.logDexLoop(loop);
+			await logger.loopLogging.logDexLoop(loop, LogType.Console);
 			break;
 		case SetupType.LIQUIDATION:
 			loop = await LiquidationLoop.createLoop(chainOperator, <LiquidationConfig>botConfig, logger);
 			//print the created arbitrage loop
-			await logger.loopLogging.logLiqLoop(loop);
+			await logger.loopLogging.logLiqLoop(loop, LogType.Console);
 			break;
 	}
 

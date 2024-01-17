@@ -240,7 +240,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 						gas: +fee.gas,
 					},
 				};
-				console.log(broadcasterOptions.gas);
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
 				return {
 					height: res.height,

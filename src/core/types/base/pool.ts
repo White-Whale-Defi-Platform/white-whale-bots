@@ -158,6 +158,9 @@ function outGivenInPCL(pool: PCLPool, offer_asset: Asset): RichAsset {
 		for (let i = 0; i < 32; i++) {
 			// #         print(F(D, x, amp, gamma),dF(D, x, amp, gamma, ask_index) )
 			const xi = xi_1 - f(d, x, amp, gamma) / dfdx(d, x, amp, gamma, ask_index);
+			if (Math.abs(xi - xi_1) < 1e-5) {
+				return xi_1;
+			}
 			x[ask_index] = xi;
 			xi_1 = xi;
 		}

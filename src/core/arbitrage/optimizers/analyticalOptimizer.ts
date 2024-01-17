@@ -104,7 +104,7 @@ export function getOptimalTradeForPCLPath(path: Path, offerAssetInfo: AssetInfo,
 		//start with 2 hop pools only
 		return [0, 0];
 	} else {
-		const tradesizes = [...Array(1400).keys()].map((x) => x * 1e6);
+		const tradesizes = Array.from({ length: 1350 }, (_, i) => (i + 1) * 1e6);
 		return binarySearch(path, offerAssetInfo, flashloanfee, tradesizes, 0, tradesizes.length - 1);
 	}
 

@@ -10,7 +10,7 @@ import {
 	toChainPrice,
 } from "../../../core/types/base/asset";
 import { Path } from "../../../core/types/base/path";
-import { AmmDexName, outGivenIn, Pool } from "../../../core/types/base/pool";
+import { AmmDexName, outGivenIn, PairType, Pool } from "../../../core/types/base/pool";
 import { OptimalTrade } from "../../../core/types/base/trades";
 import { IncreaseAllowanceMessage } from "../../../core/types/messages/allowance";
 import { FlashLoanMessage, WasmMessage } from "../../../core/types/messages/flashloanmessage";
@@ -74,7 +74,7 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 		if (isNativeAsset(offerAssetChain.info)) {
 			msg = <DefaultSwapMessage>{
 				swap: {
-					max_spread: "0.1",
+					max_spread: pool.pairType === PairType.pcl ? undefined : "0.1",
 					offer_asset: {
 						amount: offerAssetChain.amount,
 						info:
@@ -83,7 +83,7 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 								: { native: offerAssetChain.info.native_token.denom },
 					},
 
-					belief_price: beliefPriceChain,
+					belief_price: pool.pairType === PairType.pcl ? undefined : beliefPriceChain,
 				},
 			};
 		} else {

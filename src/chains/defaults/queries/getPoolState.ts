@@ -71,23 +71,33 @@ export async function getPoolStates(chainOperator: ChainOperator, pools: Array<P
 				pool.assets[1].amount = poolState.token2_reserve;
 				return;
 			} else {
-				const poolState = <PoolState>await chainOperator.queryContractSmart(pool.address, {
-					pool: {},
-				});
-				const [assets] = processPoolStateAssets(poolState);
-				pool.assets = assets;
-
 				if (pool.pairType === PairType.pcl) {
+					const [poolState, d, config]: [PoolState, number, PCLConfigResponse] = await Promise.all([
+						chainOperator.queryContractSmart(pool.address, {
+							pool: {},
+						}),
+						chainOperator.queryContractSmart(pool.address, { compute_d: {} }),
+						chainOperator.queryContractSmart(pool.address, {
+							config: {},
+						}),
+					]);
 					const pclPool: PCLPool = <PCLPool>pool;
-					const d = Number(await chainOperator.queryContractSmart(pool.address, { compute_d: {} }));
-					const config: PCLConfigResponse = await chainOperator.queryContractSmart(pool.address, {
-						config: {},
-					});
 					const configParams: PCLConfigParams = JSON.parse(fromAscii(fromBase64(config.params)));
-					pclPool.D = d;
+					pclPool.D = Number(d);
 					pclPool.amp = +configParams.amp;
 					pclPool.gamma = +configParams.gamma;
 					pclPool.priceScale = +configParams.price_scale;
+					pclPool.feeGamma = +configParams.fee_gamma;
+					pclPool.midFee = +configParams.mid_fee;
+					pclPool.outFee = +configParams.out_fee;
+					const [assets] = processPoolStateAssets(poolState);
+					pool.assets = assets;
+				} else {
+					const poolState = <PoolState>await chainOperator.queryContractSmart(pool.address, {
+						pool: {},
+					});
+					const [assets] = processPoolStateAssets(poolState);
+					pool.assets = assets;
 				}
 			}
 		}),
