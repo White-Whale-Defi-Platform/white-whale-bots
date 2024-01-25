@@ -1,9 +1,15 @@
+import { setupWasmExtension } from "@cosmjs/cosmwasm-stargate";
+import { fromAscii, fromBase64 } from "@cosmjs/encoding";
+import { QueryClient } from "@cosmjs/stargate";
+import { HttpBatchClient, Tendermint34Client } from "@cosmjs/tendermint-rpc";
 import BigNumber from "bignumber.js";
 import { assert } from "chai";
 import { describe } from "mocha";
 
-import { Asset, RichAsset } from "../../../../core/types/base/asset";
+import { processPoolStateAssets } from "../../../../chains/defaults/queries/getPoolState";
+import { Asset, fromChainAsset } from "../../../../core/types/base/asset";
 import { AmmDexName, outGivenIn, PairType, PCLPool, Pool } from "../../../../core/types/base/pool";
+import { Uint128 } from "../../../../core/types/base/uint128";
 import { identity } from "../../../../core/types/identity";
 
 describe("Test outGivenIn", () => {
@@ -134,7 +140,7 @@ describe("Test outGivenIn", () => {
 			totalShare: "357638203545997474",
 			dexname: AmmDexName.default,
 			pairType: PairType.xyk,
-			address: "",
+			address: "inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp",
 			factoryAddress: "",
 			routerAddress: "",
 			inputfee: 0,
@@ -154,20 +160,53 @@ describe("Test outGivenIn", () => {
 		const price = BigNumber(pool.assets[1].amount).dividedBy(BigNumber(pool.assets[0].amount));
 		assert.closeTo(price.toNumber() * 0.997 * +input.amount, +output.amount, 100);
 	});
-	it("should have a return amount close to simulated result for PCL pool", () => {
-		const asset0: RichAsset = {
-			info: { native_token: { denom: "peggy0xdAC17F958D2ee523a2206206994597C13D831ec7" } },
-			amount: "119049137856",
-			decimals: 6,
-		};
-		const asset1: RichAsset = {
-			amount: "3004379246.755965",
-			info: { native_token: { denom: "inj" } },
-			decimals: 18,
-		};
+	it("should have a return amount close to simulated result for PCL pool", async () => {
+		//creat config based on environment variables
+		const _httpClient = new HttpBatchClient("https://ww-injective-rpc.polkachu.com");
+		const tmClient = await Tendermint34Client.create(_httpClient);
+		const _wasmQueryClient = QueryClient.withExtensions(tmClient, setupWasmExtension);
+
+		interface PoolState {
+			assets: [Asset, Asset];
+			total_share: Uint128;
+		}
+		interface PCLConfigResponse {
+			block_time_last: number;
+			params: string;
+			owner: string;
+			factory_addr: string;
+			price_scale: string;
+		}
+
+		interface PCLConfigParams {
+			amp: string;
+			gamma: string;
+			mid_fee: string;
+			out_fee: string;
+			fee_gamma: string;
+			repeg_profit_threshold: string;
+			min_price_scale_delta: string;
+			price_scale: string;
+			ma_half_time: number;
+			track_asset_balances: boolean;
+		}
+
+		const [poolState, d, config]: [PoolState, number, PCLConfigResponse] = await Promise.all([
+			_wasmQueryClient.wasm.queryContractSmart("inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp", {
+				pool: {},
+			}),
+			_wasmQueryClient.wasm.queryContractSmart("inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp", { compute_d: {} }),
+			_wasmQueryClient.wasm.queryContractSmart("inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp", {
+				config: {},
+			}),
+		]);
+
+		const configParams: PCLConfigParams = JSON.parse(fromAscii(fromBase64(config.params)));
+		const [assets, dexname, totalShare] = processPoolStateAssets(poolState);
+
 		const pclPool: PCLPool = {
-			assets: [asset0, asset1],
-			totalShare: "18278368578",
+			assets: assets,
+			totalShare: totalShare,
 			address: "inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp",
 			dexname: AmmDexName.default,
 			pairType: PairType.pcl,
@@ -176,13 +215,13 @@ describe("Test outGivenIn", () => {
 			LPratio: 0,
 			factoryAddress: "",
 			routerAddress: "",
-			D: 239345.29781235137,
-			amp: 10,
-			gamma: 0.000145,
-			priceScale: 40.04034110992774,
-			midFee: 0.0026,
-			outFee: 0.0045,
-			feeGamma: 0.00023,
+			D: Number(d),
+			amp: +configParams.amp,
+			gamma: +configParams.gamma,
+			priceScale: +configParams.price_scale,
+			feeGamma: +configParams.fee_gamma,
+			midFee: +configParams.mid_fee,
+			outFee: +configParams.out_fee,
 		};
 
 		/*expected outcome: {
@@ -199,7 +238,18 @@ describe("Test outGivenIn", () => {
 			amount: "10000000",
 		};
 		const out0 = outGivenIn(pclPool, offerAsset);
-
+		const outSimulated = await _wasmQueryClient.wasm.queryContractSmart(
+			"inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp",
+			{ simulation: { offer_asset: offerAsset } },
+		);
+		console.log(out0, fromChainAsset({ amount: outSimulated.return_amount, info: out0.info }))
 		assert.closeTo(+out0.amount, BigNumber("249260.514562831308").toNumber(), 1);
 	});
 });
+
+/**
+ *
+ */
+function delay(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}

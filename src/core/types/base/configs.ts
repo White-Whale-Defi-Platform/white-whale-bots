@@ -93,6 +93,7 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
  *
  */
 async function getBaseConfig(envs: NodeJS.ProcessEnv): Promise<BaseConfig> {
+	console.log(envs);
 	let setupType: SetupType;
 	switch (envs.SETUP_TYPE.toLocaleLowerCase()) {
 		case "dex":

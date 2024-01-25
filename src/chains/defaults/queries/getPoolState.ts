@@ -137,7 +137,7 @@ export async function initPools(
 /**
  *
  */
-function processPoolStateAssets(poolState: PoolState): [Array<RichAsset>, AmmDexName, string] {
+export function processPoolStateAssets(poolState: PoolState): [Array<RichAsset>, AmmDexName, string] {
 	const assets: Array<RichAsset> = [];
 	let type = AmmDexName.default;
 
