@@ -164,9 +164,14 @@ export class DexLoop implements DexLoopInterface {
 	 */
 	async reset() {
 		this.unCDPaths();
-		await this.updatePoolStates(this.chainOperator, this.pools);
-		if (this.updateOrderbookStates) {
-			await this.updateOrderbookStates(this.chainOperator, this.orderbooks);
+
+		if (this.updateOrderbookStates && this.orderbooks.length > 0) {
+			await Promise.all([
+				this.updateOrderbookStates(this.chainOperator, this.orderbooks),
+				this.updatePoolStates(this.chainOperator, this.pools),
+			]);
+		} else {
+			await this.updatePoolStates(this.chainOperator, this.pools);
 		}
 	}
 

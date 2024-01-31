@@ -77,8 +77,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 	 */
 	public async step() {
 		this.iterations++;
-
-		if (this.updateOrderbookStates) {
+		if (this.updateOrderbookStates && this.orderbooks.length > 0) {
 			await Promise.all([
 				this.updatePoolStates(this.chainOperator, this.pools),
 				this.updateOrderbookStates(this.chainOperator, this.orderbooks),
@@ -86,10 +85,26 @@ export class DexMempoolLoop implements DexLoopInterface {
 		} else {
 			await this.updatePoolStates(this.chainOperator, this.pools);
 		}
+		const arbTrade = this.ammArb(this.paths, this.botConfig);
+		const arbTradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
+
+		if (arbTrade && arbTradeOB) {
+			if (arbTrade.profit > arbTradeOB.profit) {
+				await this.trade(arbTrade);
+			} else if (arbTrade.profit <= arbTradeOB.profit) {
+				await this.trade(arbTradeOB);
+			}
+			return;
+		} else if (arbTrade) {
+			await this.trade(arbTrade);
+			return;
+		} else if (arbTradeOB) {
+			await this.trade(arbTradeOB);
+			return;
+		}
 
 		while (true) {
 			this.mempool = await this.chainOperator.queryMempool();
-
 			if (+this.mempool.total_bytes < this.totalBytes) {
 				break;
 			} else if (+this.mempool.total_bytes === this.totalBytes) {
@@ -121,10 +136,13 @@ export class DexMempoolLoop implements DexLoopInterface {
 				} else if (arbTrade.profit <= arbTradeOB.profit) {
 					await this.trade(arbTradeOB);
 				}
+				return;
 			} else if (arbTrade) {
 				await this.trade(arbTrade);
+				return;
 			} else if (arbTradeOB) {
 				await this.trade(arbTradeOB);
+				return;
 			}
 		}
 		return;
