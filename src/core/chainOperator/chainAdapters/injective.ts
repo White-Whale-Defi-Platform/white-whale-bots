@@ -54,7 +54,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	constructor(botConfig: BotConfig, network: Network = Network.Mainnet) {
+	constructor(botConfig: BotConfig, network: Network = Network.MainnetSentry) {
 		const endpoints = getNetworkEndpoints(network);
 		const privateKey = PrivateKey.fromMnemonic(botConfig.mnemonic, "m/44'/60'/0'/0/0");
 		this._privateKey = privateKey;
@@ -223,14 +223,14 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			} else {
 				/*
 				interface MsgBroadcasterTxOptions {
-    msgs: Msgs | Msgs[];
-    injectiveAddress: string;
-    ethereumAddress?: string;
-    memo?: string;
-    feePrice?: string;
-    feeDenom?: string;
-    gasLimit?: number;
-    };
+	msgs: Msgs | Msgs[];
+	injectiveAddress: string;
+	ethereumAddress?: string;
+	memo?: string;
+	feePrice?: string;
+	feeDenom?: string;
+	gasLimit?: number;
+	};
 }
 				*/
 				const broadcasterOptions = {
