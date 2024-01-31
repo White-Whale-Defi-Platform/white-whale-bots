@@ -93,9 +93,8 @@ export async function setBotConfig(envs: NodeJS.ProcessEnv): Promise<BotConfig> 
  *
  */
 async function getBaseConfig(envs: NodeJS.ProcessEnv): Promise<BaseConfig> {
-	console.log(envs);
 	let setupType: SetupType;
-	switch (envs.SETUP_TYPE.toLocaleLowerCase()) {
+	switch (envs.SETUP_TYPE!.toLocaleLowerCase()) {
 		case "dex":
 			setupType = SetupType.DEX;
 			break;
@@ -113,9 +112,9 @@ async function getBaseConfig(envs: NodeJS.ProcessEnv): Promise<BaseConfig> {
 	let RPCURLS: Array<string>;
 	if (envs.RPC_URL && envs.USE_RPC_URL_SCRAPER == "1") {
 		const RPCURLS_PROVIDED = envs.RPC_URL.startsWith("[") ? JSON.parse(envs.RPC_URL) : [envs.RPC_URL];
-		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX, RPCURLS_PROVIDED);
+		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX!, RPCURLS_PROVIDED);
 	} else if (!envs.RPC_URL && envs.USE_RPC_URL_SCRAPER == "1") {
-		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX);
+		RPCURLS = await getRPCfromRegistry(envs.CHAIN_PREFIX!);
 	} else if (envs.RPC_URL) {
 		RPCURLS = envs.RPC_URL.startsWith("[") ? JSON.parse(envs.RPC_URL) : [envs.RPC_URL];
 	} else {
@@ -152,22 +151,22 @@ async function getBaseConfig(envs: NodeJS.ProcessEnv): Promise<BaseConfig> {
 	};
 
 	//Calculate tx fees and profit thresholds
-	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD;
-	const GAS_UNIT_PRICE = +envs.GAS_UNIT_PRICE; //price per gas unit in BASE_DENOM
-	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP;
-	const GAS_TO_BASE_RATIO = +envs.GAS_TO_BASE_RATIO ?? 1;
+	const PROFIT_THRESHOLD = +envs.PROFIT_THRESHOLD!;
+	const GAS_UNIT_PRICE = +envs.GAS_UNIT_PRICE!; //price per gas unit in BASE_DENOM
+	const GAS_USAGE_PER_HOP = +envs.GAS_USAGE_PER_HOP!;
+	const GAS_TO_BASE_RATIO = +envs.GAS_TO_BASE_RATIO! ?? 1;
 
 	return {
 		setupType: setupType,
-		baseDenom: envs.BASE_DENOM,
-		chainPrefix: envs.CHAIN_PREFIX,
-		gasDenom: envs.GAS_DENOM,
+		baseDenom: envs.BASE_DENOM!,
+		chainPrefix: envs.CHAIN_PREFIX!,
+		gasDenom: envs.GAS_DENOM!,
 		gasPrice: GAS_UNIT_PRICE,
 		gasDenomToBaseRato: GAS_TO_BASE_RATIO,
 		gasPerHop: GAS_USAGE_PER_HOP,
 		profitThreshold: PROFIT_THRESHOLD,
 		loggerConfig: loggerConfig,
-		mnemonic: envs.WALLET_MNEMONIC,
+		mnemonic: envs.WALLET_MNEMONIC!,
 		rpcUrls: RPCURLS,
 		grpcUrl: envs.GRPC_URL,
 		restUrl: envs.REST_URL,
@@ -180,25 +179,27 @@ async function getBaseConfig(envs: NodeJS.ProcessEnv): Promise<BaseConfig> {
  *
  */
 function getLiquidationConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): LiquidationConfig {
-	return { overseerAddresses: JSON.parse(envs.OVERSEER_ADDRESSES), ...baseConfig };
+	return { overseerAddresses: JSON.parse(envs.OVERSEER_ADDRESSES!), ...baseConfig };
 }
 /**
  *
  */
 function getDexConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): DexConfig {
-	let pools = envs.POOLS.trim()
+	let pools = envs
+		.POOLS!.trim()
 		.replace(/\n|\r|\t/g, "")
 		.replace(/,\s*$/, "");
 	pools = pools.startsWith("[") && pools.endsWith("]") ? pools : `[${pools}]`;
 	const POOLS_ENVS = JSON.parse(pools);
 
-	let factories = envs.FACTORIES_TO_ROUTERS_MAPPING.trim()
+	let factories = envs
+		.FACTORIES_TO_ROUTERS_MAPPING!.trim()
 		.replace(/\n|\r|\t/g, "")
 		.replace(/,\s*$/, "");
 	factories = factories.startsWith("[") && factories.endsWith("]") ? factories : `[${factories}]`;
 	const FACTORIES_TO_ROUTERS_MAPPING = JSON.parse(factories);
 
-	const OFFER_ASSET_INFO: NativeAssetInfo = { native_token: { denom: envs.BASE_DENOM } };
+	const OFFER_ASSET_INFO: NativeAssetInfo = { native_token: { denom: envs.BASE_DENOM! } };
 
 	const IGNORE_ADDRS: IgnoredAddresses = {};
 	const timeoutDuration = envs.TIMEOUT_DURATION === undefined ? 100 : Number(envs.TIMEOUT_DURATION);
@@ -214,10 +215,10 @@ function getDexConfig(envs: NodeJS.ProcessEnv, baseConfig: BaseConfig): DexConfi
 
 	return {
 		...baseConfig,
-		flashloanRouterAddress: envs.FLASHLOAN_ROUTER_ADDRESS,
-		flashloanFee: +envs.FLASHLOAN_FEE,
+		flashloanRouterAddress: envs.FLASHLOAN_ROUTER_ADDRESS!,
+		flashloanFee: +envs.FLASHLOAN_FEE!,
 		ignoreAddresses: IGNORE_ADDRS,
-		maxPathPools: +envs.MAX_PATH_HOPS,
+		maxPathPools: +envs.MAX_PATH_HOPS!,
 		mappingFactoryRouter: FACTORIES_TO_ROUTERS_MAPPING,
 		offerAssetInfo: OFFER_ASSET_INFO,
 		poolEnvs: POOLS_ENVS,
