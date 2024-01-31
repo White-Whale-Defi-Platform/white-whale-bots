@@ -1,4 +1,5 @@
-import { fromAscii, fromBase64, fromUtf8 } from "@cosmjs/encoding";
+import { fromAscii, fromBase64, fromUtf8, toHex } from "@cosmjs/encoding";
+import { sha256 } from "@injectivelabs/sdk-ts";
 import { BigNumber } from "bignumber.js";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { inspect } from "util";
@@ -22,6 +23,7 @@ import {
 	fromChainAsset,
 	isMatchingAssetInfos,
 	isWyndDaoNativeAsset,
+	NativeAssetInfo,
 	RichAsset,
 	toChainPrice,
 } from "./asset";
@@ -126,16 +128,26 @@ function outGivenInPCL(pool: PCLPool, offer_asset: Asset): RichAsset {
 	//assumes outputfee
 	const [_, asset_out] = getAssetsOrder(pool, offer_asset.info) ?? [];
 	let ask_index: 0 | 1 = 0;
+	let offer_index: 0 | 1 = 1;
 	if (isMatchingAssetInfos(pool.assets[0].info, offer_asset.info)) {
 		ask_index = 1;
+		offer_index = 0;
 	} else {
 		ask_index = 0;
+		offer_index = 1;
 	}
 	const xs = pool.assets.map((asset) => +asset.amount / 10 ** 6);
 
-	xs[1 - ask_index] = xs[1 - ask_index] + +offer_asset.amount / 1e6;
 	xs[1] *= pool.priceScale;
-	const new_outBalance = newton_y(xs, pool.amp, pool.gamma, pool.D, ask_index);
+	const D = newton_d(xs, pool.amp, pool.gamma, pool.D);
+
+	if (offer_index === 1) {
+		xs[offer_index] = xs[offer_index] + (+offer_asset.amount / 1e6) * pool.priceScale;
+	} else {
+		xs[offer_index] = xs[offer_index] + +offer_asset.amount / 1e6;
+	}
+
+	const new_outBalance = newton_y(xs, pool.amp, pool.gamma, D, ask_index);
 	const delta_outBalance = xs[ask_index] - new_outBalance;
 
 	const dy = ask_index === 0 ? delta_outBalance : delta_outBalance / pool.priceScale;
@@ -165,6 +177,21 @@ function outGivenInPCL(pool: PCLPool, offer_asset: Asset): RichAsset {
 			xi_1 = xi;
 		}
 		return xi_1;
+	}
+
+	/**
+	 *
+	 */
+	function newton_d(x: Array<number>, amp: number, gamma: number, oldD?: number) {
+		let d_prev = oldD ? oldD : 2 * Math.sqrt(x[0] * x[1]);
+		for (let i = 0; i < 32; i++) {
+			const d = d_prev - f(d_prev, x, amp, gamma) / dfdd(d_prev, x, amp, gamma);
+			if (Math.abs(d - d_prev) <= 1e-5) {
+				return d;
+			}
+			d_prev = d;
+		}
+		return d_prev;
 	}
 	/**
 	 *
@@ -198,6 +225,24 @@ function outGivenInPCL(pool: PCLPool, offer_asset: Asset): RichAsset {
 		return (k_x * (x[0] + x[1]) + k) * d + x_r - k_x * d_pow2;
 	}
 
+	/**
+	 *
+	 */
+	function dfdd(d: number, x: Array<number>, amp: number, gamma: number): number {
+		const mul = x[0] * x[1];
+		const a_gamma_pow2 = amp * gamma ** 2;
+
+		const k0 = (mul * 4) / d ** 2;
+
+		const gamma_one_k0 = gamma + 1 - k0;
+		const gamma_one_k0_pow2 = gamma_one_k0 ** 2;
+
+		const k = (a_gamma_pow2 * k0) / gamma_one_k0_pow2;
+		const k_d_denom = d ** 3 * gamma_one_k0_pow2 * gamma_one_k0;
+		const k_d = -mul * 2 ** 3 * a_gamma_pow2 * (gamma + 1 + k0);
+
+		return ((k_d * d) / k_d_denom + k) * (x[0] + x[1]) - ((k_d * d) / k_d_denom + 2 * k) * d - d / 2;
+	}
 	/**
 	 *
 	 */
@@ -267,6 +312,7 @@ export function applyMempoolMessagesOnPools(pools: Array<Pool>, mempoolTxs: Arra
 	for (const mempoolTx of mempoolTxs) {
 		try {
 			const decodedMsg = JSON.parse(fromUtf8(mempoolTx.message.msg));
+
 			const poolToUpdate = pools.find(
 				(pool) =>
 					pool.address === mempoolTx.message.contract ||
