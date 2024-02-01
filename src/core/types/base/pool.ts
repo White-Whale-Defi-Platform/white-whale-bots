@@ -1,5 +1,4 @@
-import { fromAscii, fromBase64, fromUtf8, toHex } from "@cosmjs/encoding";
-import { sha256 } from "@injectivelabs/sdk-ts";
+import { fromAscii, fromBase64, fromUtf8 } from "@cosmjs/encoding";
 import { BigNumber } from "bignumber.js";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 import { inspect } from "util";
@@ -23,7 +22,6 @@ import {
 	fromChainAsset,
 	isMatchingAssetInfos,
 	isWyndDaoNativeAsset,
-	NativeAssetInfo,
 	RichAsset,
 	toChainPrice,
 } from "./asset";
