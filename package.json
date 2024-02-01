@@ -10,7 +10,7 @@
     "build": "tsc",
     "clean": "rimraf out",
     "start": "npm run build && node out/index.js",
-    "test": "mocha -r ts-node/register src/tests/**/*.spec.ts",
+    "test": "mocha --timeout 10000 -r  ts-node/register src/tests/**/*.spec.ts",
     "test:coverage": "nyc npm run test"
   },
   "author": "White Whale",

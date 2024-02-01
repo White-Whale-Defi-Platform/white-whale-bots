@@ -2,16 +2,21 @@ import { setupWasmExtension } from "@cosmjs/cosmwasm-stargate";
 import { fromAscii, fromBase64 } from "@cosmjs/encoding";
 import { QueryClient } from "@cosmjs/stargate";
 import { HttpBatchClient, Tendermint34Client } from "@cosmjs/tendermint-rpc";
+import { doesNotMatch } from "assert";
 import BigNumber from "bignumber.js";
-import { assert } from "chai";
+import { assert, expect } from "chai";
+import dotenv from "dotenv";
 import { describe } from "mocha";
 
-import { processPoolStateAssets } from "../../../../chains/defaults/queries/getPoolState";
-import { Asset, fromChainAsset } from "../../../../core/types/base/asset";
+import { initPools, processPoolStateAssets } from "../../../../chains/defaults/queries/getPoolState";
+import { ChainOperator } from "../../../../core/chainOperator/chainoperator";
+import { Asset, fromChainAsset, RichAsset, toChainAsset } from "../../../../core/types/base/asset";
+import { DexConfig, setBotConfig } from "../../../../core/types/base/configs";
 import { AmmDexName, outGivenIn, PairType, PCLPool, Pool } from "../../../../core/types/base/pool";
 import { Uint128 } from "../../../../core/types/base/uint128";
 import { identity } from "../../../../core/types/identity";
 
+dotenv.config({ path: "./src/envs/chains/injective.env" });
 describe("Test outGivenIn", () => {
 	const pool = identity<Pool>({
 		assets: [
@@ -160,90 +165,48 @@ describe("Test outGivenIn", () => {
 		const price = BigNumber(pool.assets[1].amount).dividedBy(BigNumber(pool.assets[0].amount));
 		assert.closeTo(price.toNumber() * 0.997 * +input.amount, +output.amount, 100);
 	});
-	it("should have a return amount close to simulated result for PCL pool", async () => {
-		//creat config based on environment variables
-		const _httpClient = new HttpBatchClient("https://ww-injective-rpc.polkachu.com");
-		const tmClient = await Tendermint34Client.create(_httpClient);
-		const _wasmQueryClient = QueryClient.withExtensions(tmClient, setupWasmExtension);
+});
 
-		interface PoolState {
-			assets: [Asset, Asset];
-			total_share: Uint128;
-		}
-		interface PCLConfigResponse {
-			block_time_last: number;
-			params: string;
-			owner: string;
-			factory_addr: string;
-			price_scale: string;
-		}
+describe("Test PCL Pool interactions", () => {
 
-		interface PCLConfigParams {
-			amp: string;
-			gamma: string;
-			mid_fee: string;
-			out_fee: string;
-			fee_gamma: string;
-			repeg_profit_threshold: string;
-			min_price_scale_delta: string;
-			price_scale: string;
-			ma_half_time: number;
-			track_asset_balances: boolean;
+	it("should be able to calculate outgivenin for PCL pools", async () => {
+		// load config required for querying
+		dotenv.config({ path: "./src/tests/mock/envs/injective.env" });
+		const botConfig = <DexConfig>await setBotConfig(process.env);
+		// console.log(botConfig);
+		const chainOperator = await ChainOperator.connectWithSigner(botConfig);
+		const pools = await initPools(chainOperator, botConfig.poolEnvs, []);
+		const pclPool = pools.find((pool) => pool.pairType === PairType.pcl);
+
+		expect(botConfig, "botconfig empty").to.not.be.undefined;
+		expect(chainOperator, "chainoperator issue").to.not.be.undefined
+		expect(pclPool, "PCL pool not found").to.not.be.undefined;
+		if (!pclPool) {
+			return
 		}
 
-		const [poolState, d, config]: [PoolState, number, PCLConfigResponse] = await Promise.all([
-			_wasmQueryClient.wasm.queryContractSmart("inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp", {
-				pool: {},
-			}),
-			_wasmQueryClient.wasm.queryContractSmart("inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp", { compute_d: {} }),
-			_wasmQueryClient.wasm.queryContractSmart("inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp", {
-				config: {},
-			}),
-		]);
+		for (const poolAsset of pclPool.assets) {
+			const offerAsset: RichAsset = {
+				info: poolAsset.info,
+				decimals: poolAsset.decimals,
+				amount: "10000000"
+			}
 
-		const configParams: PCLConfigParams = JSON.parse(fromAscii(fromBase64(config.params)));
-		const [assets, dexname, totalShare] = processPoolStateAssets(poolState);
+			const out0 = outGivenIn(pclPool, offerAsset);
+			const chainAsset: Asset = toChainAsset(offerAsset);
+			const simulatedResult = await chainOperator.queryContractSmart(
+				pclPool.address,
+				{ simulation: { offer_asset: chainAsset } },
+			);
+			const outSimulatedAsset = fromChainAsset({ amount: simulatedResult.return_amount, info: out0.info });
+			assert.closeTo(+out0.amount, +outSimulatedAsset.amount, 1);
+		}
 
-		const pclPool: PCLPool = {
-			assets: assets,
-			totalShare: totalShare,
-			address: "inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp",
-			dexname: AmmDexName.default,
-			pairType: PairType.pcl,
-			inputfee: 0,
-			outputfee: 0.3,
-			LPratio: 0,
-			factoryAddress: "",
-			routerAddress: "",
-			D: Number(d),
-			amp: +configParams.amp,
-			gamma: +configParams.gamma,
-			priceScale: +configParams.price_scale,
-			feeGamma: +configParams.fee_gamma,
-			midFee: +configParams.mid_fee,
-			outFee: +configParams.out_fee,
-		};
 
-		/*expected outcome: {
-  "return_amount": "249260514562831308",
-  "spread_amount": "484148904998105",
-  "commission_amount": "698611467674416"
-}*/
-		const offerAsset: Asset = {
-			info: {
-				native_token: {
-					denom: "peggy0xdAC17F958D2ee523a2206206994597C13D831ec7",
-				},
-			},
-			amount: "10000000",
-		};
-		const out0 = outGivenIn(pclPool, offerAsset);
-		const outSimulated = await _wasmQueryClient.wasm.queryContractSmart(
-			"inj1c95v0zr7ah777qn05sqwfnd03le4f40rucs0dp",
-			{ simulation: { offer_asset: offerAsset } },
-		);
-		console.log(out0, fromChainAsset({ amount: outSimulated.return_amount, info: out0.info }))
-		assert.closeTo(+out0.amount, BigNumber("249260.514562831308").toNumber(), 1);
+
+
+
+
 	});
 });
 
