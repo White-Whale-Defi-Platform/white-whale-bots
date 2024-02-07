@@ -6,7 +6,7 @@ import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
 import { LogType } from "../../base/logging";
-import { Orderbook } from "../../base/orderbook";
+import { Orderbook, removedUnusedOrderbooks } from "../../base/orderbook";
 import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
 import { Pool, removedUnusedPools } from "../../base/pool";
 import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
@@ -51,9 +51,9 @@ export class DexLoop implements DexLoopInterface {
 		const paths = getAmmPaths(allPools, botConfig);
 		const filteredPools = removedUnusedPools(allPools, paths);
 		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks, botConfig);
-
+		const filteredOrderbooks = removedUnusedOrderbooks(orderbooks, orderbookPaths);
 		this.orderbookPaths = orderbookPaths;
-		this.orderbooks = orderbooks;
+		this.orderbooks = filteredOrderbooks;
 		this.pools = filteredPools;
 		this.CDpaths = new Map<
 			string,
@@ -99,6 +99,7 @@ export class DexLoop implements DexLoopInterface {
 			}
 		}
 		const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+
 		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
 			console.log("spinning up mempool loop");
 			return new DexMempoolLoop(
@@ -163,9 +164,14 @@ export class DexLoop implements DexLoopInterface {
 	 */
 	async reset() {
 		this.unCDPaths();
-		await this.updatePoolStates(this.chainOperator, this.pools);
-		if (this.updateOrderbookStates) {
-			await this.updateOrderbookStates(this.chainOperator, this.orderbooks);
+
+		if (this.updateOrderbookStates && this.orderbooks.length > 0) {
+			await Promise.all([
+				this.updateOrderbookStates(this.chainOperator, this.orderbooks),
+				this.updatePoolStates(this.chainOperator, this.pools),
+			]);
+		} else {
+			await this.updatePoolStates(this.chainOperator, this.pools);
 		}
 	}
 

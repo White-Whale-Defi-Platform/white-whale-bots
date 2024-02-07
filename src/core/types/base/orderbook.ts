@@ -1,4 +1,5 @@
 import { Asset, NativeAssetInfo } from "./asset";
+import { OrderbookPath } from "./path";
 
 export interface Order {
 	price: number;
@@ -58,4 +59,17 @@ export function OrderbookMarketBuy(orderbook: Orderbook, offerAsset: Asset) {
 		sellIndex = sellIndex + 1;
 	}
 	return [result, orderbook.sells[sellIndex].price, +offerAsset.amount / result];
+}
+
+/**
+ * Function to remove orderboks that are not used in paths.
+ * @param orderbooks Array of Orderbook type to check for filtering.
+ * @param paths Array of Path types to check the pools against.
+ * @returns Filtered array of Pools.
+ */
+export function removedUnusedOrderbooks(orderbooks: Array<Orderbook>, paths: Array<OrderbookPath>): Array<Orderbook> {
+	const filteredOrderbooks: Set<Orderbook> = new Set(
+		orderbooks.filter((orderbook) => paths.some((path) => path.orderbook.marketId === orderbook.marketId)),
+	);
+	return [...filteredOrderbooks];
 }

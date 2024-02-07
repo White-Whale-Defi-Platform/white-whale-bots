@@ -54,7 +54,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	/**
 	 *
 	 */
-	constructor(botConfig: BotConfig, network: Network = Network.Mainnet) {
+	constructor(botConfig: BotConfig, network: Network = Network.MainnetSentry) {
 		const endpoints = getNetworkEndpoints(network);
 		const privateKey = PrivateKey.fromMnemonic(botConfig.mnemonic, "m/44'/60'/0'/0/0");
 		this._privateKey = privateKey;
@@ -211,7 +211,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			if (!fee || fee === "auto") {
 				const broadcasterOptions = {
 					msgs: preppedMsgs,
-					injectiveAddress: this._publicAddress,
 				};
 				const simRes = await this._signAndBroadcastClient.simulate(broadcasterOptions);
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
@@ -224,25 +223,23 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			} else {
 				/*
 				interface MsgBroadcasterTxOptions {
-    msgs: Msgs | Msgs[];
-    injectiveAddress: string;
-    ethereumAddress?: string;
-    memo?: string;
-    feePrice?: string;
-    feeDenom?: string;
-    gasLimit?: number;
-    };
+	msgs: Msgs | Msgs[];
+	injectiveAddress: string;
+	ethereumAddress?: string;
+	memo?: string;
+	feePrice?: string;
+	feeDenom?: string;
+	gasLimit?: number;
+	};
 }
 				*/
 				const broadcasterOptions = {
 					msgs: preppedMsgs,
-					injectiveAddress: this._publicAddress,
 					gas: {
 						gasPrice: String(+fee.amount[0].amount / +fee.gas),
 						gas: +fee.gas,
 					},
 				};
-
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
 				return {
 					height: res.height,

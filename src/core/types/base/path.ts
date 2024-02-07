@@ -6,14 +6,21 @@ import { isMatchingAssetInfos } from "./asset";
 import { DexConfig } from "./configs";
 import { Orderbook } from "./orderbook";
 import { Pool } from "./pool";
+
+export enum PathComplexity {
+	default = "default",
+	orderbook = "orderbook",
+	pcl = "pcl",
+	orderbook_pcl = "orderbook & pcl",
+}
 export interface Path {
 	pools: Array<Pool>;
 	equalpaths: Array<Path>;
 	identifier: string;
 	fee: StdFee;
 	threshold: number;
+	pathComplexity: PathComplexity;
 }
-
 export enum OrderSequence {
 	AmmFirst,
 	OrderbookFirst,
@@ -27,6 +34,7 @@ export interface OrderbookPath {
 	identifier: string;
 	fee: StdFee;
 	threshold: number;
+	pathComplexity: PathComplexity;
 }
 /**
  *
@@ -61,6 +69,7 @@ export function getOrderbookAmmPaths(
 					identifier: pool.address + orderbook.marketId,
 					fee: fee,
 					threshold: threshold,
+					pathComplexity: PathComplexity.orderbook,
 				});
 				const reversedpath = identity<OrderbookPath>({
 					pool: pool,
@@ -70,6 +79,7 @@ export function getOrderbookAmmPaths(
 					identifier: orderbook.marketId + pool.address,
 					fee: fee,
 					threshold: threshold,
+					pathComplexity: PathComplexity.orderbook,
 				});
 				paths.push(path, reversedpath);
 				idx += 2;
@@ -95,7 +105,7 @@ export function getFeeAndThresholdForAmmPath(
 	botConfig: DexConfig,
 ): { fee: StdFee; threshold: number } {
 	const decimalCompensator = botConfig.gasDenom === "inj" ? 1e12 : 1;
-	const flashloanCompensator = botConfig.flashloanRouterAddress ? 3.6 : 1;
+	const flashloanCompensator = botConfig.flashloanRouterAddress ? 4 : 1;
 	const gasFee = {
 		denom: botConfig.gasDenom,
 		amount: (
@@ -129,7 +139,7 @@ export function getFeeAndThresholdForOrderbookPath(
 	botConfig: DexConfig,
 ): { fee: StdFee; threshold: number } {
 	const decimalCompensator = botConfig.gasDenom === "inj" ? 1e12 : 1;
-	const flashloanCompensator = botConfig.flashloanRouterAddress ? 3.6 : 1;
+	const flashloanCompensator = botConfig.flashloanRouterAddress ? 4 : 1;
 	const gasFee = {
 		denom: botConfig.gasDenom,
 		amount: (botConfig.gasPerHop * 2 * botConfig.gasPrice * decimalCompensator * flashloanCompensator).toFixed(),

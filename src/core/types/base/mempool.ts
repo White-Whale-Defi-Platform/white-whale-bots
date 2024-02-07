@@ -131,7 +131,7 @@ function discardIgnored(
 ) {
 	if (
 		ignoreAddresses[address].timeoutAt === 0 ||
-		ignoreAddresses[address].timeoutAt + ignoreAddresses[address].duration <= iteration
+		ignoreAddresses[address].timeoutAt + ignoreAddresses[address].duration >= iteration
 	) {
 		if (reciever) {
 			ignoreAddresses[reciever] = {
@@ -140,7 +140,7 @@ function discardIgnored(
 			};
 		}
 		ignoreAddresses[address].timeoutAt = iteration;
-	} else if (ignoreAddresses[address].timeoutAt + ignoreAddresses[address].duration >= iteration) {
+	} else if (ignoreAddresses[address].timeoutAt + ignoreAddresses[address].duration <= iteration) {
 		delete ignoreAddresses[address];
 		return true;
 	}

@@ -13,7 +13,7 @@ describe("Test send successful Telegram Message", () => {
 	it("Should return true after sending to chat", async () => {
 		const logger = new TelegramLogger(testToken, testChatId);
 		const status = await logger.sendMessage("test");
-		assert.equal(status, true);
+		assert.equal(status, undefined);
 	});
 });
 

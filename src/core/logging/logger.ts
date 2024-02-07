@@ -59,7 +59,7 @@ export class Logger {
 		/**
 		 *
 		 */
-		async logConfig(botConfig: BotConfig) {
+		async logConfig(botConfig: BotConfig, logType = LogType.All) {
 			//todo: place this in the logger class
 			let startupMessage = "===".repeat(30);
 			startupMessage += "\n**White Whale Bot**";
@@ -77,12 +77,12 @@ export class Logger {
 			}
 			startupMessage += "\n";
 			startupMessage += "---".repeat(30);
-			await this._sendMessage(startupMessage, LogType.All);
+			await this._sendMessage(startupMessage, logType);
 		},
 		/**
 		 *
 		 */
-		async logDexLoop(loop: DexLoopInterface) {
+		async logDexLoop(loop: DexLoopInterface, logType = LogType.All) {
 			let setupMessage = "---".repeat(30);
 			setupMessage += `\n**Derived Paths for Arbitrage:**`;
 			setupMessage += `\nTotal AMM Paths: \t${loop.paths.length}\n`;
@@ -95,13 +95,13 @@ export class Logger {
 			)}`;
 			setupMessage += `\n**Total Orderbook paths: ** \t${loop.orderbookPaths.length}\n`;
 			setupMessage += "---".repeat(30);
-			await this._sendMessage(setupMessage, LogType.All);
+			await this._sendMessage(setupMessage, logType);
 		},
 
 		/**
 		 *
 		 */
-		async logLiqLoop(loop: LiquidationLoop) {
+		async logLiqLoop(loop: LiquidationLoop, logType = LogType.All) {
 			const allLoans: Array<Loan> = [];
 			loop.overseers.map((overseer) => {
 				for (const loan of Object.values(overseer.loans)) {
@@ -117,7 +117,7 @@ Min Risk ratio: ${maxRisk[maxRisk.length - 1].riskRatio.toPrecision(3)}`;
 			setupMessage += `\n**Amount of outstanding loans: ${allLoans.length}`;
 			setupMessage += `\n**Total amount of outstanding value: ${totalLoan / 1e6}`;
 
-			await this._sendMessage(setupMessage, LogType.All);
+			await this._sendMessage(setupMessage, logType);
 		},
 	};
 

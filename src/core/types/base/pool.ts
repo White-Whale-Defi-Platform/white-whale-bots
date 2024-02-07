@@ -41,7 +41,7 @@ export enum AmmDexName {
 export enum ClobDexName {
 	injective = "injective",
 }
-export interface Pool {
+export interface DefaultPool {
 	/**
 	 * The two assets that can be swapped between in the pool.
 	 */
@@ -56,11 +56,29 @@ export interface Pool {
 	address: string;
 
 	dexname: AmmDexName;
+	pairType: PairType;
 	inputfee: number;
 	outputfee: number;
 	LPratio: number;
 	factoryAddress: string;
 	routerAddress: string;
+}
+
+export type Pool = DefaultPool | PCLPool;
+export interface PCLPool extends DefaultPool {
+	D: number;
+	amp: number;
+	gamma: number;
+	priceScale: number;
+	feeGamma: number;
+	midFee: number;
+	outFee: number;
+}
+
+export enum PairType {
+	xyk = "xyk",
+	pcl = "pcl",
+	stable = "stable",
 }
 
 /**
@@ -70,6 +88,18 @@ export interface Pool {
  * @return [number, assetInfo] of the received asset by the user.
  */
 export function outGivenIn(pool: Pool, offer_asset: Asset): RichAsset {
+	if (pool.pairType === PairType.xyk) {
+		return outGivenInXYK(pool, offer_asset);
+	} else if (pool.pairType === PairType.pcl) {
+		return outGivenInPCL(<PCLPool>pool, offer_asset);
+	}
+	return { ...offer_asset, decimals: 6 };
+}
+
+/**
+ *
+ */
+function outGivenInXYK(pool: Pool, offer_asset: Asset): RichAsset {
 	const [asset_in, asset_out] = getAssetsOrder(pool, offer_asset.info) ?? [];
 	const a_in = BigNumber(asset_in.amount);
 	const a_out = BigNumber(asset_out.amount);
@@ -87,6 +117,141 @@ export function outGivenIn(pool: Pool, offer_asset: Asset): RichAsset {
 			.multipliedBy(r2)
 			.toNumber();
 		return { amount: String(outGivenIn), info: asset_out.info, decimals: asset_out.decimals };
+	}
+}
+/**
+ *
+ */
+function outGivenInPCL(pool: PCLPool, offer_asset: Asset): RichAsset {
+	//assumes outputfee
+	const [_, asset_out] = getAssetsOrder(pool, offer_asset.info) ?? [];
+	let ask_index: 0 | 1 = 0;
+	let offer_index: 0 | 1 = 1;
+	if (isMatchingAssetInfos(pool.assets[0].info, offer_asset.info)) {
+		ask_index = 1;
+		offer_index = 0;
+	} else {
+		ask_index = 0;
+		offer_index = 1;
+	}
+	const xs = pool.assets.map((asset) => +asset.amount / 10 ** 6);
+
+	xs[1] *= pool.priceScale;
+	const D = newton_d(xs, pool.amp, pool.gamma, pool.D);
+
+	if (offer_index === 1) {
+		xs[offer_index] = xs[offer_index] + (+offer_asset.amount / 1e6) * pool.priceScale;
+	} else {
+		xs[offer_index] = xs[offer_index] + +offer_asset.amount / 1e6;
+	}
+
+	const new_outBalance = newton_y(xs, pool.amp, pool.gamma, D, ask_index);
+	const delta_outBalance = xs[ask_index] - new_outBalance;
+
+	const dy = ask_index === 0 ? delta_outBalance : delta_outBalance / pool.priceScale;
+	xs[ask_index] = new_outBalance;
+	const outputFeeRate = fee(xs, pool.feeGamma, pool.midFee, pool.outFee);
+	const outputFee = dy * outputFeeRate;
+	const return_amount = dy - outputFee;
+
+	return { amount: String(return_amount * 1e6), info: asset_out.info, decimals: asset_out.decimals };
+	/**
+	 *
+	 */
+	function newton_y(xs: Array<number>, amp: number, gamma: number, d: number, ask_index: 1 | 0): number {
+		const N_POW2 = 4;
+		const x = xs.slice();
+		const x0 = d ** 2 / (N_POW2 * x[1 - ask_index]);
+		let xi_1 = x0;
+		x[ask_index] = x0;
+
+		for (let i = 0; i < 32; i++) {
+			// #         print(F(D, x, amp, gamma),dF(D, x, amp, gamma, ask_index) )
+			const xi = xi_1 - f(d, x, amp, gamma) / dfdx(d, x, amp, gamma, ask_index);
+			if (Math.abs(xi - xi_1) < 1e-5) {
+				return xi_1;
+			}
+			x[ask_index] = xi;
+			xi_1 = xi;
+		}
+		return xi_1;
+	}
+
+	/**
+	 *
+	 */
+	function newton_d(x: Array<number>, amp: number, gamma: number, oldD?: number) {
+		let d_prev = oldD ? oldD : 2 * Math.sqrt(x[0] * x[1]);
+		for (let i = 0; i < 32; i++) {
+			const d = d_prev - f(d_prev, x, amp, gamma) / dfdd(d_prev, x, amp, gamma);
+			if (Math.abs(d - d_prev) <= 1e-5) {
+				return d;
+			}
+			d_prev = d;
+		}
+		return d_prev;
+	}
+	/**
+	 *
+	 */
+	function f(d: number, x: Array<number>, amp: number, gamma: number) {
+		const N_POW2 = 4;
+		const mul = x[0] * x[1];
+		const d_pow2 = d ** 2;
+		const k0 = (mul * N_POW2) / d_pow2;
+		const k = (amp * gamma ** 2 * k0) / (gamma + 1 - k0) ** 2;
+		return k * d * (x[0] + x[1]) + mul - k * d_pow2 - d_pow2 / N_POW2;
+	}
+	/**
+	 *
+	 */
+	function dfdx(d: number, x: Array<number>, amp: number, gamma: number, ask_index: 1 | 0) {
+		const N_POW2 = 4;
+		const padding = 10000000000000;
+		const x_r = x[1 - ask_index];
+		const d_pow2 = d ** 2;
+		const k0 = (x[0] * x[1] * N_POW2) / d_pow2;
+
+		const gamma_one_k0 = gamma + 1 - k0;
+		const gamma_one_k0_pow2 = gamma_one_k0 ** 2;
+		const a_gamma_pow2 = amp * gamma ** 2;
+		const k = (a_gamma_pow2 * k0) / gamma_one_k0_pow2;
+		const k0_x = x_r * N_POW2;
+		const k_x =
+			(k0_x * a_gamma_pow2 * (gamma + 1 + k0) * padding) / (padding * d_pow2 * gamma_one_k0 * gamma_one_k0_pow2);
+		// #     print("Variables xr: {}, dpow2: {}, k0: {}, gamma_one_k0: {}, gamma_one_k0_pow2: {}, a_gamma_pow2: {}, k: {}, k0_x: {}, k_x: {}, ".format(x_r, d_pow2, k0, gamma_one_k0, gamma_one_k0_pow2, a_gamma_pow2, k, k0_x, k_x))
+		return (k_x * (x[0] + x[1]) + k) * d + x_r - k_x * d_pow2;
+	}
+
+	/**
+	 *
+	 */
+	function dfdd(d: number, x: Array<number>, amp: number, gamma: number): number {
+		const mul = x[0] * x[1];
+		const a_gamma_pow2 = amp * gamma ** 2;
+
+		const k0 = (mul * 4) / d ** 2;
+
+		const gamma_one_k0 = gamma + 1 - k0;
+		const gamma_one_k0_pow2 = gamma_one_k0 ** 2;
+
+		const k = (a_gamma_pow2 * k0) / gamma_one_k0_pow2;
+		const k_d_denom = d ** 3 * gamma_one_k0_pow2 * gamma_one_k0;
+		const k_d = -mul * 2 ** 3 * a_gamma_pow2 * (gamma + 1 + k0);
+
+		return ((k_d * d) / k_d_denom + k) * (x[0] + x[1]) - ((k_d * d) / k_d_denom + 2 * k) * d - d / 2;
+	}
+	/**
+	 *
+	 */
+	function fee(x: Array<number>, feeGamma: number, midFee: number, outFee: number): number {
+		const sum = x[0] + x[1];
+		let k = (x[0] * x[1] * 4) / sum ** 2;
+		k = feeGamma / (feeGamma + 1 - k);
+		if (k <= 0.001) {
+			k = 0;
+		}
+		return k * midFee + (1 - k) * outFee;
 	}
 }
 
@@ -145,6 +310,7 @@ export function applyMempoolMessagesOnPools(pools: Array<Pool>, mempoolTxs: Arra
 	for (const mempoolTx of mempoolTxs) {
 		try {
 			const decodedMsg = JSON.parse(fromUtf8(mempoolTx.message.msg));
+
 			const poolToUpdate = pools.find(
 				(pool) =>
 					pool.address === mempoolTx.message.contract ||
@@ -188,6 +354,7 @@ export function applyMempoolMessagesOnPools(pools: Array<Pool>, mempoolTxs: Arra
 		} catch (e) {
 			console.log("cannot apply swap operations message");
 			console.log(inspect(JSON.parse(fromUtf8(swapOperationsMsg.msg.msg)), true, null, true));
+			console.log(e);
 			continue;
 		}
 	}

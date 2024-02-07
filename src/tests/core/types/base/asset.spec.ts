@@ -27,7 +27,7 @@ describe("Test convert 18 to 6 decimal asset and vice versa", () => {
 
 		const output = fromChainAsset(input);
 
-		assert.equal(input, output);
+		assert.equal(input.amount, output.amount);
 	});
 
 	it("Should return 18 decimal asset after 6 decimal input 'inj' denom TO chain", async () => {
