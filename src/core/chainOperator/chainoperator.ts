@@ -3,6 +3,7 @@ import { EncodeObject } from "@cosmjs/proto-signing";
 import { StdFee } from "@cosmjs/stargate";
 import { Network } from "@injectivelabs/networks";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
+import { QueryContractInfoResponse } from "cosmjs-types/cosmwasm/wasm/v1/query";
 
 import { BotConfig } from "../types/base/configs";
 import CosmjsAdapter from "./chainAdapters/cosmjs";
@@ -70,6 +71,12 @@ export class ChainOperator {
 		}
 	}
 
+	/**
+	 *
+	 */
+	async queryContractInfo(address: string): Promise<QueryContractInfoResponse> {
+		return await this.client.queryContractInfo(address);
+	}
 	/**
 	 *
 	 */

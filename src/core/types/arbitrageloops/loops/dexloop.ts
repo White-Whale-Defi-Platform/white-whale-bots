@@ -98,7 +98,12 @@ export class DexLoop implements DexLoopInterface {
 				orderbooks.push(...obs);
 			}
 		}
-		const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
+		const allPools = await initPools(
+			chainOperator,
+			botConfig.poolEnvs,
+			botConfig.mappingFactoryRouter,
+			botConfig.manualPoolsOnly,
+		);
 
 		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
 			console.log("spinning up mempool loop");

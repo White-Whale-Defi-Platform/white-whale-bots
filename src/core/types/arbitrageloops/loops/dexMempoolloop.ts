@@ -51,7 +51,9 @@ export class DexMempoolLoop implements DexLoopInterface {
 		updateOrderbookStates?: DexLoopInterface["updateOrderbookStates"],
 	) {
 		const paths = getAmmPaths(allPools, botConfig);
+
 		const filteredPools = removedUnusedPools(allPools, paths);
+		console.log(`all pools: ${allPools.length}, filtered pools: ${filteredPools.length}`);
 		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks, botConfig);
 		const filteredOrderbooks = removedUnusedOrderbooks(orderbooks, orderbookPaths);
 		this.orderbookPaths = orderbookPaths;

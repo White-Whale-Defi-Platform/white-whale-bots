@@ -7,6 +7,7 @@ import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { HttpBatchClient, HttpClient } from "@cosmjs/tendermint-rpc/build/rpcclients";
 import { SkipBundleClient } from "@skip-mev/skipjs";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
+import { QueryContractInfoResponse } from "cosmjs-types/cosmwasm/wasm/v1/query";
 
 import { BotConfig } from "../../types/base/configs";
 import { Mempool } from "../../types/base/mempool";
@@ -208,7 +209,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	 */
 	public async getNewClients(): Promise<string | void> {
 		let out: string;
-		const TIMEOUTDUR = 60000; // 10 Min timeout if error
+		const TIMEOUTDUR = 1000; // 10 Min timeout if error
 		let n = 0;
 		let urlString: string | undefined;
 		this._timeoutRPCs.set(this._currRpcUrl, Date.now());
@@ -247,6 +248,14 @@ class CosmjsAdapter implements ChainOperatorInterface {
 		console.log("Continue...");
 		this._currRpcUrl = out;
 	}
+
+	/**
+	 *
+	 */
+	async queryContractInfo(address: string): Promise<QueryContractInfoResponse> {
+		return await this._wasmQueryClient.wasm.getContractInfo(address);
+	}
+
 	/**
 	 *
 	 */

@@ -115,12 +115,15 @@ export async function initPools(
 	chainOperator: ChainOperator,
 	poolAddresses: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>,
 	factoryMapping: Array<{ factory: string; router: string }>,
+	manualPoolsOnly = false,
 ): Promise<Array<Pool>> {
 	const pools: Array<Pool> = [];
 	const factoryPools = await getPoolsFromFactory(chainOperator, factoryMapping);
 	for (const poolAddress of poolAddresses) {
-		const pool: Pool = await initPool(chainOperator, poolAddress.pool);
-
+		const pool: Pool | undefined = await initPool(chainOperator, poolAddress.pool);
+		if (!pool) {
+			continue;
+		}
 		const factory = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.factory ?? "";
 		const router = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.router ?? "";
 
@@ -130,6 +133,28 @@ export async function initPools(
 			(pool.factoryAddress = factory),
 			(pool.routerAddress = router);
 		pools.push(pool);
+	}
+
+	//if we allow factorypools we try instantiate all pools available from the factory
+	if (!manualPoolsOnly) {
+		//filter all factory pools with the ones we manually setup using POOLS env
+		const filteredFactoryPools = factoryPools.filter(
+			(fp) => poolAddresses.find((pa) => pa.pool === fp.pool) === undefined,
+		);
+
+		for (const factoryPool of filteredFactoryPools) {
+			const pool: Pool | undefined = await initPool(chainOperator, factoryPool.pool);
+			if (!pool) {
+				continue;
+			}
+			pool.inputfee = 0;
+			pool.outputfee = 0.3;
+			pool.LPratio = 0.667;
+			pool.factoryAddress = factoryPool.factory;
+			pool.routerAddress = factoryPool.router;
+
+			pools.push(pool);
+		}
 	}
 	return pools;
 }
@@ -194,10 +219,13 @@ function processJunoswapPoolStateAssets(poolState: JunoSwapPoolState): [Array<Ri
 /**
  *
  */
-async function initPool(chainOperator: ChainOperator, pooladdress: string): Promise<Pool> {
+async function initPool(chainOperator: ChainOperator, pooladdress: string): Promise<Pool | undefined> {
 	const pairType = await initPairType(chainOperator, pooladdress);
 	const defaultPool = await initDefaultPool(chainOperator, pooladdress);
-
+	if (!defaultPool) {
+		console.error("Unable to initialize pool: ", pooladdress);
+		return undefined;
+	}
 	if (pairType === PairType.pcl) {
 		return await initPCLPool(chainOperator, defaultPool);
 	}
@@ -205,17 +233,28 @@ async function initPool(chainOperator: ChainOperator, pooladdress: string): Prom
 	/**
 	 *
 	 */
-	async function initDefaultPool(chainOperator: ChainOperator, pooladdress: string): Promise<DefaultPool> {
+	async function initDefaultPool(
+		chainOperator: ChainOperator,
+		pooladdress: string,
+	): Promise<DefaultPool | undefined> {
 		let assets: Array<RichAsset> = [];
 		let dexname: AmmDexName;
 		let totalShare: string;
 		try {
 			const poolState = <PoolState>await chainOperator.queryContractSmart(pooladdress, { pool: {} });
 
+			if (
+				poolState.total_share == "0" ||
+				poolState.assets[0].amount == "0" ||
+				poolState.assets[1].amount == "0"
+			) {
+				return undefined;
+			}
 			[assets, dexname, totalShare] = processPoolStateAssets(poolState);
 		} catch (error) {
-			const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(pooladdress, { info: {} });
-			[assets, dexname, totalShare] = processJunoswapPoolStateAssets(poolState);
+			console.log("error querying pool: ", pooladdress);
+			console.log(error);
+			return undefined;
 		}
 		const defaultPool: DefaultPool = {
 			assets: assets,
