@@ -25,6 +25,7 @@ import { ChainId } from "@injectivelabs/ts-types";
 import { SkipBundleClient } from "@skip-mev/skipjs";
 import { MsgSend as CosmJSMsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
+import { QueryContractInfoResponse } from "cosmjs-types/cosmwasm/wasm/v1/query";
 import { MsgExecuteContract as CosmJSMsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
 import { BotConfig } from "../../types/base/configs";
@@ -161,6 +162,13 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	async queryMempool(): Promise<Mempool> {
 		const mempoolResult = await this._httpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
 		return mempoolResult.result;
+	}
+
+	/**
+	 *
+	 */
+	async queryContractInfo(address: string): Promise<QueryContractInfoResponse> {
+		return await this._wasmQueryClient.wasm.getContractInfo(address);
 	}
 	/**
 	 *

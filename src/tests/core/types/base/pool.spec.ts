@@ -1,19 +1,13 @@
-import { setupWasmExtension } from "@cosmjs/cosmwasm-stargate";
-import { fromAscii, fromBase64 } from "@cosmjs/encoding";
-import { QueryClient } from "@cosmjs/stargate";
-import { HttpBatchClient, Tendermint34Client } from "@cosmjs/tendermint-rpc";
-import { doesNotMatch } from "assert";
 import BigNumber from "bignumber.js";
 import { assert, expect } from "chai";
 import dotenv from "dotenv";
 import { describe } from "mocha";
 
-import { initPools, processPoolStateAssets } from "../../../../chains/defaults/queries/getPoolState";
+import { initPools } from "../../../../chains/defaults/queries/getPoolState";
 import { ChainOperator } from "../../../../core/chainOperator/chainoperator";
 import { Asset, fromChainAsset, RichAsset, toChainAsset } from "../../../../core/types/base/asset";
 import { DexConfig, setBotConfig } from "../../../../core/types/base/configs";
-import { AmmDexName, outGivenIn, PairType, PCLPool, Pool } from "../../../../core/types/base/pool";
-import { Uint128 } from "../../../../core/types/base/uint128";
+import { AmmDexName, outGivenIn, PairType, Pool } from "../../../../core/types/base/pool";
 import { identity } from "../../../../core/types/identity";
 
 dotenv.config({ path: "./src/envs/chains/injective.env" });
@@ -168,7 +162,6 @@ describe("Test outGivenIn", () => {
 });
 
 describe("Test PCL Pool interactions", () => {
-
 	it("should be able to calculate outgivenin for PCL pools", async () => {
 		// load config required for querying
 		dotenv.config({ path: "./src/tests/mock/envs/injective.env" });
@@ -179,34 +172,27 @@ describe("Test PCL Pool interactions", () => {
 		const pclPool = pools.find((pool) => pool.pairType === PairType.pcl);
 
 		expect(botConfig, "botconfig empty").to.not.be.undefined;
-		expect(chainOperator, "chainoperator issue").to.not.be.undefined
+		expect(chainOperator, "chainoperator issue").to.not.be.undefined;
 		expect(pclPool, "PCL pool not found").to.not.be.undefined;
 		if (!pclPool) {
-			return
+			return;
 		}
 
 		for (const poolAsset of pclPool.assets) {
 			const offerAsset: RichAsset = {
 				info: poolAsset.info,
 				decimals: poolAsset.decimals,
-				amount: "10000000"
-			}
+				amount: "10000000",
+			};
 
 			const out0 = outGivenIn(pclPool, offerAsset);
 			const chainAsset: Asset = toChainAsset(offerAsset);
-			const simulatedResult = await chainOperator.queryContractSmart(
-				pclPool.address,
-				{ simulation: { offer_asset: chainAsset } },
-			);
+			const simulatedResult = await chainOperator.queryContractSmart(pclPool.address, {
+				simulation: { offer_asset: chainAsset },
+			});
 			const outSimulatedAsset = fromChainAsset({ amount: simulatedResult.return_amount, info: out0.info });
 			assert.closeTo(+out0.amount, +outSimulatedAsset.amount, 1);
 		}
-
-
-
-
-
-
 	});
 });
 

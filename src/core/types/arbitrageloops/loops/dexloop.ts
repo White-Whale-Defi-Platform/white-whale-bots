@@ -1,7 +1,9 @@
+import * as fs from "fs/promises";
+
 import * as chains from "../../../../chains";
 import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
 import { tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
-import {} from "../../../arbitrage/optimizers/orderbookOptimizer";
+import { } from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
@@ -98,8 +100,39 @@ export class DexLoop implements DexLoopInterface {
 				orderbooks.push(...obs);
 			}
 		}
-		const allPools = await initPools(chainOperator, botConfig.poolEnvs, botConfig.mappingFactoryRouter);
 
+		//read pools from file if exists, else initialise them again and store
+		/********************************************************************* */
+		let allPools: Array<Pool>;
+		try {
+			// reading a JSON file synchronously
+			const allPoolsData = await fs.readFile(`./src/envs/storage/pools_${botConfig.chainPrefix}.json`, {
+				encoding: "utf-8",
+			});
+
+			allPools = JSON.parse(allPoolsData);
+			console.log(`pool data found in "./src/envs/storage/pools_${botConfig.chainPrefix}.json", re-using these`);
+		} catch (error) {
+			// cannot find stored pools
+			console.log(
+				`pool data not found in "./src/envs/storage/pools_${botConfig.chainPrefix}.json", initialiasing all pools`,
+			);
+			allPools = await initPools(
+				chainOperator,
+				botConfig.poolEnvs,
+				botConfig.mappingFactoryRouter,
+				botConfig.manualPoolsOnly,
+			);
+
+			console.log(`storing pools as  "./src/envs/storage/pools_${botConfig.chainPrefix}.json"`);
+			// writing the JSON string content to a file
+			await fs.writeFile(`./src/envs/storage/pools_${botConfig.chainPrefix}.json`, JSON.stringify(allPools));
+			// throwing the error
+		}
+		/********************************************************************* */
+
+		//Initialise correct loop based on read config
+		/********************************************************************* */
 		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
 			console.log("spinning up mempool loop");
 			return new DexMempoolLoop(

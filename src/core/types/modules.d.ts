@@ -70,6 +70,11 @@ declare namespace NodeJS {
 		 */
 		POOLS: string;
 		/**
+		 * Whether we query the pool factory to get all existing pools or only use the manually entered pools.
+		 */
+		MANUAL_POOLS_ONLY: string;
+
+		/**
 		 * A list of all known orderbook pairs (marketids), only relevant when SETUP_TYPE = dex.
 		 */
 		ORDERBOOKS: string;
