@@ -17,6 +17,9 @@ node_modules/
 juno.env
 terra.env
 injective.env
+
+# App specific Pool variables
+pools_*.json
 # Build directory
 out/
 
