@@ -1,7 +1,7 @@
-import { JsonObject, setupWasmExtension, WasmExtension } from "@cosmjs/cosmwasm-stargate";
+import { JsonObject, setupWasmExtension, WasmExtension } from "@cosmjs/cosmwasm-stargate/build";
 import { stringToPath } from "@cosmjs/crypto/build/slip10";
-import { DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing";
-import { QueryClient, StdFee } from "@cosmjs/stargate";
+import { DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing/build";
+import { QueryClient, StdFee } from "@cosmjs/stargate/build";
 import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
 import { HttpBatchClient } from "@cosmjs/tendermint-rpc";
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
@@ -10,7 +10,6 @@ import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
 import {
 	BaseAccount,
 	ChainRestAuthApi,
-	createTransaction,
 	IndexerGrpcSpotApi,
 	MsgBroadcasterWithPk,
 	MsgCreateSpotMarketOrder,
@@ -24,7 +23,6 @@ import {
 import { ChainId } from "@injectivelabs/ts-types";
 import { SkipBundleClient } from "@skip-mev/skipjs";
 import { MsgSend as CosmJSMsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { QueryContractInfoResponse } from "cosmjs-types/cosmwasm/wasm/v1/query";
 import { MsgExecuteContract as CosmJSMsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
@@ -274,52 +272,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			transactionHash: "",
 			rawLog: "",
 		};
-	}
-
-	/**
-	 *
-	 */
-	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string, otherTx?: TxRaw) {
-		if (!this._skipBundleClient || !this._skipSigningAddress) {
-			console.log("skip bundle client not initialised");
-			process.exit(1);
-		}
-
-		const preppedMsgs = this.prepair(messages);
-		// console.log(inspect(preppedMsgs, { depth: null }));
-		if (!preppedMsgs || preppedMsgs.length === 0) {
-			return;
-		}
-		const { signBytes, txRaw, bodyBytes, authInfoBytes } = createTransaction({
-			fee: fee,
-			memo: memo,
-			chainId: this._chainId,
-			message: preppedMsgs,
-			pubKey: this._publicKey.toBase64(),
-			sequence: this._sequence,
-			accountNumber: this._accountNumber,
-		});
-		const signature = await this._privateKey.sign(Buffer.from(signBytes));
-
-		txRaw.signatures = [signature];
-		const cosmTxRaw = {
-			signatures: txRaw.signatures,
-			bodyBytes: bodyBytes,
-			authInfoBytes: authInfoBytes,
-		};
-
-		let signed;
-		if (otherTx) {
-			signed = await this._skipBundleClient.signBundle(
-				[otherTx, cosmTxRaw],
-				this._signer,
-				this._skipSigningAddress,
-			);
-		} else {
-			signed = await this._skipBundleClient.signBundle([cosmTxRaw], this._signer, this._skipSigningAddress);
-		}
-		const res = await this._skipBundleClient.sendBundle(signed, 0, true);
-		return res;
 	}
 	/**
 	 *

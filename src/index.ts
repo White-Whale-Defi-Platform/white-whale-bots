@@ -7,12 +7,17 @@ import { LiquidationLoop } from "./core/types/arbitrageloops/loops/liqMempoolLoo
 import { DexConfig, LiquidationConfig, setBotConfig, SetupType } from "./core/types/base/configs";
 import { LogType } from "./core/types/base/logging";
 // load env files
-dotenv.config({ path: "./src/envs/chains/injective.env" });
+dotenv.config({ path: "./src/envs/chains/osmosis.env" });
 
 /**
  * Runs the main program.
  */
 async function main() {
+	// console.log(await client.osmosis.gamm.v1beta1.pools());
+	// console.log(await client.osmosis.cosmwasmpool.v1beta1.pools());
+	// const q = await client.osmosis.poolmanager.v1beta1.allPools();
+	// console.log(q.pools);
+
 	//creat config based on environment variables
 	const botConfig = await setBotConfig(process.env);
 
@@ -24,6 +29,7 @@ async function main() {
 	//spawn chainOperator for interaction with blockchains
 	const chainOperator = await ChainOperator.connectWithSigner(botConfig);
 	//create the arbitrage loop based on input config
+
 	let loop;
 	switch (botConfig.setupType) {
 		case SetupType.DEX:

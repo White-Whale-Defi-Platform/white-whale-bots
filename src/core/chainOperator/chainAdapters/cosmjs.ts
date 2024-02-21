@@ -1,7 +1,7 @@
-import { JsonObject, setupWasmExtension, SigningCosmWasmClient, WasmExtension } from "@cosmjs/cosmwasm-stargate";
-import { DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing";
+import { JsonObject, setupWasmExtension, SigningCosmWasmClient, WasmExtension } from "@cosmjs/cosmwasm-stargate/build";
+import { DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing/build";
 import { AccountData } from "@cosmjs/proto-signing/build/signer";
-import { BroadcastTxError, GasPrice, QueryClient, setupAuthExtension, StdFee } from "@cosmjs/stargate";
+import { BroadcastTxError, GasPrice, QueryClient, setupAuthExtension, StdFee } from "@cosmjs/stargate/build";
 import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { HttpBatchClient, HttpClient } from "@cosmjs/tendermint-rpc/build/rpcclients";
@@ -20,7 +20,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	private _signingCWClient!: SigningCosmWasmClient; //used to sign transactions
 	private _tmClient!: Tendermint34Client; //used to broadcast transactions
 	private _httpClient!: HttpBatchClient | HttpClient; //used to query rpc methods (unconfirmed_txs, account)
-	private _wasmQueryClient!: QueryClient & WasmExtension; //used to query wasm methods (contract states)
+	protected _wasmQueryClient!: QueryClient & WasmExtension; //used to query wasm methods (contract states)
 	private _account!: AccountData;
 	private _publicAddress!: string;
 	private _accountNumber = 0;
@@ -161,31 +161,6 @@ class CosmjsAdapter implements ChainOperatorInterface {
 			transactionHash: "",
 			rawLog: "",
 		};
-	}
-	/**
-	 *
-	 */
-	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string, otherTx?: TxRaw) {
-		if (!this._skipBundleClient) {
-			console.log("skip bundle client not initialised");
-			process.exit(1);
-		}
-
-		const signerData = {
-			accountNumber: this._accountNumber,
-			sequence: this._sequence,
-			chainId: this._chainId,
-		};
-		const txRaw: TxRaw = await this._signingCWClient.sign(this.publicAddress, messages, fee, "", signerData);
-
-		let signed;
-		if (otherTx) {
-			signed = await this._skipBundleClient.signBundle([otherTx, txRaw], this._signer, this.publicAddress);
-		} else {
-			signed = await this._skipBundleClient.signBundle([txRaw], this._signer, this.publicAddress);
-		}
-		const res = await this._skipBundleClient.sendBundle(signed, 0, true);
-		return res;
 	}
 
 	/**

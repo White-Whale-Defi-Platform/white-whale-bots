@@ -79,6 +79,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 	 */
 	public async step() {
 		this.iterations++;
+		console.time("updating states");
 		if (this.updateOrderbookStates && this.orderbooks.length > 0) {
 			await Promise.all([
 				this.updatePoolStates(this.chainOperator, this.pools),
@@ -87,8 +88,12 @@ export class DexMempoolLoop implements DexLoopInterface {
 		} else {
 			await this.updatePoolStates(this.chainOperator, this.pools);
 		}
+		console.timeEnd("updating states");
+
+		console.time("calcing arb");
 		const arbTrade = this.ammArb(this.paths, this.botConfig);
 		const arbTradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
+		console.timeEnd("calcing arb");
 
 		if (arbTrade && arbTradeOB) {
 			if (arbTrade.profit > arbTradeOB.profit) {
@@ -219,12 +224,12 @@ export class DexMempoolLoop implements DexLoopInterface {
 		for (const equalpath of path.equalpaths) {
 			this.CDpaths.set(equalpath.identifier, {
 				timeoutIteration: this.iterations,
-				timeoutDuration: 5,
+				timeoutDuration: 600,
 				path: equalpath,
 			});
 		}
 		//add self to the CDPath array
-		this.CDpaths.set(path.identifier, { timeoutIteration: this.iterations, timeoutDuration: 10, path: path });
+		this.CDpaths.set(path.identifier, { timeoutIteration: this.iterations, timeoutDuration: 600, path: path });
 
 		//remove all paths on cooldown from active paths
 		this.paths = this.paths.filter((pathToCheck) => this.CDpaths.get(pathToCheck.identifier) === undefined);

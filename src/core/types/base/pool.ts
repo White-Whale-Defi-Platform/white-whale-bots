@@ -37,6 +37,7 @@ export enum AmmDexName {
 	junoswap = "junoswap",
 	default = "default",
 	wyndex = "wyndex",
+	osmosis = "osmosis",
 }
 export enum ClobDexName {
 	injective = "injective",
@@ -64,7 +65,11 @@ export interface DefaultPool {
 	routerAddress: string;
 }
 
-export type Pool = DefaultPool | PCLPool;
+export interface OsmosisDefaultPool extends DefaultPool {
+	id: number;
+}
+
+export type Pool = DefaultPool | PCLPool | OsmosisDefaultPool;
 export interface PCLPool extends DefaultPool {
 	D: number;
 	amp: number;

@@ -1,25 +1,25 @@
-import { JsonObject } from "@cosmjs/cosmwasm-stargate";
-import { EncodeObject } from "@cosmjs/proto-signing";
-import { StdFee } from "@cosmjs/stargate";
+import { JsonObject } from "@cosmjs/cosmwasm-stargate/build";
+import { EncodeObject } from "@cosmjs/proto-signing/build";
+import { StdFee } from "@cosmjs/stargate/build";
 import { Network } from "@injectivelabs/networks";
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { QueryContractInfoResponse } from "cosmjs-types/cosmwasm/wasm/v1/query";
 
 import { BotConfig } from "../types/base/configs";
 import CosmjsAdapter from "./chainAdapters/cosmjs";
 import InjectiveAdapter from "./chainAdapters/injective";
+import OsmosisAdapter from "./chainAdapters/osmosis";
 import { TxResponse } from "./chainOperatorInterface";
 /**
  *
  */
 export class ChainOperator {
-	client: CosmjsAdapter | InjectiveAdapter;
+	client: CosmjsAdapter | InjectiveAdapter | OsmosisAdapter;
 	network: string;
 
 	/**
 	 *
 	 */
-	constructor(client: CosmjsAdapter | InjectiveAdapter, network: string) {
+	constructor(client: CosmjsAdapter | InjectiveAdapter | OsmosisAdapter, network: string) {
 		this.client = client;
 		this.network = network;
 	}
@@ -32,6 +32,14 @@ export class ChainOperator {
 			await injectiveClient.init(botConfig);
 			return new Promise((resolve, reject) => {
 				resolve(new ChainOperator(injectiveClient, Network.Mainnet));
+			});
+		}
+
+		if (botConfig.chainPrefix.includes("osmo")) {
+			const osmosisClient = new OsmosisAdapter(botConfig);
+			await osmosisClient.init(botConfig);
+			return new Promise((resolve, reject) => {
+				resolve(new ChainOperator(osmosisClient, botConfig.rpcUrls[0]));
 			});
 		}
 
@@ -130,17 +138,5 @@ export class ChainOperator {
 	 */
 	async reset() {
 		return await this.client.reset();
-	}
-	/**
-	 *
-	 */
-	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string, otherTx?: TxRaw) {
-		try {
-			return await this.client.signAndBroadcastSkipBundle(messages, fee, memo, otherTx);
-		} catch (e) {
-			console.log(e);
-			await this.client.getNewClients();
-			return await this.client.signAndBroadcastSkipBundle(messages, fee, memo, otherTx);
-		}
 	}
 }
