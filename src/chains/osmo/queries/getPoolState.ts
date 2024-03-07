@@ -3,7 +3,6 @@ import { Pool as CLPool } from "osmojs/dist/codegen/osmosis/concentratedliquidit
 import { CosmWasmPool as CosmWasmPool } from "osmojs/dist/codegen/osmosis/cosmwasmpool/v1beta1/model/pool";
 import { Pool as StableswapPool } from "osmojs/dist/codegen/osmosis/gamm/poolmodels/stableswap/v1beta1/stableswap_pool";
 import { Pool as BalancerPool } from "osmojs/dist/codegen/osmosis/gamm/v1beta1/balancerPool";
-import { PoolResponse } from "osmojs/dist/codegen/osmosis/poolmanager/v1beta1/query";
 
 import OsmosisAdapter from "../../../core/chainOperator/chainAdapters/osmosis";
 import { ChainOperator } from "../../../core/chainOperator/chainoperator";
@@ -13,11 +12,11 @@ import {
 	fromChainAsset,
 	isWyndDaoNativeAsset,
 	isWyndDaoTokenAsset,
-	JunoSwapAssetInfo,
 	RichAsset,
 } from "../../../core/types/base/asset";
 import { AmmDexName, DefaultPool, OsmosisDefaultPool, PairType, PCLPool, Pool } from "../../../core/types/base/pool";
 import { Uint128 } from "../../../core/types/base/uint128";
+import { getPoolStates as getPoolStatesDefault, initPools as initPoolsDefault } from "../../defaults";
 
 interface PCLConfigResponse {
 	block_time_last: number;
@@ -40,15 +39,6 @@ interface PCLConfigParams {
 	track_asset_balances: boolean;
 }
 
-interface JunoSwapPoolState {
-	token1_reserve: string;
-	token1_denom: JunoSwapAssetInfo;
-	token2_reserve: string;
-	token2_denom: JunoSwapAssetInfo;
-	lp_token_supply: string;
-	lp_token_address: string;
-}
-
 interface PoolState {
 	assets: [Asset, Asset];
 	total_share: Uint128;
@@ -66,53 +56,18 @@ interface PairResponse {
  * @param pools An array of Pool objects to obtain the chain states for.
  */
 export async function getPoolStates(chainOperator: ChainOperator, pools: Array<Pool>) {
-	await Promise.all(
-		pools.map(async (pool) => {
-			if (pool.dexname === AmmDexName.osmosis) {
-				const poolState: PoolResponse = await (<OsmosisAdapter>chainOperator.client).poolState(
-					(<OsmosisDefaultPool>pool).id,
-				);
-				const poolAssets = poolState.pool?.poolAssets.map((asset): RichAsset => {
-					return fromChainAsset({
-						amount: asset.token.amount,
-						info: { native_token: { denom: asset.token.denom } },
-					});
-				});
-				if (poolAssets) {
-					pool.assets = poolAssets;
-				}
-			} else {
-				if (pool.pairType === PairType.pcl) {
-					const [poolState, d, config]: [PoolState, number, PCLConfigResponse] = await Promise.all([
-						chainOperator.queryContractSmart(pool.address, {
-							pool: {},
-						}),
-						chainOperator.queryContractSmart(pool.address, { compute_d: {} }),
-						chainOperator.queryContractSmart(pool.address, {
-							config: {},
-						}),
-					]);
-					const pclPool: PCLPool = <PCLPool>pool;
-					const configParams: PCLConfigParams = JSON.parse(fromAscii(fromBase64(config.params)));
-					pclPool.D = Number(d);
-					pclPool.amp = +configParams.amp;
-					pclPool.gamma = +configParams.gamma;
-					pclPool.priceScale = +configParams.price_scale;
-					pclPool.feeGamma = +configParams.fee_gamma;
-					pclPool.midFee = +configParams.mid_fee;
-					pclPool.outFee = +configParams.out_fee;
-					const [assets] = processPoolStateAssets(poolState);
-					pool.assets = assets;
-				} else {
-					const poolState = <PoolState>await chainOperator.queryContractSmart(pool.address, {
-						pool: {},
-					});
-					const [assets] = processPoolStateAssets(poolState);
-					pool.assets = assets;
-				}
+	const allPools = await (<OsmosisAdapter>chainOperator.client).allPools();
+	for (const pool of allPools.pools) {
+		if (<string>pool.$typeUrl === "/osmosis.gamm.v1beta1.Pool") {
+			const poolToUpdate = pools.find((pa) => pa.address === (<BalancerPool>pool).address);
+			if (poolToUpdate) {
+				poolToUpdate.assets = initBalancerPool(<BalancerPool>pool).assets;
 			}
-		}),
-	);
+		}
+	}
+	const otherPools = pools.filter((pool) => pool.dexname === AmmDexName.default);
+
+	await getPoolStatesDefault(chainOperator, otherPools);
 }
 
 /**
@@ -129,18 +84,23 @@ export async function initPools(
 	manualPoolsOnly = false,
 ): Promise<Array<Pool>> {
 	const allPools = await (<OsmosisAdapter>chainOperator.client).allPools();
-	const pools: Array<Pool> = [];
+	const osmosisPools: Array<Pool> = [];
 	for (const pool of allPools.pools) {
 		const q = <string>pool.$typeUrl;
 		let derivedPool: CosmWasmPool | BalancerPool | CLPool | StableswapPool | Pool | undefined;
 		switch (q) {
 			case "/osmosis.cosmwasmpool.v1beta1.CosmWasmPool":
-				console.log("found cosmwasmpool");
-				// derivedPool = await initPool(chainOperator, (<CosmWasmPool>pool).contractAddress);
+				console.log("found cosmwasmpool: ", (<CosmWasmPool>pool).contractAddress);
+				derivedPool = await initPool(chainOperator, (<CosmWasmPool>pool).contractAddress);
 				// // console.log(derivedPool);
-				// if (derivedPool) {
-				// 	pools.push(derivedPool);
-				// }
+				if (derivedPool) {
+					const derivedOsmosisPool: OsmosisDefaultPool = {
+						...derivedPool,
+						weights: [50, 50],
+						id: Number((<CosmWasmPool>pool).poolId),
+					};
+					osmosisPools.push(derivedOsmosisPool);
+				}
 				break;
 			case "/osmosis.gamm.v1beta1.Pool":
 				derivedPool = <BalancerPool>pool;
@@ -149,7 +109,7 @@ export async function initPools(
 					+derivedPool.poolAssets[0].token.amount > 1e6 &&
 					+derivedPool.poolAssets[1].token.amount > 1e6
 				) {
-					pools.push(initBalancerPool(derivedPool));
+					osmosisPools.push(initBalancerPool(derivedPool));
 				}
 				break;
 			case "/osmosis.concentratedliquidity.v1beta1.Pool":
@@ -168,45 +128,9 @@ export async function initPools(
 		}
 	}
 
-	// const factoryPools = await getPoolsFromFactory(chainOperator, factoryMapping);
-	// for (const poolAddress of poolAddresses) {
-	// 	const pool: Pool | undefined = await initPool(chainOperator, poolAddress.pool);
-	// 	if (!pool) {
-	// 		continue;
-	// 	}
-	// 	const factory = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.factory ?? "";
-	// 	const router = factoryPools.find((fp) => fp.pool == poolAddress.pool)?.router ?? "";
-
-	// 	(pool.inputfee = poolAddress.inputfee),
-	// 		(pool.outputfee = poolAddress.outputfee),
-	// 		(pool.LPratio = poolAddress.LPratio),
-	// 		(pool.factoryAddress = factory),
-	// 		(pool.routerAddress = router);
-	// 	pools.push(pool);
-	// }
-
-	// //if we allow factorypools we try instantiate all pools available from the factory
-	// if (!manualPoolsOnly) {
-	// 	//filter all factory pools with the ones we manually setup using POOLS env
-	// 	const filteredFactoryPools = factoryPools.filter(
-	// 		(fp) => poolAddresses.find((pa) => pa.pool === fp.pool) === undefined,
-	// 	);
-
-	// 	for (const factoryPool of filteredFactoryPools) {
-	// 		const pool: Pool | undefined = await initPool(chainOperator, factoryPool.pool);
-	// 		if (!pool) {
-	// 			continue;
-	// 		}
-	// 		pool.inputfee = 0;
-	// 		pool.outputfee = 0.3;
-	// 		pool.LPratio = 0.667;
-	// 		pool.factoryAddress = factoryPool.factory;
-	// 		pool.routerAddress = factoryPool.router;
-
-	// 		pools.push(pool);
-	// 	}
-	// }
-	return pools;
+	const wasmPools = await initPoolsDefault(chainOperator, poolAddresses, factoryMapping, manualPoolsOnly);
+	console.log("wasmpools: ", wasmPools.length);
+	return [...osmosisPools, ...wasmPools];
 }
 
 /**
@@ -239,6 +163,7 @@ export function processPoolStateAssets(poolState: PoolState): [Array<RichAsset>,
 	}
 	return [assets, type, poolState.total_share];
 }
+
 /**
  *
  */
@@ -248,6 +173,7 @@ function initBalancerPool(poolState: BalancerPool): OsmosisDefaultPool {
 	const poolAssets = poolState.poolAssets.map((asset): RichAsset => {
 		return fromChainAsset({ amount: asset.token.amount, info: { native_token: { denom: asset.token.denom } } });
 	});
+	const poolWeights = poolState.poolAssets.map((asset) => +asset.weight);
 	return {
 		assets: poolAssets,
 		address: poolState.address,
@@ -260,19 +186,23 @@ function initBalancerPool(poolState: BalancerPool): OsmosisDefaultPool {
 		routerAddress: "",
 		LPratio: 1,
 		id: Number(poolState.id),
+		weights: poolWeights,
 	};
 }
 /**
  *
  */
 async function initPool(chainOperator: ChainOperator, pooladdress: string): Promise<Pool | undefined> {
-	const pairType = await initPairType(chainOperator, pooladdress);
-	const defaultPool = await initDefaultPool(chainOperator, pooladdress);
-	if (!defaultPool) {
+	let pairType: PairType;
+	let defaultPool;
+	try {
+		pairType = await initPairType(chainOperator, pooladdress);
+		defaultPool = await initDefaultPool(chainOperator, pooladdress);
+	} catch (e) {
 		console.error("Unable to initialize pool: ", pooladdress);
 		return undefined;
 	}
-	if (pairType === PairType.pcl) {
+	if (pairType === PairType.pcl && defaultPool) {
 		return await initPCLPool(chainOperator, defaultPool);
 	}
 	return defaultPool;

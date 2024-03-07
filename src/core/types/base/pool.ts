@@ -67,6 +67,7 @@ export interface DefaultPool {
 
 export interface OsmosisDefaultPool extends DefaultPool {
 	id: number;
+	weights: Array<number>;
 }
 
 export type Pool = DefaultPool | PCLPool | OsmosisDefaultPool;

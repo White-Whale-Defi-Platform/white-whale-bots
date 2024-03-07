@@ -6,7 +6,7 @@ import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
 import { Mempool, IgnoredAddresses, MempoolTx, decodeMempool, flushTxMemory } from "../../base/mempool";
 import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
-import { removedUnusedPools, applyMempoolMessagesOnPools, Pool } from "../../base/pool";
+import { removedUnusedPools, applyMempoolMessagesOnPools, Pool, AmmDexName } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { Orderbook, removedUnusedOrderbooks } from "../../base/orderbook";
 
@@ -56,6 +56,11 @@ export class DexMempoolLoop implements DexLoopInterface {
 		console.log(`all pools: ${allPools.length}, filtered pools: ${filteredPools.length}`);
 		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks, botConfig);
 		const filteredOrderbooks = removedUnusedOrderbooks(orderbooks, orderbookPaths);
+		// paths
+		// 	.filter((p) => p.pools.length === 2)
+		// 	.forEach((p) => {
+		// 		console.log(p.pools[0].address, p.pools[0].dexname, p.pools[1].address, p.pools[1].dexname);
+		// 	});
 		this.orderbookPaths = orderbookPaths;
 		this.pools = filteredPools;
 		this.orderbooks = filteredOrderbooks;
@@ -95,6 +100,15 @@ export class DexMempoolLoop implements DexLoopInterface {
 		const arbTradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
 		console.timeEnd("calcing arb");
 
+		const ps = this.paths.filter(
+			(path) => path.pools.find((pool) => pool.dexname === AmmDexName.default) !== undefined,
+		);
+		for (const path of ps) {
+			for (const p of path.pools) {
+				console.log(p.address, p.dexname);
+			}
+			console.log("---".repeat(10), "end of path", "---".repeat(10));
+		}
 		if (arbTrade && arbTradeOB) {
 			if (arbTrade.profit > arbTradeOB.profit) {
 				await this.trade(arbTrade);

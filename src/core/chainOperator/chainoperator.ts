@@ -56,13 +56,7 @@ export class ChainOperator {
 		try {
 			return await this.client.queryContractSmart(address, queryMsg);
 		} catch (e: any) {
-			//custom error for initPools JunoSwapPoolState
-			if (e.message.includes("unknown variant `pool`,")) {
-				throw new Error(e.message);
-			}
-			console.log(e);
-			await this.client.getNewClients();
-			await this.client.queryContractSmart(address, queryMsg);
+			return {};
 		}
 	}
 
