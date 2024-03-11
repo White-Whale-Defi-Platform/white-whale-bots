@@ -18,7 +18,7 @@ import { ChainOperatorInterface, TxResponse } from "../chainOperatorInterface";
  */
 class CosmjsAdapter implements ChainOperatorInterface {
 	private _signingCWClient!: SigningCosmWasmClient; //used to sign transactions
-	private _tmClient!: Tendermint34Client; //used to broadcast transactions
+	protected _tmClient!: Tendermint34Client; //used to broadcast transactions
 	private _httpClient!: HttpBatchClient | HttpClient; //used to query rpc methods (unconfirmed_txs, account)
 	protected _wasmQueryClient!: QueryClient & WasmExtension; //used to query wasm methods (contract states)
 	private _account!: AccountData;

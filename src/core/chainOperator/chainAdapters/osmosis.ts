@@ -22,9 +22,9 @@ class OsmosisAdapter extends CosmjsAdapter {
 	 */
 	async init(botConfig: BotConfig) {
 		await super.init(botConfig);
-		this._poolmanagerQueryClient = osmosis.osmosis.poolmanager.v1beta1.createRpcQueryExtension(
-			this._wasmQueryClient,
-		);
+		this._poolmanagerQueryClient = (
+			await osmosis.osmosis.ClientFactory.createRPCQueryClient({ rpcEndpoint: botConfig.rpcUrls[0] })
+		).osmosis.poolmanager.v1beta1;
 	}
 	/**
 	 *

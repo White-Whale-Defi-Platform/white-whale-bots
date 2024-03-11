@@ -69,6 +69,7 @@
     "cosmjs-utils": "^0.1.0",
     "discord.js": "14.14.1",
     "dotenv": "^16.4.4",
-    "osmojs": "^16.8.3"
+    "osmo-query": "^16.10.0",
+    "osmojs": "^16.10.0"
   }
 }
