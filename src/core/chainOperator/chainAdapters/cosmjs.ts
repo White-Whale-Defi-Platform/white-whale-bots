@@ -162,31 +162,6 @@ class CosmjsAdapter implements ChainOperatorInterface {
 			rawLog: "",
 		};
 	}
-	/**
-	 *
-	 */
-	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string, otherTx?: TxRaw) {
-		if (!this._skipBundleClient) {
-			console.log("skip bundle client not initialised");
-			process.exit(1);
-		}
-
-		const signerData = {
-			accountNumber: this._accountNumber,
-			sequence: this._sequence,
-			chainId: this._chainId,
-		};
-		const txRaw: TxRaw = await this._signingCWClient.sign(this.publicAddress, messages, fee, "", signerData);
-
-		let signed;
-		if (otherTx) {
-			signed = await this._skipBundleClient.signBundle([otherTx, txRaw], this._signer, this.publicAddress);
-		} else {
-			signed = await this._skipBundleClient.signBundle([txRaw], this._signer, this.publicAddress);
-		}
-		const res = await this._skipBundleClient.sendBundle(signed, 0, true);
-		return res;
-	}
 
 	/**
 	 *

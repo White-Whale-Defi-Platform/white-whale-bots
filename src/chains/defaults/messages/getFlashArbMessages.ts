@@ -76,7 +76,6 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 		if (isNativeAsset(offerAssetChain.info)) {
 			msg = <DefaultSwapMessage>{
 				swap: {
-					max_spread: String(spread),
 					offer_asset: {
 						amount: offerAssetChain.amount,
 						info:
@@ -84,8 +83,6 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 								? offerAssetChain.info
 								: { native: offerAssetChain.info.native_token.denom },
 					},
-
-					belief_price: beliefPriceChain,
 				},
 			};
 		} else {
@@ -128,7 +125,7 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 								amount: offerAssetChain.amount,
 								denom: offerAssetChain.info.native_token.denom,
 							},
-					  ]
+						]
 					: [],
 				msg: toBase64(toUtf8(JSON.stringify(msg))),
 			},

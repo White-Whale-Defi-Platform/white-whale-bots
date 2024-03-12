@@ -10,8 +10,8 @@ import { getNetworkEndpoints, Network } from "@injectivelabs/networks";
 import {
 	BaseAccount,
 	ChainRestAuthApi,
-	createTransaction,
 	IndexerGrpcSpotApi,
+	IndexerGrpcSpotStream,
 	MsgBroadcasterWithPk,
 	MsgCreateSpotMarketOrder,
 	MsgExecuteContract,
@@ -20,11 +20,11 @@ import {
 	PrivateKey,
 	PublicKey,
 	SpotMarket,
+	SpotOrderbookV2StreamCallback,
 } from "@injectivelabs/sdk-ts";
 import { ChainId } from "@injectivelabs/ts-types";
 import { SkipBundleClient } from "@skip-mev/skipjs";
 import { MsgSend as CosmJSMsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { QueryContractInfoResponse } from "cosmjs-types/cosmwasm/wasm/v1/query";
 import { MsgExecuteContract as CosmJSMsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
@@ -38,6 +38,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	private _privateKey: PrivateKey;
 	private _signAndBroadcastClient: MsgBroadcasterWithPk;
 	private _spotQueryClient: IndexerGrpcSpotApi;
+	private _spotStreamClient: IndexerGrpcSpotStream;
 	private _wasmQueryClient!: QueryClient & WasmExtension; //used to query wasm methods (contract states)
 	private _httpClient!: HttpBatchClient;
 	private _authClient: ChainRestAuthApi;
@@ -69,6 +70,7 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			},
 		});
 		this._spotQueryClient = new IndexerGrpcSpotApi(endpoints.indexer);
+		this._spotStreamClient = new IndexerGrpcSpotStream(endpoints.indexer);
 		this._authClient = new ChainRestAuthApi(botConfig.restUrl ?? endpoints.rest);
 		this._chainId = network === Network.TestnetK8s ? ChainId.Testnet : ChainId.Mainnet;
 		this._publicKey = privateKey.toPublicKey();
@@ -148,7 +150,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	async queryContractSmart(address: string, queryMsg: Record<string, unknown>): Promise<JsonObject> {
 		return await this._wasmQueryClient.wasm.queryContractSmart(address, queryMsg);
 	}
-
 	/**
 	 *
 	 */
@@ -163,7 +164,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 		const mempoolResult = await this._httpClient.execute(createJsonRpcRequest("unconfirmed_txs"));
 		return mempoolResult.result;
 	}
-
 	/**
 	 *
 	 */
@@ -176,7 +176,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	async queryOrderbook(marketId: string): Promise<OrderbookWithSequence> {
 		return await this._spotQueryClient.fetchOrderbookV2(marketId);
 	}
-
 	/**
 	 *
 	 */
@@ -188,14 +187,18 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	> {
 		return await this._spotQueryClient.fetchOrderbooksV2(marketIds);
 	}
-
+	/**
+	 *
+	 */
+	streamOrderbooks(marketIds: Array<string>, callback: SpotOrderbookV2StreamCallback) {
+		return this._spotStreamClient.streamSpotOrderbookV2({ marketIds: marketIds, callback: callback });
+	}
 	/**
 	 *
 	 */
 	async queryMarket(marketId: string): Promise<SpotMarket> {
 		return await this._spotQueryClient.fetchMarket(marketId);
 	}
-
 	/**
 	 *
 	 */
@@ -274,52 +277,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			transactionHash: "",
 			rawLog: "",
 		};
-	}
-
-	/**
-	 *
-	 */
-	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string, otherTx?: TxRaw) {
-		if (!this._skipBundleClient || !this._skipSigningAddress) {
-			console.log("skip bundle client not initialised");
-			process.exit(1);
-		}
-
-		const preppedMsgs = this.prepair(messages);
-		// console.log(inspect(preppedMsgs, { depth: null }));
-		if (!preppedMsgs || preppedMsgs.length === 0) {
-			return;
-		}
-		const { signBytes, txRaw, bodyBytes, authInfoBytes } = createTransaction({
-			fee: fee,
-			memo: memo,
-			chainId: this._chainId,
-			message: preppedMsgs,
-			pubKey: this._publicKey.toBase64(),
-			sequence: this._sequence,
-			accountNumber: this._accountNumber,
-		});
-		const signature = await this._privateKey.sign(Buffer.from(signBytes));
-
-		txRaw.signatures = [signature];
-		const cosmTxRaw = {
-			signatures: txRaw.signatures,
-			bodyBytes: bodyBytes,
-			authInfoBytes: authInfoBytes,
-		};
-
-		let signed;
-		if (otherTx) {
-			signed = await this._skipBundleClient.signBundle(
-				[otherTx, cosmTxRaw],
-				this._signer,
-				this._skipSigningAddress,
-			);
-		} else {
-			signed = await this._skipBundleClient.signBundle([cosmTxRaw], this._signer, this._skipSigningAddress);
-		}
-		const res = await this._skipBundleClient.sendBundle(signed, 0, true);
-		return res;
 	}
 	/**
 	 *

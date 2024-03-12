@@ -2,7 +2,7 @@ import { JsonObject } from "@cosmjs/cosmwasm-stargate";
 import { EncodeObject } from "@cosmjs/proto-signing";
 import { StdFee } from "@cosmjs/stargate";
 import { Network } from "@injectivelabs/networks";
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
+import { SpotOrderbookV2StreamCallback } from "@injectivelabs/sdk-ts";
 import { QueryContractInfoResponse } from "cosmjs-types/cosmwasm/wasm/v1/query";
 
 import { BotConfig } from "../types/base/configs";
@@ -128,19 +128,13 @@ export class ChainOperator {
 	/**
 	 *
 	 */
-	async reset() {
-		return await this.client.reset();
+	streamOrderbooks(marketIds: Array<string>, callback: SpotOrderbookV2StreamCallback) {
+		return (<InjectiveAdapter>this.client).streamOrderbooks(marketIds, callback);
 	}
 	/**
 	 *
 	 */
-	async signAndBroadcastSkipBundle(messages: Array<EncodeObject>, fee: StdFee, memo?: string, otherTx?: TxRaw) {
-		try {
-			return await this.client.signAndBroadcastSkipBundle(messages, fee, memo, otherTx);
-		} catch (e) {
-			console.log(e);
-			await this.client.getNewClients();
-			return await this.client.signAndBroadcastSkipBundle(messages, fee, memo, otherTx);
-		}
+	async reset() {
+		return await this.client.reset();
 	}
 }

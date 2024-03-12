@@ -57,7 +57,7 @@ function getOptimalTradeForPath(
 	offerAssetInfo: AssetInfo,
 	flashloanfee: number,
 ): [number, RichAsset, number, number, number] {
-	const tradesizes = Array.from({ length: 1350 }, (_, i) => (i + 1) * 1e6);
+	const tradesizes = Array.from({ length: 900 }, (_, i) => (i + 1) * 1e6);
 
 	return binarySearch(path, offerAssetInfo, flashloanfee, tradesizes, 0, tradesizes.length - 1);
 	/**

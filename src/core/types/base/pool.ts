@@ -26,7 +26,7 @@ import {
 	toChainPrice,
 } from "./asset";
 import { MempoolTx } from "./mempool";
-import { Path } from "./path";
+import { OrderbookPath, Path } from "./path";
 import { Uint128 } from "./uint128";
 BigNumber.config({
 	ROUNDING_MODE: BigNumber.ROUND_DOWN,
@@ -550,9 +550,17 @@ export function getAssetsOrder(pool: Pool, assetInfo: AssetInfo) {
  * @param paths Array of Path types to check the pools against.
  * @returns Filtered array of Pools.
  */
-export function removedUnusedPools(pools: Array<Pool>, paths: Array<Path>): Array<Pool> {
+export function removedUnusedPools(
+	pools: Array<Pool>,
+	paths: Array<Path>,
+	orderbookpaths?: Array<OrderbookPath>,
+): Array<Pool> {
 	const filteredPools: Set<Pool> = new Set(
-		pools.filter((pool) => paths.some((path) => path.pools.some((pathPool) => pathPool.address === pool.address))),
+		pools.filter(
+			(pool) =>
+				paths.some((path) => path.pools.some((pathPool) => pathPool.address === pool.address)) ||
+				orderbookpaths?.some((op) => op.pool.address === pool.address),
+		),
 	);
 	return [...filteredPools];
 }

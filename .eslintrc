@@ -95,7 +95,7 @@
     "promise/no-new-statics": "error",
     "promise/valid-params": "error",
     "promise/prefer-await-to-then": "error",
-    "promise/prefer-await-to-callbacks": "error",
+    "promise/prefer-await-to-callbacks": "warn",
     "no-undef": "off",
     "no-redeclare": "off",
     "no-unused-vars": "off",

@@ -3,7 +3,7 @@ import * as fs from "fs/promises";
 import * as chains from "../../../../chains";
 import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
 import { tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
-import { } from "../../../arbitrage/optimizers/orderbookOptimizer";
+import {} from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
@@ -14,7 +14,7 @@ import { Pool, removedUnusedPools } from "../../base/pool";
 import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { DexMempoolLoop } from "./dexMempoolloop";
-import { DexMempoolSkipLoop } from "./dexMempoolSkiploop";
+import { DexWebsockedLoop } from "./dexWebsocketLoop";
 
 /**
  *
@@ -133,9 +133,9 @@ export class DexLoop implements DexLoopInterface {
 
 		//Initialise correct loop based on read config
 		/********************************************************************* */
-		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
-			console.log("spinning up mempool loop");
-			return new DexMempoolLoop(
+		if (botConfig.orderbooks.length > 0) {
+			console.log("spinning up ws loop");
+			return new DexWebsockedLoop(
 				chainOperator,
 				botConfig,
 				logger,
@@ -143,11 +143,11 @@ export class DexLoop implements DexLoopInterface {
 				orderbooks,
 				getPoolStates,
 				msgFactory,
-				getOrderbookState,
 			);
-		} else if (botConfig.useMempool && botConfig.skipConfig?.useSkip) {
-			console.log("spinning up skip mempool loop");
-			return new DexMempoolSkipLoop(
+		}
+		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
+			console.log("spinning up mempool loop");
+			return new DexMempoolLoop(
 				chainOperator,
 				botConfig,
 				logger,
