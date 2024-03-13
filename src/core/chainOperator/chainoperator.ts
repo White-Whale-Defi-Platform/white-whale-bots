@@ -131,6 +131,13 @@ export class ChainOperator {
 	streamOrderbooks(marketIds: Array<string>, callback: SpotOrderbookV2StreamCallback) {
 		return (<InjectiveAdapter>this.client).streamOrderbooks(marketIds, callback);
 	}
+
+	/**
+	 *
+	 */
+	streamTx() {
+		return this.client.streamTx();
+	}
 	/**
 	 *
 	 */

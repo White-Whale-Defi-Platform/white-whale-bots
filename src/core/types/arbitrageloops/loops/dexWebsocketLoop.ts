@@ -1,18 +1,20 @@
 /* eslint-disable simple-import-sort/imports */
-
 import { tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
-import { Mempool, IgnoredAddresses, flushTxMemory } from "../../base/mempool";
+import { Mempool, IgnoredAddresses, flushTxMemory, decodeMessage } from "../../base/mempool";
 import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
-import { removedUnusedPools, Pool } from "../../base/pool";
+import { removedUnusedPools, Pool, applyMempoolMessagesOnPools } from "../../base/pool";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { Order, Orderbook, removedUnusedOrderbooks } from "../../base/orderbook";
 import { Subscription } from "rxjs";
 import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
 import { IndexerSpotStreamTransformer } from "@injectivelabs/sdk-ts";
-
+import { TxEvent } from "@cosmjs/tendermint-rpc/build/comet38/responses";
+import { Listener } from "xstream";
+import { decodeTxRaw } from "@cosmjs/proto-signing/build/decode";
+import { toHex } from "@cosmjs/encoding";
 /**
  *
  */
@@ -37,6 +39,7 @@ export class DexWebsockedLoop implements DexLoopInterface {
 	ignoreAddresses!: IgnoredAddresses;
 	blockHeight = 0;
 	subscription!: Subscription;
+	txHistory: { [key: string]: boolean } = {};
 
 	/**
 	 *
@@ -77,10 +80,17 @@ export class DexWebsockedLoop implements DexLoopInterface {
 	/**
 	 *
 	 */
-	callbackFunction = async (
+	newTxCallback = (newTx: TxEvent) => {
+		console.log(newTx);
+	};
+	/**
+	 *
+	 */
+	orderbookCallback = async (
 		orderbookUpdate: ReturnType<typeof IndexerSpotStreamTransformer.orderbookV2StreamCallback>,
 	) => {
-		console.time("updating orderbook");
+		console.time("new ob");
+		this.iterations++;
 		const orderbook = this.orderbooks.find((ob) => ob.marketId === orderbookUpdate.marketId);
 		if (!orderbook) {
 			return;
@@ -108,15 +118,11 @@ export class DexWebsockedLoop implements DexLoopInterface {
 			};
 			orderbook.sells.push(sellOrder);
 		}
-		console.timeEnd("updating orderbook");
-		console.time("updating pool states");
-		await this.updatePoolStates(this.chainOperator, this.pools);
-		console.timeEnd("updating pool states");
 
-		console.time("arb");
+		console.timeEnd("new ob");
 		const arbTrade = this.ammArb(this.paths, this.botConfig);
 		const arbTradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
-		console.timeEnd("arb");
+
 		if (arbTrade && arbTradeOB) {
 			this.subscription.unsubscribe();
 			if (arbTrade.profit > arbTradeOB.profit) {
@@ -134,12 +140,47 @@ export class DexWebsockedLoop implements DexLoopInterface {
 	 *
 	 */
 	public async step() {
-		console.log("step");
-		this.iterations++;
 		this.subscription = this.chainOperator.streamOrderbooks(
 			this.orderbooks.map((ob) => ob.marketId),
-			this.callbackFunction,
+			this.orderbookCallback,
 		);
+
+		const stream = this.chainOperator.streamTx();
+		const newTxListener: Listener<TxEvent> = {
+			/**
+			 *
+			 */
+			next: (x: TxEvent) => {
+				if (!this.txHistory[toHex(x.hash)]) {
+					this.txHistory[toHex(x.hash)] = true;
+					for (const message of decodeTxRaw(x.tx).body.messages) {
+						const msgExecuteContract = decodeMessage(message);
+						if (msgExecuteContract) {
+							applyMempoolMessagesOnPools(this.pools, [
+								{ message: msgExecuteContract, txBytes: new Uint8Array() },
+							]);
+						}
+					}
+				}
+			},
+			/**
+			 *
+			 */
+			error: (err: any) => console.log(err),
+			/**
+			 *
+			 */
+			complete: () => console.log("completed"),
+		};
+		stream.addListener(newTxListener);
+
+		while (true) {
+			console.time("new pool states");
+			await this.updatePoolStates(this.chainOperator, this.pools);
+			this.txHistory = {};
+			console.timeEnd("new pool states");
+			await delay(5000);
+		}
 	}
 
 	/**
@@ -164,7 +205,7 @@ export class DexWebsockedLoop implements DexLoopInterface {
 		}
 		this.cdPaths(trade.path);
 
-		await delay(6000);
+		await delay(1000);
 		await this.reset();
 	}
 

@@ -1,7 +1,6 @@
 import { fromAscii, fromBase64, fromUtf8 } from "@cosmjs/encoding";
 import { decodeTxRaw } from "@cosmjs/proto-signing";
 import { MsgExecuteContract as MsgExecuteContractCompatBase } from "@injectivelabs/core-proto-ts/cjs/cosmwasm/wasm/v1/tx";
-import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
 export interface Mempool {
@@ -59,42 +58,10 @@ export function decodeMempool(
 		const txBytes = fromBase64(tx);
 		const txRaw = decodeTxRaw(txBytes);
 		for (const message of txRaw.body.messages) {
-			let msgExecuteContract: MsgExecuteContract;
-
-			switch (message.typeUrl) {
-				case "/cosmos.bank.v1beta1.MsgSend": {
-					const msgSend: MsgSend = MsgSend.decode(message.value);
-					//if one of the spam wallets sends funds to a new wallet, add the new wallet to the ignore addresses
-					if (ignoreAddresses[msgSend.fromAddress]) {
-						discardIgnored(msgSend.fromAddress, msgSend.toAddress, ignoreAddresses, iteration);
-					}
-					break;
-				}
-
-				case "/injective.wasmx.v1.MsgExecuteContractCompat": {
-					const msgExecuteContractCompatBase: MsgExecuteContractCompatBase =
-						MsgExecuteContractCompatBase.decode(message.value);
-					const funds = msgExecuteContractCompatBase.funds;
-					msgExecuteContract = MsgExecuteContract.fromPartial({
-						contract: msgExecuteContractCompatBase.contract,
-						sender: msgExecuteContractCompatBase.sender,
-						msg: msgExecuteContractCompatBase.msg,
-						funds: funds,
-					});
-					if (isAllowedMempoolMsg(msgExecuteContract, ignoreAddresses, iteration)) {
-						decodedMessages.push({ message: msgExecuteContract, txBytes: txBytes });
-					}
-					break;
-				}
-				case "/cosmwasm.wasm.v1.MsgExecuteContract": {
-					msgExecuteContract = MsgExecuteContract.decode(message.value);
-					if (isAllowedMempoolMsg(msgExecuteContract, ignoreAddresses, iteration)) {
-						decodedMessages.push({ message: msgExecuteContract, txBytes: txBytes });
-					}
-					break;
-				}
-				default: {
-					break;
+			const decodedMessage = decodeMessage(message);
+			if (decodedMessage) {
+				if (isAllowedMempoolMsg(decodedMessage, ignoreAddresses, iteration)) {
+					decodedMessages.push({ message: decodedMessage, txBytes: txBytes });
 				}
 			}
 		}
@@ -145,4 +112,32 @@ function discardIgnored(
 		return true;
 	}
 	return false;
+}
+/**
+ *
+ */
+export function decodeMessage(message: any): MsgExecuteContract | undefined {
+	let msgExecuteContract: MsgExecuteContract;
+	switch (message.typeUrl) {
+		case "/injective.wasmx.v1.MsgExecuteContractCompat": {
+			const msgExecuteContractCompatBase: MsgExecuteContractCompatBase = MsgExecuteContractCompatBase.decode(
+				message.value,
+			);
+			const funds = msgExecuteContractCompatBase.funds;
+			msgExecuteContract = MsgExecuteContract.fromPartial({
+				contract: msgExecuteContractCompatBase.contract,
+				sender: msgExecuteContractCompatBase.sender,
+				msg: msgExecuteContractCompatBase.msg,
+				funds: funds,
+			});
+			return msgExecuteContract;
+		}
+		case "/cosmwasm.wasm.v1.MsgExecuteContract": {
+			msgExecuteContract = MsgExecuteContract.decode(message.value);
+			return msgExecuteContract;
+		}
+		default: {
+			break;
+		}
+	}
 }

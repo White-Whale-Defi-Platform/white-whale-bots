@@ -2,7 +2,7 @@ import { JsonObject, setupWasmExtension, WasmExtension } from "@cosmjs/cosmwasm-
 import { stringToPath } from "@cosmjs/crypto/build/slip10";
 import { DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing";
 import { QueryClient, StdFee } from "@cosmjs/stargate";
-import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
+import { Comet38Client } from "@cosmjs/tendermint-rpc";
 import { HttpBatchClient } from "@cosmjs/tendermint-rpc";
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { TransactionException } from "@injectivelabs/exceptions/dist/cjs/exceptions/TransactionException";
@@ -23,7 +23,6 @@ import {
 	SpotOrderbookV2StreamCallback,
 } from "@injectivelabs/sdk-ts";
 import { ChainId } from "@injectivelabs/ts-types";
-import { SkipBundleClient } from "@skip-mev/skipjs";
 import { MsgSend as CosmJSMsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 import { QueryContractInfoResponse } from "cosmjs-types/cosmwasm/wasm/v1/query";
 import { MsgExecuteContract as CosmJSMsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
@@ -41,17 +40,16 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	private _spotStreamClient: IndexerGrpcSpotStream;
 	private _wasmQueryClient!: QueryClient & WasmExtension; //used to query wasm methods (contract states)
 	private _httpClient!: HttpBatchClient;
+	private _websocketClient!: Comet38Client;
 	private _authClient: ChainRestAuthApi;
 	private _chainId: ChainId;
 
 	private _publicKey: PublicKey;
 	private _publicAddress!: string;
 
+	private _accountNumber!: number;
 	private _signer!: DirectSecp256k1HdWallet;
-	private _accountNumber = 0;
 	private _sequence = 0;
-	private _skipBundleClient?: SkipBundleClient;
-	private _skipSigningAddress!: string;
 
 	/**
 	 *
@@ -124,10 +122,6 @@ class InjectiveAdapter implements ChainOperatorInterface {
 			hdPaths: [hdPath],
 		});
 
-		if (botConfig.skipConfig) {
-			this._skipBundleClient = new SkipBundleClient(botConfig.skipConfig.skipRpcUrl);
-			this._skipSigningAddress = (await this._signer.getAccounts())[0].address;
-		}
 		// const markets = await this._spotQueryClient.fetchMarkets();
 		// for (const market of markets) {
 		// 	console.log(market.marketId, market.baseDenom, market.quoteDenom, market.ticker);
@@ -138,7 +132,10 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 */
 	async setClients(rpcUrl: string) {
 		this._httpClient = new HttpBatchClient(rpcUrl);
-		const tmClient = await Tendermint34Client.create(this._httpClient);
+		const tmClient = await Comet38Client.create(this._httpClient);
+		this._websocketClient = await Comet38Client.connect(
+			rpcUrl.replace("http://", "ws://").replace("https://", "wss://"),
+		);
 		this._wasmQueryClient = QueryClient.withExtensions(tmClient, setupWasmExtension);
 		// this._signingCWClient = await SigningCosmWasmClient.connectWithSigner(rpcUrl, this._signer, {
 		// 	gasPrice: GasPrice.fromString(this._gasPrice + this._denom),
@@ -192,6 +189,13 @@ class InjectiveAdapter implements ChainOperatorInterface {
 	 */
 	streamOrderbooks(marketIds: Array<string>, callback: SpotOrderbookV2StreamCallback) {
 		return this._spotStreamClient.streamSpotOrderbookV2({ marketIds: marketIds, callback: callback });
+	}
+
+	/**
+	 *
+	 */
+	streamTx() {
+		return this._websocketClient.subscribeTx();
 	}
 	/**
 	 *

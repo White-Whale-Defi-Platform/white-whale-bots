@@ -2,7 +2,7 @@ import { JsonObject, setupWasmExtension, SigningCosmWasmClient, WasmExtension } 
 import { DirectSecp256k1HdWallet, EncodeObject } from "@cosmjs/proto-signing";
 import { AccountData } from "@cosmjs/proto-signing/build/signer";
 import { BroadcastTxError, GasPrice, QueryClient, setupAuthExtension, StdFee } from "@cosmjs/stargate";
-import { Tendermint34Client } from "@cosmjs/tendermint-rpc";
+import { Comet38Client, Tendermint34Client } from "@cosmjs/tendermint-rpc";
 import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
 import { HttpBatchClient, HttpClient } from "@cosmjs/tendermint-rpc/build/rpcclients";
 import { SkipBundleClient } from "@skip-mev/skipjs";
@@ -21,6 +21,7 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	private _tmClient!: Tendermint34Client; //used to broadcast transactions
 	private _httpClient!: HttpBatchClient | HttpClient; //used to query rpc methods (unconfirmed_txs, account)
 	private _wasmQueryClient!: QueryClient & WasmExtension; //used to query wasm methods (contract states)
+	private _websocketClient!: Comet38Client;
 	private _account!: AccountData;
 	private _publicAddress!: string;
 	private _accountNumber = 0;
@@ -104,6 +105,9 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	async setClients(rpcUrl: string) {
 		this._httpClient = new HttpBatchClient(rpcUrl);
 		this._tmClient = await Tendermint34Client.create(this._httpClient);
+		this._websocketClient = await Comet38Client.connect(
+			rpcUrl.replace("http://", "ws://").replace("https://", "wss://"),
+		);
 		this._wasmQueryClient = QueryClient.withExtensions(this._tmClient, setupWasmExtension, setupAuthExtension);
 		this._signingCWClient = await SigningCosmWasmClient.connectWithSigner(rpcUrl, this._signer, {
 			gasPrice: GasPrice.fromString(this._gasPrice + this._denom),
@@ -249,6 +253,13 @@ class CosmjsAdapter implements ChainOperatorInterface {
 	 */
 	async queryMarket(marketId: string) {
 		console.log("market query not yet implemented for cosmjs");
+	}
+
+	/**
+	 *
+	 */
+	streamTx() {
+		return this._websocketClient.subscribeTx();
 	}
 	/**
 	 *
