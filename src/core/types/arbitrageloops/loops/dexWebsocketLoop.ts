@@ -52,9 +52,9 @@ export class DexWebsockedLoop implements DexLoopInterface {
 	) {
 		const paths = getAmmPaths(allPools, botConfig);
 
-		const filteredPools = removedUnusedPools(allPools, paths);
-		console.log(`all pools: ${allPools.length}, filtered pools: ${filteredPools.length}`);
 		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks, botConfig);
+		const filteredPools = removedUnusedPools(allPools, paths, orderbookPaths);
+		console.log(`all pools: ${allPools.length}, filtered pools: ${filteredPools.length}`);
 		const filteredOrderbooks = removedUnusedOrderbooks(orderbooks, orderbookPaths);
 		this.orderbookPaths = orderbookPaths;
 		this.pools = filteredPools;
