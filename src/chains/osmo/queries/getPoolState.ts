@@ -16,7 +16,7 @@ import {
 } from "../../../core/types/base/asset";
 import { AmmDexName, DefaultPool, OsmosisDefaultPool, PairType, PCLPool, Pool } from "../../../core/types/base/pool";
 import { Uint128 } from "../../../core/types/base/uint128";
-import { getPoolStates as getPoolStatesDefault, initPools as initPoolsDefault } from "../../defaults";
+import { getPoolStates as getPoolStatesDefault } from "../../defaults";
 
 interface PCLConfigResponse {
 	block_time_last: number;
@@ -77,12 +77,7 @@ export async function getPoolStates(chainOperator: ChainOperator, pools: Array<P
  * @param factoryMapping An array of objects (set by environment variables) holding the mapping between factories and their routers.
  * @returns An array of instantiated Pool objects.
  */
-export async function initPools(
-	chainOperator: ChainOperator,
-	poolAddresses: Array<{ pool: string; inputfee: number; outputfee: number; LPratio: number }>,
-	factoryMapping: Array<{ factory: string; router: string }>,
-	manualPoolsOnly = false,
-): Promise<Array<Pool>> {
+export async function initPools(chainOperator: ChainOperator): Promise<Array<Pool>> {
 	const allPools = await (<OsmosisAdapter>chainOperator.client).allPools();
 	const osmosisPools: Array<Pool> = [];
 	for (const pool of allPools.pools) {
@@ -90,8 +85,7 @@ export async function initPools(
 		let derivedPool: CosmWasmPool | BalancerPool | CLPool | StableswapPool | Pool | undefined;
 		switch (q) {
 			case "/osmosis.cosmwasmpool.v1beta1.CosmWasmPool":
-				console.log("found cosmwasmpool: ", (<CosmWasmPool>pool).contractAddress);
-				derivedPool = await initPool(chainOperator, (<CosmWasmPool>pool).contractAddress);
+				derivedPool = await initOsmosisCosmWasmPool(chainOperator, <CosmWasmPool>pool);
 				// // console.log(derivedPool);
 				if (derivedPool) {
 					const derivedOsmosisPool: OsmosisDefaultPool = {
@@ -127,10 +121,7 @@ export async function initPools(
 				break;
 		}
 	}
-
-	const wasmPools = await initPoolsDefault(chainOperator, poolAddresses, factoryMapping, manualPoolsOnly);
-	console.log("wasmpools: ", wasmPools.length);
-	return [...osmosisPools, ...wasmPools];
+	return osmosisPools;
 }
 
 /**
@@ -188,6 +179,23 @@ function initBalancerPool(poolState: BalancerPool): OsmosisDefaultPool {
 		id: Number(poolState.id),
 		weights: poolWeights,
 	};
+}
+
+/**
+ *
+ */
+async function initOsmosisCosmWasmPool(chainOperator: ChainOperator, cwpool: CosmWasmPool) {
+	const wwconfig = await chainOperator.queryContractSmart(cwpool.contractAddress, { get_config: {} });
+	if (wwconfig["white_whale_pool" as keyof typeof wwconfig] !== undefined) {
+		return await initPool(chainOperator, wwconfig.white_whale_pool);
+	} else {
+		const astroconfig = await chainOperator.queryContractSmart(cwpool.contractAddress, { config: {} });
+		if (astroconfig["params" as keyof typeof astroconfig] !== undefined) {
+			return await initPool(chainOperator, cwpool.contractAddress);
+		}
+	}
+	console.error("Unable to initialize pool: ", cwpool.contractAddress);
+	return undefined;
 }
 /**
  *
