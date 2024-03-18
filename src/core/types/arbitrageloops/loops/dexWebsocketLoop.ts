@@ -77,6 +77,33 @@ export class DexWebsockedLoop implements DexLoopInterface {
 		this.ignoreAddresses = botConfig.ignoreAddresses ?? {};
 	}
 
+	newTxListener: Listener<TxEvent> = {
+		/**
+		 *
+		 */
+		next: (x: TxEvent) => {
+			if (!this.txHistory[toHex(x.hash)]) {
+				this.txHistory[toHex(x.hash)] = true;
+				for (const message of decodeTxRaw(x.tx).body.messages) {
+					const msgExecuteContract = decodeMessage(message);
+					if (msgExecuteContract) {
+						console.log("msg execute contract");
+						applyMempoolMessagesOnPools(this.pools, [
+							{ message: msgExecuteContract, txBytes: new Uint8Array() },
+						]);
+					}
+				}
+			}
+		},
+		/**
+		 *
+		 */
+		error: (err: any) => console.log(err),
+		/**
+		 *
+		 */
+		complete: () => console.log("completed"),
+	};
 	/**
 	 *
 	 */
@@ -118,13 +145,12 @@ export class DexWebsockedLoop implements DexLoopInterface {
 			};
 			orderbook.sells.push(sellOrder);
 		}
-
+		await this.updatePoolStates(this.chainOperator, this.pools);
 		console.timeEnd("new ob");
 		const arbTrade = this.ammArb(this.paths, this.botConfig);
 		const arbTradeOB = this.orderbookArb(this.orderbookPaths, this.botConfig);
 
 		if (arbTrade && arbTradeOB) {
-			this.subscription.unsubscribe();
 			if (arbTrade.profit > arbTradeOB.profit) {
 				await this.trade(arbTrade);
 			} else if (arbTrade.profit <= arbTradeOB.profit) {
@@ -144,43 +170,6 @@ export class DexWebsockedLoop implements DexLoopInterface {
 			this.orderbooks.map((ob) => ob.marketId),
 			this.orderbookCallback,
 		);
-
-		const stream = this.chainOperator.streamTx();
-		const newTxListener: Listener<TxEvent> = {
-			/**
-			 *
-			 */
-			next: (x: TxEvent) => {
-				if (!this.txHistory[toHex(x.hash)]) {
-					this.txHistory[toHex(x.hash)] = true;
-					for (const message of decodeTxRaw(x.tx).body.messages) {
-						const msgExecuteContract = decodeMessage(message);
-						if (msgExecuteContract) {
-							applyMempoolMessagesOnPools(this.pools, [
-								{ message: msgExecuteContract, txBytes: new Uint8Array() },
-							]);
-						}
-					}
-				}
-			},
-			/**
-			 *
-			 */
-			error: (err: any) => console.log(err),
-			/**
-			 *
-			 */
-			complete: () => console.log("completed"),
-		};
-		stream.addListener(newTxListener);
-
-		while (true) {
-			console.time("new pool states");
-			await this.updatePoolStates(this.chainOperator, this.pools);
-			this.txHistory = {};
-			console.timeEnd("new pool states");
-			await delay(5000);
-		}
 	}
 
 	/**
@@ -198,6 +187,7 @@ export class DexWebsockedLoop implements DexLoopInterface {
 	 *
 	 */
 	public async trade(trade: Trade) {
+		this.subscription.unsubscribe();
 		if (trade.tradeType === TradeType.AMM) {
 			await this.tradeAmm(<OptimalTrade>trade);
 		} else if (trade.tradeType === TradeType.COMBINED) {
@@ -205,7 +195,7 @@ export class DexWebsockedLoop implements DexLoopInterface {
 		}
 		this.cdPaths(trade.path);
 
-		await delay(1000);
+		await delay(5000);
 		await this.reset();
 	}
 

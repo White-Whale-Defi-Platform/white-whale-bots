@@ -227,7 +227,9 @@ class InjectiveAdapter implements ChainOperatorInterface {
 				const broadcasterOptions = {
 					msgs: preppedMsgs,
 				};
-				const simRes = await this._signAndBroadcastClient.simulate(broadcasterOptions);
+				// console.log(fee);
+				// const simRes = await this._signAndBroadcastClient.simulate(broadcasterOptions);
+				// console.log(simRes);
 				const res = await this._signAndBroadcastClient.broadcast(broadcasterOptions);
 				return {
 					height: res.height,

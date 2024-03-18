@@ -187,7 +187,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], arbTradeOB.path.fee);
+		const txResponse = await this.chainOperator.signAndBroadcast([messages[0][0]], "auto");
 		await this.logger?.tradeLogging.logOrderbookTrade(arbTradeOB, txResponse);
 	}
 
@@ -204,7 +204,7 @@ export class DexMempoolLoop implements DexLoopInterface {
 			console.error("error in creating messages", 1);
 			process.exit(1);
 		}
-		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], arbTrade.path.fee);
+		const txResponse = await this.chainOperator.signAndBroadcast(messages[0], "auto");
 
 		await this.logger?.tradeLogging.logAmmTrade(arbTrade, txResponse);
 	}

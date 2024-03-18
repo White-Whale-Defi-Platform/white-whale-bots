@@ -139,7 +139,6 @@ class CosmjsAdapter implements ChainOperatorInterface {
 				const txRaw = await this._signingCWClient.sign(this.publicAddress, msgs, fee, "memo", signerData);
 				const txBytes = TxRaw.encode(txRaw).finish();
 				const res = await this._tmClient.broadcastTxSync({ tx: txBytes });
-
 				return {
 					height: 0,
 					code: res.code,
