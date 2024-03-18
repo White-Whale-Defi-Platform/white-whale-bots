@@ -552,13 +552,13 @@ export function getAssetsOrder(pool: Pool, assetInfo: AssetInfo) {
  */
 export function removedUnusedPools(
 	pools: Array<Pool>,
-	paths: Array<Path>,
+	paths?: Array<Path>,
 	orderbookpaths?: Array<OrderbookPath>,
 ): Array<Pool> {
 	const filteredPools: Set<Pool> = new Set(
 		pools.filter(
 			(pool) =>
-				paths.some((path) => path.pools.some((pathPool) => pathPool.address === pool.address)) ||
+				paths?.some((path) => path.pools.some((pathPool) => pathPool.address === pool.address)) ||
 				orderbookpaths?.some((op) => op.pool.address === pool.address),
 		),
 	);
