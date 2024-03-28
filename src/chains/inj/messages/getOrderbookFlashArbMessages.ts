@@ -3,20 +3,13 @@ import { EncodeObject } from "@cosmjs/proto-signing";
 import { OrderTypeMap } from "@injectivelabs/sdk-ts";
 import { MsgExecuteContract } from "cosmjs-types/cosmwasm/wasm/v1/tx";
 
-import {
-	isMatchingAssetInfos,
-	isNativeAsset,
-	RichAsset,
-	toChainAsset,
-	toChainPrice,
-} from "../../../core/types/base/asset";
+import { isNativeAsset, RichAsset, toChainAsset, toChainPrice } from "../../../core/types/base/asset";
 import { OrderSequence } from "../../../core/types/base/path";
 import { AmmDexName, caclulateSpread, outGivenIn, Pool } from "../../../core/types/base/pool";
 import { OptimalOrderbookTrade } from "../../../core/types/base/trades";
-import { IncreaseAllowanceMessage } from "../../../core/types/messages/allowance";
 import { FlashLoanMessage, WasmMessage } from "../../../core/types/messages/flashloanmessage";
 import { SendMessage } from "../../../core/types/messages/sendmessages";
-import { DefaultSwapMessage, InnerSwapMessage, JunoSwapMessage } from "../../../core/types/messages/swapmessages";
+import { DefaultSwapMessage, InnerSwapMessage } from "../../../core/types/messages/swapmessages";
 import { getMarketSpotOrderMessage } from "./getSpotOrderMessage";
 /**
  *
@@ -108,7 +101,8 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 	const spread = caclulateSpread(pool, _offerAsset, beliefPriceChain);
 	const offerAssetChain = toChainAsset(_offerAsset); //will be compensated for 18 decimals if needed
 
-	let msg: DefaultSwapMessage | JunoSwapMessage | SendMessage;
+	let msg: DefaultSwapMessage | SendMessage;
+	const wasmMessages: Array<WasmMessage> = [];
 	if (pool.dexname === AmmDexName.default || pool.dexname === AmmDexName.wyndex) {
 		if (isNativeAsset(offerAssetChain.info)) {
 			msg = <DefaultSwapMessage>{
@@ -142,55 +136,48 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 				},
 			};
 		}
-	} else {
-		msg = <JunoSwapMessage>{
-			swap: {
-				input_token: isMatchingAssetInfos(pool.assets[0].info, offerAssetChain.info) ? "Token1" : "Token2",
-				input_amount: offerAssetChain.amount,
-				min_output: String(Math.round(+outAsset.amount * 0.99)),
-			},
-		};
-	}
-	const wasmMessage: WasmMessage = {
-		wasm: {
-			execute: {
-				contract_addr:
-					!isNativeAsset(offerAssetChain.info) &&
-					(pool.dexname === AmmDexName.default || pool.dexname === AmmDexName.wyndex)
-						? offerAssetChain.info.token.contract_addr
-						: pool.address,
-				funds: isNativeAsset(offerAssetChain.info)
-					? [
-							{
-								amount: offerAssetChain.amount,
-								denom: offerAssetChain.info.native_token.denom,
-							},
-					  ]
-					: [],
-				msg: toBase64(toUtf8(JSON.stringify(msg))),
-			},
-		},
-	};
-	const wasmMessages: Array<WasmMessage> = [];
-	if (!isNativeAsset(offerAssetChain.info) && pool.dexname === AmmDexName.junoswap) {
-		const allowanceMessage: IncreaseAllowanceMessage = {
-			increase_allowance: {
-				amount: offerAssetChain.amount,
-				spender: pool.address,
-			},
-		};
 
-		const allowanceWasmMessage: WasmMessage = {
+		const wasmMessage: WasmMessage = {
 			wasm: {
 				execute: {
-					contract_addr: offerAssetChain.info.token.contract_addr,
-					funds: [],
-					msg: toBase64(toUtf8(JSON.stringify(allowanceMessage))),
+					contract_addr:
+						!isNativeAsset(offerAssetChain.info) &&
+						(pool.dexname === AmmDexName.default || pool.dexname === AmmDexName.wyndex)
+							? offerAssetChain.info.token.contract_addr
+							: pool.address,
+					funds: isNativeAsset(offerAssetChain.info)
+						? [
+								{
+									amount: offerAssetChain.amount,
+									denom: offerAssetChain.info.native_token.denom,
+								},
+						  ]
+						: [],
+					msg: toBase64(toUtf8(JSON.stringify(msg))),
 				},
 			},
 		};
-		wasmMessages.push(allowanceWasmMessage);
+
+		// if (!isNativeAsset(offerAssetChain.info) && pool.dexname === AmmDexName.junoswap) {
+		// 	const allowanceMessage: IncreaseAllowanceMessage = {
+		// 		increase_allowance: {
+		// 			amount: offerAssetChain.amount,
+		// 			spender: pool.address,
+		// 		},
+		// 	};
+
+		// 	const allowanceWasmMessage: WasmMessage = {
+		// 		wasm: {
+		// 			execute: {
+		// 				contract_addr: offerAssetChain.info.token.contract_addr,
+		// 				funds: [],
+		// 				msg: toBase64(toUtf8(JSON.stringify(allowanceMessage))),
+		// 			},
+		// 		},
+		// 	};
+		// 	wasmMessages.push(allowanceWasmMessage);
+		// }
+		wasmMessages.push(wasmMessage);
 	}
-	wasmMessages.push(wasmMessage);
 	return [wasmMessages, outAsset] as const;
 }

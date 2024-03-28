@@ -5,10 +5,8 @@ import {
 	Asset,
 	AssetInfo,
 	fromChainAsset,
-	isJunoSwapNativeAssetInfo,
 	isWyndDaoNativeAsset,
 	isWyndDaoTokenAsset,
-	JunoSwapAssetInfo,
 	RichAsset,
 } from "../../../core/types/base/asset";
 import { AmmDexName, DefaultPool, PairType, PCLPool, Pool } from "../../../core/types/base/pool";
@@ -36,15 +34,6 @@ interface PCLConfigParams {
 	track_asset_balances: boolean;
 }
 
-interface JunoSwapPoolState {
-	token1_reserve: string;
-	token1_denom: JunoSwapAssetInfo;
-	token2_reserve: string;
-	token2_denom: JunoSwapAssetInfo;
-	lp_token_supply: string;
-	lp_token_address: string;
-}
-
 interface PoolState {
 	assets: [Asset, Asset];
 	total_share: Uint128;
@@ -64,41 +53,33 @@ interface PairResponse {
 export async function getPoolStates(chainOperator: ChainOperator, pools: Array<Pool>) {
 	await Promise.all(
 		pools.map(async (pool) => {
-			if (pool.dexname === AmmDexName.junoswap) {
-				const poolState = <JunoSwapPoolState>await chainOperator.queryContractSmart(pool.address, { info: {} });
-
-				pool.assets[0].amount = poolState.token1_reserve;
-				pool.assets[1].amount = poolState.token2_reserve;
-				return;
-			} else {
-				if (pool.pairType === PairType.pcl) {
-					const [poolState, d, config]: [PoolState, number, PCLConfigResponse] = await Promise.all([
-						chainOperator.queryContractSmart(pool.address, {
-							pool: {},
-						}),
-						chainOperator.queryContractSmart(pool.address, { compute_d: {} }),
-						chainOperator.queryContractSmart(pool.address, {
-							config: {},
-						}),
-					]);
-					const pclPool: PCLPool = <PCLPool>pool;
-					const configParams: PCLConfigParams = JSON.parse(fromAscii(fromBase64(config.params)));
-					pclPool.D = Number(d);
-					pclPool.amp = +configParams.amp;
-					pclPool.gamma = +configParams.gamma;
-					pclPool.priceScale = +configParams.price_scale;
-					pclPool.feeGamma = +configParams.fee_gamma;
-					pclPool.midFee = +configParams.mid_fee;
-					pclPool.outFee = +configParams.out_fee;
-					const [assets] = processPoolStateAssets(poolState);
-					pool.assets = assets;
-				} else {
-					const poolState = <PoolState>await chainOperator.queryContractSmart(pool.address, {
+			if (pool.pairType === PairType.pcl) {
+				const [poolState, d, config]: [PoolState, number, PCLConfigResponse] = await Promise.all([
+					chainOperator.queryContractSmart(pool.address, {
 						pool: {},
-					});
-					const [assets] = processPoolStateAssets(poolState);
-					pool.assets = assets;
-				}
+					}),
+					chainOperator.queryContractSmart(pool.address, { compute_d: {} }),
+					chainOperator.queryContractSmart(pool.address, {
+						config: {},
+					}),
+				]);
+				const pclPool: PCLPool = <PCLPool>pool;
+				const configParams: PCLConfigParams = JSON.parse(fromAscii(fromBase64(config.params)));
+				pclPool.D = Number(d);
+				pclPool.amp = +configParams.amp;
+				pclPool.gamma = +configParams.gamma;
+				pclPool.priceScale = +configParams.price_scale;
+				pclPool.feeGamma = +configParams.fee_gamma;
+				pclPool.midFee = +configParams.mid_fee;
+				pclPool.outFee = +configParams.out_fee;
+				const [assets] = processPoolStateAssets(poolState);
+				pool.assets = assets;
+			} else {
+				const poolState = <PoolState>await chainOperator.queryContractSmart(pool.address, {
+					pool: {},
+				});
+				const [assets] = processPoolStateAssets(poolState);
+				pool.assets = assets;
 			}
 		}),
 	);
@@ -188,32 +169,6 @@ export function processPoolStateAssets(poolState: PoolState): [Array<RichAsset>,
 		}
 	}
 	return [assets, type, poolState.total_share];
-}
-
-/**
- *
- */
-function processJunoswapPoolStateAssets(poolState: JunoSwapPoolState): [Array<RichAsset>, AmmDexName, string] {
-	const assets: Array<RichAsset> = [];
-	assets.push(
-		fromChainAsset({
-			amount: String(poolState.token1_reserve),
-			info: isJunoSwapNativeAssetInfo(poolState.token1_denom)
-				? { native_token: { denom: poolState.token1_denom.native } }
-				: { token: { contract_addr: poolState.token1_denom.cw20 } },
-		}),
-	);
-
-	assets.push(
-		fromChainAsset({
-			amount: String(poolState.token2_reserve),
-			info: isJunoSwapNativeAssetInfo(poolState.token2_denom)
-				? { native_token: { denom: poolState.token2_denom.native } }
-				: { token: { contract_addr: poolState.token2_denom.cw20 } },
-		}),
-	);
-
-	return [assets, AmmDexName.junoswap, poolState.lp_token_supply];
 }
 
 /**

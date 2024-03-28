@@ -15,23 +15,6 @@ export type InnerSwapMessage = {
 	};
 };
 
-export type JunoSwapMessage = {
-	swap: {
-		input_token: string;
-		input_amount: string;
-		min_output: string;
-	};
-};
-
-export type JunoSwapOperationsMessage = {
-	pass_through_swap: {
-		output_min_token: string;
-		input_token: string;
-		input_token_amount: string;
-		output_amm_address: string;
-	};
-};
-
 export type WWSwapOperation = {
 	terra_swap: {
 		offer_asset_info: AssetInfo;
@@ -124,23 +107,6 @@ export function isDefaultSwapMessage(msg: any): msg is DefaultSwapMessage {
 	return isSwapMessage(msg) && msg.swap["offer_asset" as keyof typeof msg.swap] !== undefined;
 }
 
-/**
- * Checks if the provided `msg` is a junoswap message.
- * @param msg The message object to be checked.
- * @return JunoSwapMessage if the `msg` is one.
- */
-export function isJunoSwapMessage(msg: any): msg is JunoSwapMessage {
-	return (
-		msg["swap" as keyof typeof msg] !== undefined && msg.swap["input_token" as keyof typeof msg.swap] !== undefined
-	);
-}
-
-/**
- *
- */
-export function isJunoSwapOperationsMessage(msg: any): msg is JunoSwapOperationsMessage {
-	return msg["pass_through_swap" as keyof typeof msg] !== undefined;
-}
 /**
  * Checks if the provided `msg` is a swap-operations message.
  * @param msg The message object to be checked.

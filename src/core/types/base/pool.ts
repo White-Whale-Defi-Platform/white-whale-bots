@@ -8,8 +8,6 @@ import {
 	isAstroSwapOperationsMessages,
 	isDefaultSwapMessage,
 	isGeneralSwapOperationsMessage,
-	isJunoSwapMessage,
-	isJunoSwapOperationsMessage,
 	isSwapMessage,
 	isSwapOperationsMessage,
 	isTFMSwapOperationsMessage,
@@ -34,7 +32,6 @@ BigNumber.config({
 });
 
 export enum AmmDexName {
-	junoswap = "junoswap",
 	default = "default",
 	wyndex = "wyndex",
 }
@@ -367,12 +364,6 @@ function applySwapMsg(pool: Pool, msg: MsgExecuteContract, pools: Array<Pool>) {
 	if (isDefaultSwapMessage(decodedMsg)) {
 		const offerAsset = fromChainAsset(decodedMsg.swap.offer_asset);
 		applyTradeOnPool(pool, offerAsset);
-	} else if (isJunoSwapMessage(decodedMsg)) {
-		const offerAsset: Asset = fromChainAsset({
-			amount: decodedMsg.swap.input_amount,
-			info: decodedMsg.swap.input_token === "Token1" ? pool.assets[0].info : pool.assets[1].info,
-		});
-		applyTradeOnPool(pool, offerAsset);
 	} else if (isSendMessage(decodedMsg)) {
 		try {
 			const msgJson = JSON.parse(fromAscii(fromBase64(decodedMsg.send.msg)));
@@ -386,22 +377,6 @@ function applySwapMsg(pool: Pool, msg: MsgExecuteContract, pools: Array<Pool>) {
 		} catch (e) {
 			console.log("cannot apply send message: \n", e);
 			console.log(decodedMsg.send);
-		}
-	} else if (isJunoSwapOperationsMessage(decodedMsg)) {
-		const offerAsset: Asset = fromChainAsset({
-			amount: decodedMsg.pass_through_swap.input_token_amount,
-			info: decodedMsg.pass_through_swap.input_token === "Token1" ? pool.assets[0].info : pool.assets[1].info,
-		});
-		applyTradeOnPool(pool, offerAsset);
-
-		// Second swap
-		const outAsset0 = outGivenIn(pool, offerAsset);
-		const secondPoolToUpdate = pools.find(
-			(pool) => pool.address === decodedMsg.pass_through_swap.output_amm_address,
-		);
-
-		if (secondPoolToUpdate !== undefined) {
-			applyTradeOnPool(secondPoolToUpdate, outAsset0);
 		}
 	}
 }
