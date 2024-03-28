@@ -3,7 +3,7 @@ import * as fs from "fs/promises";
 import * as chains from "../../../../chains";
 import { messageFactory } from "../../../../chains/defaults/messages/messageFactory";
 import { tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
-import { } from "../../../arbitrage/optimizers/orderbookOptimizer";
+import {} from "../../../arbitrage/optimizers/orderbookOptimizer";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging";
 import { DexConfig } from "../../base/configs";
@@ -14,7 +14,6 @@ import { Pool, removedUnusedPools } from "../../base/pool";
 import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
 import { DexLoopInterface } from "../interfaces/dexloopInterface";
 import { DexMempoolLoop } from "./dexMempoolloop";
-import { DexMempoolSkipLoop } from "./dexMempoolSkiploop";
 
 /**
  *
@@ -136,18 +135,6 @@ export class DexLoop implements DexLoopInterface {
 		if (botConfig.useMempool && !botConfig.skipConfig?.useSkip) {
 			console.log("spinning up mempool loop");
 			return new DexMempoolLoop(
-				chainOperator,
-				botConfig,
-				logger,
-				allPools,
-				orderbooks,
-				getPoolStates,
-				msgFactory,
-				getOrderbookState,
-			);
-		} else if (botConfig.useMempool && botConfig.skipConfig?.useSkip) {
-			console.log("spinning up skip mempool loop");
-			return new DexMempoolSkipLoop(
 				chainOperator,
 				botConfig,
 				logger,
