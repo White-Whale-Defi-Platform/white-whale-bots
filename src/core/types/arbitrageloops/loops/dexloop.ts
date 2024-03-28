@@ -133,7 +133,7 @@ export class DexLoop implements DexLoopInterface {
 
 		//Initialise correct loop based on read config
 		/********************************************************************* */
-		if (botConfig.orderbooks.length > 0) {
+		if (botConfig.orderbooks.length > 0 || botConfig.useMempool) {
 			console.log("spinning up ws loop");
 			return new DexWebsockedLoop(
 				chainOperator,

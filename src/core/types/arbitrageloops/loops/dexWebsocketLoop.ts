@@ -1,20 +1,23 @@
-/* eslint-disable simple-import-sort/imports */
+import { fromBase64 } from "@cosmjs/encoding";
+import { decodeTxRaw } from "@cosmjs/proto-signing";
+import { TxEvent } from "@cosmjs/tendermint-rpc/build/comet38/responses";
+import { createJsonRpcRequest } from "@cosmjs/tendermint-rpc/build/jsonrpc";
+import { SubscriptionEvent } from "@cosmjs/tendermint-rpc/build/rpcclients";
+import { IndexerSpotStreamTransformer } from "@injectivelabs/sdk-ts";
+import { Subscription } from "rxjs";
+import { WebSocket } from "ws";
+import { Listener } from "xstream";
+
 import { tryAmmArb, tryOrderbookArb } from "../../../arbitrage/arbitrage";
 import { ChainOperator } from "../../../chainOperator/chainoperator";
 import { Logger } from "../../../logging/logger";
 import { DexConfig } from "../../base/configs";
-import { Mempool, IgnoredAddresses, flushTxMemory, decodeMessage } from "../../base/mempool";
-import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
-import { removedUnusedPools, Pool, applyMempoolMessagesOnPools } from "../../base/pool";
-import { DexLoopInterface } from "../interfaces/dexloopInterface";
+import { decodeMempool, flushTxMemory, IgnoredAddresses, Mempool, MempoolTx } from "../../base/mempool";
 import { Order, Orderbook, removedUnusedOrderbooks } from "../../base/orderbook";
-import { Subscription } from "rxjs";
+import { getAmmPaths, getOrderbookAmmPaths, isOrderbookPath, OrderbookPath, Path } from "../../base/path";
+import { applyMempoolMessagesOnPools, Pool, removedUnusedPools } from "../../base/pool";
 import { OptimalOrderbookTrade, OptimalTrade, Trade, TradeType } from "../../base/trades";
-import { IndexerSpotStreamTransformer } from "@injectivelabs/sdk-ts";
-import { TxEvent } from "@cosmjs/tendermint-rpc/build/comet38/responses";
-import { Listener } from "xstream";
-import { decodeTxRaw } from "@cosmjs/proto-signing/build/decode";
-import { toHex } from "@cosmjs/encoding";
+import { DexLoopInterface } from "../interfaces/dexloopInterface";
 /**
  *
  */
@@ -39,6 +42,7 @@ export class DexWebsockedLoop implements DexLoopInterface {
 	ignoreAddresses!: IgnoredAddresses;
 	blockHeight = 0;
 	subscription!: Subscription;
+	tmWebsocket!: WebSocket;
 	txHistory: { [key: string]: boolean } = {};
 
 	/**
@@ -58,9 +62,6 @@ export class DexWebsockedLoop implements DexLoopInterface {
 		const orderbookPaths = getOrderbookAmmPaths(allPools, orderbooks, botConfig);
 		const filteredPools = removedUnusedPools(allPools, paths, orderbookPaths);
 		console.log(`all pools: ${allPools.length}, filtered pools: ${filteredPools.length}`);
-		for (const p of filteredPools) {
-			console.log(p.address, p.assets[0], p.assets[1]);
-		}
 		const filteredOrderbooks = removedUnusedOrderbooks(orderbooks, orderbookPaths);
 		this.orderbookPaths = orderbookPaths;
 		this.pools = filteredPools;
@@ -80,23 +81,32 @@ export class DexWebsockedLoop implements DexLoopInterface {
 		this.ignoreAddresses = botConfig.ignoreAddresses ?? {};
 	}
 
-	newTxListener: Listener<TxEvent> = {
+	newTxListener: Listener<SubscriptionEvent> = {
 		/**
 		 *
 		 */
-		next: (x: TxEvent) => {
-			if (!this.txHistory[toHex(x.hash)]) {
-				this.txHistory[toHex(x.hash)] = true;
-				for (const message of decodeTxRaw(x.tx).body.messages) {
-					const msgExecuteContract = decodeMessage(message);
-					if (msgExecuteContract) {
-						console.log("msg execute contract");
-						applyMempoolMessagesOnPools(this.pools, [
-							{ message: msgExecuteContract, txBytes: new Uint8Array() },
-						]);
+		next: async (e) => {
+			this.iterations++;
+			flushTxMemory();
+			console.log(e.data.value["block"]["header"]["height"]);
+			for (const tx of e.data.value["block"]["data"]["txs"]) {
+				const txBytes = fromBase64(tx);
+				const txRaw = decodeTxRaw(txBytes);
+				for (const msg of txRaw.body.messages) {
+					if (
+						[
+							"/injective.wasmx.v1.MsgExecuteContractCompat",
+							"/cosmwasm.wasm.v1.MsgExecuteContract",
+						].includes(msg.typeUrl)
+					) {
+						console.log("updating pool states");
+						await this.updatePoolStates(this.chainOperator, this.pools);
+
+						return;
 					}
 				}
 			}
+			return;
 		},
 		/**
 		 *
@@ -169,10 +179,105 @@ export class DexWebsockedLoop implements DexLoopInterface {
 	 *
 	 */
 	public async step() {
-		this.subscription = this.chainOperator.streamOrderbooks(
-			this.orderbooks.map((ob) => ob.marketId),
-			this.orderbookCallback,
+		console.log("start");
+		// this.subscription = this.chainOperator.streamOrderbooks(
+		// 	this.orderbooks.map((ob) => ob.marketId),
+		// 	this.orderbookCallback,
+		// );
+		const mempoolJsonRequest = createJsonRpcRequest("unconfirmed_txs", { limit: "100" });
+		/**
+		 *
+		 */
+		const mempoolQuerier = (ws: WebSocket) => {
+			ws.send(JSON.stringify(mempoolJsonRequest));
+			setTimeout(() => mempoolQuerier(ws), 100);
+		};
+		this.tmWebsocket = new WebSocket(
+			this.botConfig.rpcUrls[0].replace("http://", "ws://").replace("https://", "wss://") + "/websocket",
 		);
+
+		this.tmWebsocket.on("error", (err) => {
+			console.log(err);
+		});
+		this.tmWebsocket.on("message", async (data) => {
+			const payLoad = JSON.parse(data.toString()).result;
+			if (payLoad["n_txs" as keyof typeof payLoad]) {
+				this.mempool = <Mempool>payLoad;
+				await this.internalStep();
+			} else if (payLoad["query" as keyof typeof payLoad]) {
+				this.iterations++;
+				flushTxMemory();
+				for (const tx of payLoad.data.value["block"]["data"]["txs"]) {
+					const txBytes = fromBase64(tx);
+					const txRaw = decodeTxRaw(txBytes);
+					for (const msg of txRaw.body.messages) {
+						if (
+							[
+								"/injective.wasmx.v1.MsgExecuteContractCompat",
+								"/cosmwasm.wasm.v1.MsgExecuteContract",
+							].includes(msg.typeUrl)
+						) {
+							await this.updatePoolStates(this.chainOperator, this.pools);
+							const arbTrade = this.ammArb(this.paths, this.botConfig);
+							if (arbTrade) {
+								await this.trade(arbTrade);
+							}
+							return;
+						}
+					}
+				}
+				return;
+			}
+		});
+
+		this.tmWebsocket.on("open", () => {
+			const jr = createJsonRpcRequest("subscribe", { query: "tm.event='NewBlock'" });
+			this.tmWebsocket.send(JSON.stringify(jr));
+			mempoolQuerier(this.tmWebsocket);
+		});
+	}
+
+	// while (true) {
+	// 	await delay(1000);
+	// 	//do nothing
+	// }
+	// const wsc = new WebsocketClient(
+	// 	this.botConfig.rpcUrls[0].replace("http://", "ws://").replace("https://", "wss://"),
+	// );
+	// const jr = createJsonRpcRequest("subscribe", { query: "tm.event='NewBlock'" });
+	// const streamor = wsc.listen(jr);
+
+	// streamor.addListener(this.newTxListener);
+
+	// while (true) {
+	// 	this.mempool = <Mempool>(await wsc.execute(createJsonRpcRequest("unconfirmed_txs"))).result;
+	/**
+	 *
+	 */
+	async internalStep() {
+		if (+this.mempool.total_bytes === this.totalBytes) {
+			return;
+		} else {
+			this.totalBytes = +this.mempool.total_bytes;
+		}
+		const mempoolTxs: Array<MempoolTx> = decodeMempool(
+			this.mempool,
+			this.ignoreAddresses,
+			this.botConfig.timeoutDuration,
+			this.iterations,
+		);
+
+		// Checks if there is a SendMsg from a blacklisted Address, if so add the reciever to the timeouted addresses
+		if (mempoolTxs.length === 0) {
+			return;
+		} else {
+			applyMempoolMessagesOnPools(this.pools, mempoolTxs);
+		}
+
+		const arbTrade = this.ammArb(this.paths, this.botConfig);
+		if (arbTrade) {
+			await this.trade(arbTrade);
+		}
 	}
 
 	/**
@@ -190,7 +295,15 @@ export class DexWebsockedLoop implements DexLoopInterface {
 	 *
 	 */
 	public async trade(trade: Trade) {
-		this.subscription.unsubscribe();
+		if (this.subscription) {
+			this.subscription.unsubscribe();
+		}
+
+		if (this.tmWebsocket) {
+			console.log(this.tmWebsocket.CLOSED);
+			this.tmWebsocket.close();
+			console.log(this.tmWebsocket.CLOSED);
+		}
 		if (trade.tradeType === TradeType.AMM) {
 			await this.tradeAmm(<OptimalTrade>trade);
 		} else if (trade.tradeType === TradeType.COMBINED) {

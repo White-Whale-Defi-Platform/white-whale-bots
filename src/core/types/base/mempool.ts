@@ -32,7 +32,7 @@ export function flushTxMemory() {
  *
  */
 export function showTxMemory() {
-	console.log(Object.keys(txMemory).length);
+	return Object.keys(txMemory).length;
 }
 /**
  *Filters the mempool for swaps, sends and swap operation messages.

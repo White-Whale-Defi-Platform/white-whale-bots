@@ -125,7 +125,7 @@ function getWasmMessages(pool: Pool, _offerAsset: RichAsset) {
 								amount: offerAssetChain.amount,
 								denom: offerAssetChain.info.native_token.denom,
 							},
-						]
+					  ]
 					: [],
 				msg: toBase64(toUtf8(JSON.stringify(msg))),
 			},

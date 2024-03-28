@@ -74,6 +74,9 @@ export function tryLiquidationArb(
  *
  */
 function isAboveThreshold(botConfig: DexConfig, optimalTrade: OptimalTrade | OptimalOrderbookTrade): boolean {
+	if (+optimalTrade.offerAsset.amount < 5e6) {
+		return false;
+	}
 	if (isOrderbookPath(optimalTrade.path)) {
 		return optimalTrade.profit >= optimalTrade.path.threshold;
 	} else {
